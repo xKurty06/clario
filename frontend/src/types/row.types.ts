@@ -1,0 +1,2 @@
+export interface SourceLocation { fileName: string; sheetName: string; rowNumber: number; }
+export interface ExtractedRow { source_file_id: string; source_file_name: string; sheet_name: string; excel_row_number: number; item_number?: string | null; quantity?: string | null; unit?: string | null; item_description: string; unit_cost?: string | null; total_cost?: string | null; lot_group?: string | null; raw_values: Record<string, unknown>; normalized_values: Record<string, unknown>; extraction_issues: string[]; }

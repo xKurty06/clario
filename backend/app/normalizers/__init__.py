@@ -1,0 +1,1 @@
+"""Transparent value normalization helpers."""

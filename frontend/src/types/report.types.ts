@@ -1,0 +1,2 @@
+export type ReportFormat = "pdf";
+
