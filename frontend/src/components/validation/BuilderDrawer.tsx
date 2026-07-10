@@ -18,7 +18,7 @@ interface BuilderDrawerProps {
   disableSave?: boolean;
 }
 
-const DRAWER_CLOSE_MS = 190;
+const DRAWER_ANIMATION_MS = 220;
 
 export function BuilderDrawer({
   title,
@@ -52,7 +52,7 @@ export function BuilderDrawer({
     closeTimeoutRef.current = window.setTimeout(() => {
       closeTimeoutRef.current = null;
       callback();
-    }, DRAWER_CLOSE_MS);
+    }, DRAWER_ANIMATION_MS);
   };
 
   const requestCancel = () => {
@@ -80,7 +80,7 @@ export function BuilderDrawer({
     const timeoutId = window.setTimeout(() => {
       setRendered(false);
       setClosing(false);
-    }, DRAWER_CLOSE_MS);
+    }, DRAWER_ANIMATION_MS);
     return () => window.clearTimeout(timeoutId);
   }, [open, rendered]);
 
@@ -102,7 +102,7 @@ export function BuilderDrawer({
   return (
     <div className="fixed inset-0 z-50">
       <button
-        className={`absolute inset-0 bg-slate-950/30 backdrop-blur-[2px] ${closing ? "animate-[builder-backdrop-out_190ms_ease_forwards]" : "animate-[builder-backdrop-in_220ms_ease-out_forwards]"}`}
+        className={`absolute inset-0 bg-slate-950/30 backdrop-blur-[2px] ${closing ? "animate-[builder-backdrop-out_220ms_cubic-bezier(0.16,1,0.3,1)_forwards]" : "animate-[builder-backdrop-in_220ms_cubic-bezier(0.16,1,0.3,1)_forwards]"}`}
         aria-label="Close drawer"
         onClick={requestCancel}
       />
@@ -110,7 +110,7 @@ export function BuilderDrawer({
         role="dialog"
         aria-modal="true"
         aria-labelledby="builder-drawer-title"
-        className={`absolute bottom-0 right-0 top-0 flex w-full max-w-2xl flex-col border-l border-slate-200 bg-white shadow-2xl ${closing ? "animate-[builder-drawer-out_190ms_cubic-bezier(0.4,0,1,1)_forwards]" : "animate-[builder-drawer-in_240ms_cubic-bezier(0.16,1,0.3,1)_forwards]"}`}
+        className={`absolute bottom-0 right-0 top-0 flex w-full max-w-2xl flex-col border-l border-slate-200 bg-white shadow-2xl ${closing ? "animate-[builder-drawer-out_220ms_cubic-bezier(0.16,1,0.3,1)_forwards]" : "animate-[builder-drawer-in_220ms_cubic-bezier(0.16,1,0.3,1)_forwards]"}`}
       >
         <header className="shrink-0 border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.12),_transparent_48%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] px-5 py-4 sm:px-6">
           <div className="flex items-start justify-between gap-4">
