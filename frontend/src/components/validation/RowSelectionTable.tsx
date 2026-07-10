@@ -1,5 +1,5 @@
 import { Ban, CheckSquare, ChevronDown, MoreHorizontal, RotateCcw, Square, Table2 } from "lucide-react";
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
 import type { PreviewRow } from "../../types/validation.types";
 
 interface RowSelectionTableProps {
@@ -12,14 +12,22 @@ interface RowSelectionTableProps {
 }
 
 interface DragSelectionState {
-  selecting: boolean;
-  selectedRows: Set<number>;
+  startClientX: number;
+  startClientY: number;
+  currentClientX: number;
+  currentClientY: number;
+  baseSelectedRows: number[];
+  mode: "include" | "exclude";
+  hasMoved: boolean;
+  originRowNumber: number;
 }
 
 const toolbarButtonClass = "inline-flex h-8 items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600";
 const rangeInputClass = "h-6 w-14 rounded-md border border-slate-200 bg-white px-1.5 text-center text-xs font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 const menuItemClass = "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus:bg-slate-50 focus:outline-none";
 const menuSectionClass = "px-3 pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400";
+const dragThreshold = 4;
+const autoScrollEdge = 48;
 
 function rowText(row: PreviewRow) {
   return Object.values(row.cells).map((value) => String(value ?? "")).join(" ").trim();
@@ -35,6 +43,18 @@ function rowStatus(row: PreviewRow, headers: string[]) {
   return { label: "Not included", className: "bg-slate-50 text-slate-500" };
 }
 
+function normalizedSelectionBox(selection: DragSelectionState) {
+  const left = Math.min(selection.startClientX, selection.currentClientX);
+  const right = Math.max(selection.startClientX, selection.currentClientX);
+  const top = Math.min(selection.startClientY, selection.currentClientY);
+  const bottom = Math.max(selection.startClientY, selection.currentClientY);
+  return { left, right, top, bottom };
+}
+
+function boxesIntersect(first: DOMRect | { left: number; right: number; top: number; bottom: number }, second: { left: number; right: number; top: number; bottom: number }) {
+  return first.left <= second.right && first.right >= second.left && first.top <= second.bottom && first.bottom >= second.top;
+}
+
 export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, onIgnoreRows, onMarkDataRows }: RowSelectionTableProps) {
   const visibleRows = rows.map((row) => row.row_number);
   const selectedRows = rows.filter((row) => row.selected).map((row) => row.row_number);
@@ -46,17 +66,135 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
   const [rangeError, setRangeError] = useState("");
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const moreActionsRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
+  const dragSelectionRef = useRef<DragSelectionState | null>(null);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const autoScrollFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    dragSelectionRef.current = dragSelection;
+  }, [dragSelection]);
+
+  const rowsInsideSelection = (selection: DragSelectionState) => {
+    const box = normalizedSelectionBox(selection);
+    return rows
+      .filter((row) => {
+        const element = rowRefs.current.get(row.row_number);
+        if (!element) return false;
+        return boxesIntersect(element.getBoundingClientRect(), box);
+      })
+      .map((row) => row.row_number);
+  };
+
+  const applyBoxSelection = (selection: DragSelectionState) => {
+    if (!selection.hasMoved) return;
+    const rowsInBox = rowsInsideSelection(selection);
+    const nextSelectedRows = new Set(selection.baseSelectedRows);
+    for (const rowNumber of rowsInBox) {
+      if (selection.mode === "include") {
+        nextSelectedRows.add(rowNumber);
+      } else {
+        nextSelectedRows.delete(rowNumber);
+      }
+    }
+    onSelectRows([...nextSelectedRows]);
+  };
+
+  const stopAutoScroll = () => {
+    if (autoScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(autoScrollFrameRef.current);
+      autoScrollFrameRef.current = null;
+    }
+  };
+
+  const startAutoScroll = () => {
+    if (autoScrollFrameRef.current !== null) return;
+
+    const scrollLoop = () => {
+      const selection = dragSelectionRef.current;
+      const pointer = lastPointerRef.current;
+      const container = scrollContainerRef.current;
+      if (!selection || !selection.hasMoved || !pointer || !container) {
+        autoScrollFrameRef.current = null;
+        return;
+      }
+
+      const bounds = container.getBoundingClientRect();
+      let deltaY = 0;
+      let deltaX = 0;
+      if (pointer.y < bounds.top + autoScrollEdge) {
+        deltaY = -Math.ceil((autoScrollEdge - (pointer.y - bounds.top)) / 4);
+      } else if (pointer.y > bounds.bottom - autoScrollEdge) {
+        deltaY = Math.ceil((autoScrollEdge - (bounds.bottom - pointer.y)) / 4);
+      }
+      if (pointer.x < bounds.left + autoScrollEdge) {
+        deltaX = -Math.ceil((autoScrollEdge - (pointer.x - bounds.left)) / 4);
+      } else if (pointer.x > bounds.right - autoScrollEdge) {
+        deltaX = Math.ceil((autoScrollEdge - (bounds.right - pointer.x)) / 4);
+      }
+
+      if (deltaY || deltaX) {
+        container.scrollTop += deltaY;
+        container.scrollLeft += deltaX;
+        const nextSelection = { ...selection, currentClientX: pointer.x, currentClientY: pointer.y };
+        dragSelectionRef.current = nextSelection;
+        setDragSelection(nextSelection);
+        applyBoxSelection(nextSelection);
+        autoScrollFrameRef.current = window.requestAnimationFrame(scrollLoop);
+        return;
+      }
+
+      autoScrollFrameRef.current = null;
+    };
+
+    autoScrollFrameRef.current = window.requestAnimationFrame(scrollLoop);
+  };
 
   useEffect(() => {
     if (!dragSelection) return undefined;
-    const endDrag = () => setDragSelection(null);
-    window.addEventListener("mouseup", endDrag);
-    window.addEventListener("blur", endDrag);
-    return () => {
-      window.removeEventListener("mouseup", endDrag);
-      window.removeEventListener("blur", endDrag);
+
+    const handleMouseMove = (event: globalThis.MouseEvent) => {
+      const current = dragSelectionRef.current;
+      if (!current) return;
+      lastPointerRef.current = { x: event.clientX, y: event.clientY };
+      const distance = Math.hypot(event.clientX - current.startClientX, event.clientY - current.startClientY);
+      const hasMoved = current.hasMoved || distance > dragThreshold;
+      const nextSelection = {
+        ...current,
+        currentClientX: event.clientX,
+        currentClientY: event.clientY,
+        hasMoved,
+      };
+      dragSelectionRef.current = nextSelection;
+      setDragSelection(nextSelection);
+      if (hasMoved) {
+        applyBoxSelection(nextSelection);
+        startAutoScroll();
+      }
     };
-  }, [dragSelection]);
+
+    const handleMouseUp = () => {
+      const current = dragSelectionRef.current;
+      if (current && !current.hasMoved) {
+        onToggleRow(current.originRowNumber);
+      }
+      stopAutoScroll();
+      dragSelectionRef.current = null;
+      lastPointerRef.current = null;
+      setDragSelection(null);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("blur", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("blur", handleMouseUp);
+      stopAutoScroll();
+    };
+  }, [dragSelection, onToggleRow]);
 
   useEffect(() => {
     if (!moreActionsOpen) return undefined;
@@ -75,31 +213,23 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
     };
   }, [moreActionsOpen]);
 
-  const applyDragSelection = (rowNumber: number, selecting: boolean, selectedRowsSet: Set<number>) => {
-    const nextSelectedRows = new Set(selectedRowsSet);
-    if (selecting) {
-      nextSelectedRows.add(rowNumber);
-    } else {
-      nextSelectedRows.delete(rowNumber);
-    }
-    onSelectRows([...nextSelectedRows]);
-    return nextSelectedRows;
-  };
-
   const handleRowMouseDown = (event: MouseEvent<HTMLTableRowElement>, row: PreviewRow) => {
     if (event.button !== 0) return;
     event.preventDefault();
-    const selecting = !row.selected;
-    const nextSelectedRows = applyDragSelection(row.row_number, selecting, new Set(selectedRows));
-    setDragSelection({ selecting, selectedRows: nextSelectedRows });
-  };
-
-  const handleRowMouseEnter = (rowNumber: number) => {
-    setDragSelection((current) => {
-      if (!current) return current;
-      const nextSelectedRows = applyDragSelection(rowNumber, current.selecting, current.selectedRows);
-      return { ...current, selectedRows: nextSelectedRows };
-    });
+    const mode = row.selected ? "exclude" : "include";
+    const initialSelection = {
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      currentClientX: event.clientX,
+      currentClientY: event.clientY,
+      baseSelectedRows: selectedRows,
+      mode,
+      hasMoved: false,
+      originRowNumber: row.row_number,
+    } satisfies DragSelectionState;
+    dragSelectionRef.current = initialSelection;
+    lastPointerRef.current = { x: event.clientX, y: event.clientY };
+    setDragSelection(initialSelection);
   };
 
   const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, rowNumber: number) => {
@@ -135,6 +265,19 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
     action();
     setMoreActionsOpen(false);
   };
+
+  const selectionBoxStyle = (() => {
+    if (!dragSelection?.hasMoved || !scrollContainerRef.current) return undefined;
+    const container = scrollContainerRef.current;
+    const containerBounds = container.getBoundingClientRect();
+    const box = normalizedSelectionBox(dragSelection);
+    return {
+      left: box.left - containerBounds.left + container.scrollLeft,
+      top: box.top - containerBounds.top + container.scrollTop,
+      width: Math.max(box.right - box.left, 1),
+      height: Math.max(box.bottom - box.top, 1),
+    } satisfies CSSProperties;
+  })();
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white">
@@ -245,7 +388,14 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
           ) : null}
         </div>
       </div>
-      <div className="max-h-[520px] overflow-auto">
+      <div ref={scrollContainerRef} className="relative max-h-[520px] overflow-auto">
+        {selectionBoxStyle ? (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute z-20 rounded-2xl border border-emerald-500/70 bg-emerald-400/10 shadow-[0_0_0_1px_rgba(16,185,129,0.18),0_14px_35px_rgba(15,23,42,0.14)] backdrop-blur-[1px]"
+            style={selectionBoxStyle}
+          />
+        ) : null}
         <table className={`w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs ${dragSelection ? "select-none" : ""}`}>
           <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600">
             <tr>
@@ -261,12 +411,18 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
               return (
                 <tr
                   key={row.row_number}
+                  ref={(element) => {
+                    if (element) {
+                      rowRefs.current.set(row.row_number, element);
+                    } else {
+                      rowRefs.current.delete(row.row_number);
+                    }
+                  }}
                   tabIndex={0}
                   role="button"
                   aria-label={`${row.selected ? "Unselect" : "Select"} Excel row ${row.row_number}`}
-                  title="Click or drag across rows to select or unselect them"
+                  title="Click to toggle one row, or drag to draw a selection box across rows"
                   onMouseDown={(event) => handleRowMouseDown(event, row)}
-                  onMouseEnter={() => handleRowMouseEnter(row.row_number)}
                   onKeyDown={(event) => handleRowKeyDown(event, row.row_number)}
                   className={`group cursor-pointer border-t border-slate-100 align-middle transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${row.selected ? "bg-emerald-50/50" : ""} ${row.ignored ? "opacity-60" : ""}`}
                 >
