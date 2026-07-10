@@ -37,7 +37,9 @@ export function SelectField({ value, options, onChange, ariaLabel, className = "
   }, [options, value]);
 
   const choose = (option: SelectOption) => {
-    onChange(option.value);
+    if (option.value !== value) {
+      onChange(option.value);
+    }
     setOpen(false);
   };
 
