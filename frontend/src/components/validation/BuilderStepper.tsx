@@ -70,9 +70,9 @@ export function BuilderStepper({ steps, activeStep, onStepChange }: BuilderStepp
             Back
           </button>
 
-          <div className="order-first min-w-0 rounded-2xl bg-slate-50 px-4 py-2 text-center sm:order-none">
+          <div className="order-first min-w-0 px-4 py-1.5 text-center sm:order-none">
             <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400" title={`Current: ${activeStepLabel}`}>Current: {activeStepLabel}</p>
-            <p className="mt-0.5 truncate text-sm font-medium text-slate-600" title={nextStep ? `Next: ${nextStep.label}` : "Final review step"}>
+            <p className="mt-0.5 truncate text-sm font-medium text-slate-700" title={nextStep ? `Next: ${nextStep.label}` : "Final review step"}>
               {nextStep ? `Next: ${nextStep.label}` : "Final review step"}
             </p>
           </div>
