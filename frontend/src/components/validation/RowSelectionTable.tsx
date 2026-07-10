@@ -217,8 +217,6 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
               role="menu"
               className="absolute right-0 top-full z-30 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/70"
             >
-              <p className="px-3 py-2 text-xs leading-5 text-slate-500">Extra actions for cleaning detected rows without crowding the main toolbar.</p>
-              <div className="my-1 h-px bg-slate-100" />
               <p className={menuSectionClass}>Selection</p>
               <button role="menuitem" type="button" onClick={() => runMoreAction(() => onSelectRows(visibleRows))} className={menuItemClass} title="Include the rows currently shown in this preview table">
                 <Table2 className="size-3.5" /> Select visible
@@ -266,7 +264,7 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
                   tabIndex={0}
                   role="button"
                   aria-label={`${row.selected ? "Unselect" : "Select"} Excel row ${row.row_number}`}
-                  title="Click or drag across rows to include or exclude them from validation"
+                  title="Click or drag across rows to select or unselect them"
                   onMouseDown={(event) => handleRowMouseDown(event, row)}
                   onMouseEnter={() => handleRowMouseEnter(row.row_number)}
                   onKeyDown={(event) => handleRowKeyDown(event, row.row_number)}
