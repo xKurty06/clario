@@ -1,5 +1,5 @@
 import { Ban, CheckSquare, RotateCcw, Square, Table2 } from "lucide-react";
-import type { KeyboardEvent } from "react";
+import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react";
 import type { PreviewRow } from "../../types/validation.types";
 
 interface RowSelectionTableProps {
@@ -9,6 +9,11 @@ interface RowSelectionTableProps {
   onSelectRows: (rowNumbers: number[]) => void;
   onIgnoreRows: (rowNumbers: number[]) => void;
   onMarkDataRows: (rowNumbers: number[]) => void;
+}
+
+interface DragSelectionState {
+  selecting: boolean;
+  selectedRows: Set<number>;
 }
 
 function rowText(row: PreviewRow) {
@@ -30,6 +35,45 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
   const selectedRows = rows.filter((row) => row.selected).map((row) => row.row_number);
   const rowsContaining = (term: string) => rows.filter((row) => rowText(row).toLowerCase().includes(term)).map((row) => row.row_number);
   const blankRows = rows.filter((row) => !rowText(row)).map((row) => row.row_number);
+  const [dragSelection, setDragSelection] = useState<DragSelectionState | null>(null);
+
+  useEffect(() => {
+    if (!dragSelection) return undefined;
+    const endDrag = () => setDragSelection(null);
+    window.addEventListener("mouseup", endDrag);
+    window.addEventListener("blur", endDrag);
+    return () => {
+      window.removeEventListener("mouseup", endDrag);
+      window.removeEventListener("blur", endDrag);
+    };
+  }, [dragSelection]);
+
+  const applyDragSelection = (rowNumber: number, selecting: boolean, selectedRowsSet: Set<number>) => {
+    const nextSelectedRows = new Set(selectedRowsSet);
+    if (selecting) {
+      nextSelectedRows.add(rowNumber);
+    } else {
+      nextSelectedRows.delete(rowNumber);
+    }
+    onSelectRows([...nextSelectedRows]);
+    return nextSelectedRows;
+  };
+
+  const handleRowMouseDown = (event: MouseEvent<HTMLTableRowElement>, row: PreviewRow) => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    const selecting = !row.selected;
+    const nextSelectedRows = applyDragSelection(row.row_number, selecting, new Set(selectedRows));
+    setDragSelection({ selecting, selectedRows: nextSelectedRows });
+  };
+
+  const handleRowMouseEnter = (rowNumber: number) => {
+    setDragSelection((current) => {
+      if (!current) return current;
+      const nextSelectedRows = applyDragSelection(rowNumber, current.selecting, current.selectedRows);
+      return { ...current, selectedRows: nextSelectedRows };
+    });
+  };
 
   const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, rowNumber: number) => {
     if (event.key !== "Enter" && event.key !== " ") return;
@@ -64,7 +108,7 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
         <button title="Mark the selected preview rows as data rows" aria-label="Mark selected rows as data" onClick={() => onMarkDataRows(selectedRows)} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">Mark selected as data</button>
       </div>
       <div className="max-h-[520px] overflow-auto">
-        <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs">
+        <table className={`w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs ${dragSelection ? "select-none" : ""}`}>
           <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600">
             <tr>
               <th className="w-12 border-b border-slate-200 p-2.5 text-center">Use</th>
@@ -82,8 +126,9 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
                   tabIndex={0}
                   role="button"
                   aria-label={`${row.selected ? "Unselect" : "Select"} Excel row ${row.row_number}`}
-                  title="Click anywhere on this row to select or unselect it"
-                  onClick={() => onToggleRow(row.row_number)}
+                  title="Click or drag across rows to select or unselect them"
+                  onMouseDown={(event) => handleRowMouseDown(event, row)}
+                  onMouseEnter={() => handleRowMouseEnter(row.row_number)}
                   onKeyDown={(event) => handleRowKeyDown(event, row.row_number)}
                   className={`group cursor-pointer border-t border-slate-100 align-middle transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${row.selected ? "bg-emerald-50/50" : ""} ${row.ignored ? "opacity-60" : ""}`}
                 >
@@ -94,6 +139,7 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
                         aria-label={`${row.selected ? "Unselect" : "Select"} Excel row ${row.row_number}`}
                         checked={row.selected}
                         onClick={(event) => event.stopPropagation()}
+                        onMouseDown={(event) => event.stopPropagation()}
                         onChange={() => onToggleRow(row.row_number)}
                         className="size-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
                       />
