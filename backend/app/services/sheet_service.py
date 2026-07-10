@@ -8,15 +8,21 @@ from app.models.file_models import SheetInfo
 from app.normalizers.text_normalizer import normalize_text
 
 HEADER_TERMS = ("item", "description", "particular", "specification", "qty", "quantity", "unit", "cost", "price", "amount", "total")
+BLANK_HEADER_LABEL = "Blank header"
+
+
+def _clean_header_value(value: object) -> str:
+    if pd.isna(value):
+        return ""
+    text = normalize_text(value)
+    return "" if text.casefold() == "nan" else text
 
 
 def clean_headers(values: list[object]) -> list[str]:
     headers: list[str] = []
     counts: dict[str, int] = {}
-    for index, value in enumerate(values):
-        base = f"Column {index + 1}" if pd.isna(value) else normalize_text(value)
-        if not base or base.casefold() == "nan":
-            base = f"Column {index + 1}"
+    for value in values:
+        base = _clean_header_value(value) or BLANK_HEADER_LABEL
         count = counts.get(base.casefold(), 0) + 1
         counts[base.casefold()] = count
         headers.append(base if count == 1 else f"{base} ({count})")
@@ -37,7 +43,13 @@ def _merged_ranges(path: Path, sheet_name: str) -> list[tuple[int, int, int, int
 
 
 def composite_headers(path: Path, sheet_name: str, frame: pd.DataFrame, header_row: int) -> list[str]:
-    """Combine split and merged headings ending at the user-selected header row."""
+    """Combine split and merged headings ending at the user-selected header row.
+
+    Blank cells on the selected header row intentionally stay blank. This avoids
+    showing duplicated merged labels for columns that look empty in Excel.
+    Parent merged headings are only used when the selected header row has its own
+    visible child header for that column.
+    """
     end_index = header_row - 1
     if end_index < 0 or end_index >= len(frame):
         raise ValueError("Header row is outside the worksheet")
@@ -56,14 +68,17 @@ def composite_headers(path: Path, sheet_name: str, frame: pd.DataFrame, header_r
                 matrix.iat[row - start_index, column] = anchor
     combined: list[str] = []
     for column in range(len(frame.columns)):
+        selected_header_text = _clean_header_value(frame.iat[end_index, column])
+        if not selected_header_text:
+            combined.append("")
+            continue
+
         parts: list[str] = []
         for value in matrix.iloc[:, column].tolist():
-            if pd.isna(value):
-                continue
-            text = normalize_text(value)
-            if text and text.casefold() != "nan" and text.casefold() not in {part.casefold() for part in parts}:
+            text = _clean_header_value(value)
+            if text and text.casefold() not in {part.casefold() for part in parts}:
                 parts.append(text)
-        combined.append(" / ".join(parts) if parts else f"Column {column + 1}")
+        combined.append(" / ".join(parts) if parts else selected_header_text)
     return clean_headers(combined)
 
 
