@@ -67,14 +67,18 @@ export function BuilderDrawer({
 
   return (
     <div className="fixed inset-0 z-50">
-      <button className={`absolute inset-0 bg-slate-950/30 backdrop-blur-[2px] ${closing ? "animate-[builder-backdrop-out_180ms_ease_forwards]" : "animate-[builder-backdrop-in_220ms_ease-out_forwards]"}`} aria-label="Close drawer" onClick={onCancel} />
+      <button
+        className={`absolute inset-0 bg-slate-950/30 backdrop-blur-[2px] ${closing ? "animate-[builder-backdrop-out_180ms_ease_forwards]" : "animate-[builder-backdrop-in_220ms_ease-out_forwards]"}`}
+        aria-label="Close drawer"
+        onClick={onCancel}
+      />
       <aside
         role="dialog"
         aria-modal="true"
         aria-labelledby="builder-drawer-title"
         className={`absolute bottom-0 right-0 top-0 flex w-full max-w-2xl flex-col border-l border-slate-200 bg-white shadow-2xl ${closing ? "animate-[builder-drawer-out_180ms_cubic-bezier(0.4,0,1,1)_forwards]" : "animate-[builder-drawer-in_240ms_cubic-bezier(0.16,1,0.3,1)_forwards]"}`}
       >
-        <header className="border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.12),_transparent_48%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] px-5 py-4 sm:px-6">
+        <header className="shrink-0 border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.12),_transparent_48%),linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] px-5 py-4 sm:px-6">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-start gap-3">
@@ -104,12 +108,22 @@ export function BuilderDrawer({
             </button>
           </div>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
-        <footer className="border-t border-slate-200 bg-white px-5 py-4 sm:px-6">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-            <div className="min-h-6 flex-1 text-sm text-slate-500 xl:max-w-[58%]">
-              {warningMessage ? <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-amber-800">{warningMessage}</p> : footerContent}
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+          {warningMessage ? (
+            <div
+              role="status"
+              className="mb-4 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-sm leading-6 text-amber-800"
+            >
+              {warningMessage}
             </div>
+          ) : null}
+          {children}
+        </div>
+
+        <footer className="shrink-0 border-t border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
+          <div className={`flex flex-col gap-3 sm:flex-row sm:items-center ${footerContent ? "sm:justify-between" : "sm:justify-end"}`}>
+            {footerContent ? <div className="min-w-0 text-sm leading-6 text-slate-500">{footerContent}</div> : null}
             <div className="flex shrink-0 flex-wrap justify-end gap-2">
               <button
                 type="button"
