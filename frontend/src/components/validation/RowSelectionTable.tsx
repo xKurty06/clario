@@ -16,7 +16,7 @@ interface DragSelectionState {
   selectedRows: Set<number>;
 }
 
-const toolbarButtonClass = "inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600";
+const toolbarButtonClass = "inline-flex h-8 items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600";
 const rangeInputClass = "h-6 w-14 rounded-md border border-slate-200 bg-white px-1.5 text-center text-xs font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 
 function rowText(row: PreviewRow) {
@@ -125,8 +125,16 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
         <button title="Select the rows shown in this preview table" aria-label="Select the rows shown in this preview table" onClick={() => onSelectRows(visibleRows)} className={toolbarButtonClass}>
           <Table2 className="size-3.5" /> Select visible
         </button>
-        <form className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 hover:bg-slate-50 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100" onSubmit={handleSelectRange} title="Select preview rows by Excel row number range">
-          <span className="text-xs font-semibold text-slate-700">Range</span>
+        <form
+          className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100"
+          onSubmit={handleSelectRange}
+          title="Select preview rows by Excel row number range. These numbers come from the Excel row column in the table."
+          aria-label="Select range by Excel row numbers"
+        >
+          <span className="whitespace-nowrap">Select range</span>
+          <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-slate-500" title="The start and end values use the Excel row numbers shown in the Excel row column.">
+            Excel row
+          </span>
           <label className="sr-only" htmlFor="row-range-start">Start Excel row</label>
           <input
             id="row-range-start"
@@ -140,7 +148,7 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
               setRangeError("");
             }}
             className={rangeInputClass}
-            title="Starting Excel row number"
+            title="Starting Excel row number, based on the Excel row column"
           />
           <span className="text-slate-400">–</span>
           <label className="sr-only" htmlFor="row-range-end">End Excel row</label>
@@ -156,11 +164,11 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
               setRangeError("");
             }}
             className={rangeInputClass}
-            title="Ending Excel row number"
+            title="Ending Excel row number, based on the Excel row column"
           />
           <button
             type="submit"
-            className="rounded-md bg-emerald-700 px-2 py-1 text-[11px] font-semibold leading-4 text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600"
+            className="inline-flex h-6 items-center rounded-md bg-emerald-700 px-2 text-[11px] font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600"
             title="Select all preview rows between the entered Excel row numbers"
             aria-label="Select Excel row range"
           >
