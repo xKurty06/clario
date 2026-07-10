@@ -1,12 +1,24 @@
 import { FileSpreadsheet, FileUp, LoaderCircle, LockKeyhole, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FieldLabel, HelpTip, SelectField } from "../components/forms";
 import { PageHeader } from "../components/layout/PageHeader";
 import { useWorkflow } from "../features/files/WorkflowContext";
+import { checkBackendHealth } from "../services/apiClient";
 import { uploadFiles } from "../services/fileApi";
-import type { PresetType } from "../types/validation.types";
+import { listRecentSessions } from "../services/validationApi";
+import type { PresetSelection } from "../types/validation.types";
 import { isSupportedFileName } from "../utils/validators";
+
+const DEFAULT_SESSION_NAME = "New session";
+
+function nextSessionName(existingNames: string[]) {
+  const names = new Set(existingNames.map((name) => name.trim()).filter(Boolean));
+  if (!names.has(DEFAULT_SESSION_NAME)) return DEFAULT_SESSION_NAME;
+  let index = 2;
+  while (names.has(`${DEFAULT_SESSION_NAME} (${index})`)) index += 1;
+  return `${DEFAULT_SESSION_NAME} (${index})`;
+}
 
 export function UploadFilesPage() {
   const navigate = useNavigate();
@@ -14,27 +26,73 @@ export function UploadFilesPage() {
   const { projectName, setProjectName, preset, setPreset, files, setFiles, setDataSources, setRules, setResult } = useWorkflow();
   const [selected, setSelected] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [formError, setFormError] = useState("");
+  const [fileError, setFileError] = useState("");
+  const [sessionNameError, setSessionNameError] = useState("");
+  const [presetError, setPresetError] = useState("");
   const [dragActive, setDragActive] = useState(false);
+
+  useEffect(() => {
+    if (projectName.trim()) return;
+    let active = true;
+    void listRecentSessions()
+      .then((sessions) => {
+        if (active) setProjectName(nextSessionName(sessions.map((session) => session.project_name)));
+      })
+      .catch(() => {
+        if (active) setProjectName(DEFAULT_SESSION_NAME);
+      });
+    return () => {
+      active = false;
+    };
+  }, [projectName, setProjectName]);
 
   const add = (list: File[]) => {
     const valid = list.filter((file) => isSupportedFileName(file.name));
-    setError(valid.length !== list.length ? "Only .xlsx, .xls, and .csv files are accepted." : "");
+    setFileError(valid.length !== list.length ? "Only .xlsx, .xls, and .csv files are accepted." : "");
+    setFormError("");
     setSelected((current) => [...current, ...valid].slice(0, 10));
   };
 
   const submit = async () => {
-    if (!selected.length) return;
+    let hasError = false;
+    setFormError("");
+
+    if (!selected.length) {
+      setFileError("Please choose at least one spreadsheet before continuing.");
+      hasError = true;
+    } else {
+      setFileError("");
+    }
+
+    if (!projectName.trim()) {
+      setSessionNameError("Please enter a session name before continuing.");
+      hasError = true;
+    } else {
+      setSessionNameError("");
+    }
+
+    if (!preset) {
+      setPresetError("Please choose a comparison preset before continuing.");
+      hasError = true;
+    } else {
+      setPresetError("");
+    }
+
+    if (hasError) {
+      return;
+    }
+
     setBusy(true);
-    setError("");
     try {
+      await checkBackendHealth();
       setFiles(await uploadFiles(selected));
       setDataSources([]);
       setRules([]);
       setResult(null);
       navigate("/mapping");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Upload failed.");
+      setFormError(cause instanceof Error ? cause.message : "Upload failed.");
     } finally {
       setBusy(false);
     }
@@ -50,36 +108,53 @@ export function UploadFilesPage() {
       <div className="grid grid-cols-[320px_minmax(0,1fr)] gap-8 pt-8">
         <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
           <div>
-            <div className="flex items-center gap-1">
-              <label htmlFor="session-name" className="text-sm font-semibold text-slate-900">Session name</label>
-              <HelpTip text="Give this review a clear name. The same name is used in the validation result and PDF report." />
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-1">
+                <label htmlFor="session-name" className="text-sm font-semibold text-slate-900">Session name</label>
+                <HelpTip text="Give this review a clear name. The same name is used in the validation result and PDF report." />
+              </div>
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700">Required</span>
             </div>
             <input
               id="session-name"
+              placeholder={DEFAULT_SESSION_NAME}
               value={projectName}
-              onChange={(event) => setProjectName(event.target.value)}
+              onChange={(event) => {
+                setProjectName(event.target.value);
+                if (event.target.value.trim()) setSessionNameError("");
+              }}
               className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-emerald-600"
             />
+            {sessionNameError && <p className="mt-2 text-xs font-medium text-red-700" role="alert">{sessionNameError}</p>}
           </div>
           <div>
-            <FieldLabel
-              className="text-sm text-slate-900"
-              help="Presets create a guided starting scaffold for data sources, common fields, and standard procurement checks. You can still customize everything in the builder."
-            >
-              Comparison preset
-            </FieldLabel>
+            <div className="flex items-center justify-between gap-3">
+              <FieldLabel
+                className="text-sm text-slate-900"
+                help="The preset only creates a starting structure. You can still customize sources, rows, fields, and rules later."
+              >
+                Comparison preset
+              </FieldLabel>
+              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700">Required</span>
+            </div>
             <SelectField
               className="mt-2"
               ariaLabel="Comparison preset"
               value={preset}
-              onChange={(value) => setPreset(value as PresetType)}
+              onChange={(value) => {
+                setPreset(value as PresetSelection);
+                if (value) setPresetError("");
+              }}
               options={[
-                { value: "reference_vs_copied", label: "Reference vs copied file", description: "Two sources with standard description and quantity checks." },
-                { value: "reference_bidder_abstract", label: "Reference + bidder + abstract", description: "Three sources with procurement-oriented formula checks." },
-                { value: "generic_two_file", label: "Generic two-file comparison", description: "Two flexible sources for arbitrary field-to-field checks." },
-                { value: "custom_comparison_builder", label: "Custom comparison builder", description: "Start empty and define your own sources, fields, and rules." },
+                { value: "", label: "Choose a comparison preset", description: "Required before continuing." },
+                { value: "reference_vs_copied", label: "Reference vs Copied File", description: "Two sources with standard description and quantity checks." },
+                { value: "reference_bidder_abstract", label: "Reference + Bidder + Abstract", description: "Three sources with procurement-oriented formula checks." },
+                { value: "generic_two_file", label: "Generic Two-File Comparison", description: "Two flexible sources for arbitrary field-to-field checks." },
+                { value: "custom_comparison_builder", label: "Custom Comparison Builder", description: "Start empty and define your own sources, fields, and rules." },
               ]}
             />
+            {presetError && <p className="mt-2 text-xs font-medium text-red-700" role="alert">{presetError}</p>}
+            <p className="mt-2 text-xs leading-5 text-slate-500">The preset only creates a starting structure. You can still customize sources, rows, fields, and rules later.</p>
           </div>
           <div className="rounded-xl bg-emerald-50 p-3 text-xs leading-5 text-emerald-800">
             <LockKeyhole className="mb-2 size-4" />
@@ -122,6 +197,7 @@ export function UploadFilesPage() {
               <span className="mt-1 block text-sm text-slate-500">Up to 10 files, 50 MB each</span>
             </span>
           </button>
+          {fileError && <p className="mt-2 text-xs font-medium text-red-700" role="alert">{fileError}</p>}
           <input ref={input} hidden multiple type="file" accept=".xlsx,.xls,.csv" onChange={(event) => add([...(event.target.files ?? [])])} />
 
           <div className="mt-4 space-y-2">
@@ -137,10 +213,10 @@ export function UploadFilesPage() {
             ))}
           </div>
 
-          {error && <p className="mt-3 text-sm text-red-700" role="alert">{error}</p>}
+          {formError && <p className="mt-3 text-sm text-red-700" role="alert">{formError}</p>}
           <button
             title="Read the selected files and continue to the comparison builder"
-            disabled={!selected.length || busy}
+            disabled={busy}
             onClick={submit}
             className="mt-5 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >

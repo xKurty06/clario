@@ -1,6 +1,7 @@
 export type FieldType = "text" | "number" | "currency" | "date" | "boolean" | "raw";
 export type Severity = "low" | "medium" | "high";
 export type PresetType = "reference_vs_copied" | "reference_bidder_abstract" | "generic_two_file" | "custom_comparison_builder";
+export type PresetSelection = PresetType | "";
 export type RowSelectionMode = "auto_detected" | "manual_include" | "manual_exclude";
 export type RuleType = "compare_values" | "formula_check" | "required_field_check" | "duplicate_check";
 export type MatchStrategy = "by_row_order" | "by_item_number_field" | "by_exact_text_field" | "by_multiple_fields" | "manual_placeholder";

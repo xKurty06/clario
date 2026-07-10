@@ -33,28 +33,28 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3 text-xs font-semibold text-slate-700">
-        <button title="Select every row in this preview" onClick={() => onSelectRows(visibleRows)} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50">
+        <button title="Select all rows in this preview" aria-label="Select all rows in this preview" onClick={() => onSelectRows(visibleRows)} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
           <CheckSquare className="size-3.5" /> Select all
         </button>
-        <button title="Clear all selected rows" onClick={() => onSelectRows([])} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50">
+        <button title="Clear the current row selection" aria-label="Clear the current row selection" onClick={() => onSelectRows([])} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
           <Square className="size-3.5" /> Select none
         </button>
-        <button title="Invert the current row selection" onClick={() => onSelectRows(rows.filter((row) => !row.selected).map((row) => row.row_number))} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50">
+        <button title="Invert which preview rows are selected" aria-label="Invert which preview rows are selected" onClick={() => onSelectRows(rows.filter((row) => !row.selected).map((row) => row.row_number))} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
           <RotateCcw className="size-3.5" /> Invert
         </button>
-        <button title="Select the visible preview rows" onClick={() => onSelectRows(visibleRows)} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50">
+        <button title="Select the rows shown in this preview table" aria-label="Select the rows shown in this preview table" onClick={() => onSelectRows(visibleRows)} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
           <Table2 className="size-3.5" /> Select visible
         </button>
         <span className="mx-1 h-5 w-px bg-slate-200" />
-        <button onClick={() => onIgnoreRows(blankRows)} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50">Exclude blank</button>
-        <button onClick={() => onIgnoreRows(rowsContaining("total"))} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50">Exclude total</button>
-        <button onClick={() => onIgnoreRows(rowsContaining("subtotal"))} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50">Exclude subtotal</button>
-        <button onClick={() => onIgnoreRows(rowsContaining("grand total"))} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50">Exclude grand total</button>
+        <button title="Ignore blank preview rows so they are skipped during validation" aria-label="Exclude blank rows from validation" onClick={() => onIgnoreRows(blankRows)} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">Exclude blank rows</button>
+        <button title="Ignore rows containing the word total" aria-label="Exclude total rows from validation" onClick={() => onIgnoreRows(rowsContaining("total"))} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">Exclude total rows</button>
+        <button title="Ignore rows containing the word subtotal" aria-label="Exclude subtotal rows from validation" onClick={() => onIgnoreRows(rowsContaining("subtotal"))} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">Exclude subtotal rows</button>
+        <button title="Ignore rows containing the phrase grand total" aria-label="Exclude grand total rows from validation" onClick={() => onIgnoreRows(rowsContaining("grand total"))} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">Exclude grand total rows</button>
         <span className="mx-1 h-5 w-px bg-slate-200" />
-        <button title="Ignore currently selected rows" onClick={() => onIgnoreRows(selectedRows)} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50">
-          <Ban className="size-3.5" /> Mark selected ignored
+        <button title="Mark the selected preview rows as ignored" aria-label="Mark selected rows as ignored" onClick={() => onIgnoreRows(selectedRows)} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
+          <Ban className="size-3.5" /> Mark selected as ignored
         </button>
-        <button title="Mark currently selected rows as data" onClick={() => onMarkDataRows(selectedRows)} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50">Mark selected data</button>
+        <button title="Mark the selected preview rows as data rows" aria-label="Mark selected rows as data" onClick={() => onMarkDataRows(selectedRows)} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">Mark selected as data</button>
       </div>
       <div className="max-h-[520px] overflow-auto">
         <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs">

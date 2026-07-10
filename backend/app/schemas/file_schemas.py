@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from app.models.comparison_models import ComparisonDataSource, DataSourcePreview
+from app.models.comparison_models import ComparisonDataSource
 
 
 class DataSourcePreviewRequest(BaseModel):
@@ -12,6 +12,3 @@ class HeaderInspectionRequest(BaseModel):
     sheet_name: str
     header_row: int
 
-
-class DataSourcePreviewResponse(DataSourcePreview):
-    pass

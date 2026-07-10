@@ -2,8 +2,9 @@ from fastapi import APIRouter, File, UploadFile
 
 from app.config.constants import MAX_FILES_PER_SESSION
 from app.core.exceptions import AppError
+from app.models.comparison_models import DataSourcePreview
 from app.models.file_models import UploadedFile
-from app.schemas.file_schemas import DataSourcePreviewRequest, DataSourcePreviewResponse, HeaderInspectionRequest
+from app.schemas.file_schemas import DataSourcePreviewRequest, HeaderInspectionRequest
 from app.services.extraction_service import preview_data_source
 from app.services.file_service import get_file, save_upload
 from app.services.sheet_service import inspect_header, inspect_sheets
@@ -32,9 +33,9 @@ async def upload_files(files: list[UploadFile] = File(...)) -> list[UploadedFile
     return results
 
 
-@router.post("/data-source-preview", response_model=DataSourcePreviewResponse)
-async def data_source_preview(request: DataSourcePreviewRequest) -> DataSourcePreviewResponse:
-    return DataSourcePreviewResponse.model_validate(preview_data_source(request.data_source))
+@router.post("/data-source-preview", response_model=DataSourcePreview)
+async def data_source_preview(request: DataSourcePreviewRequest) -> DataSourcePreview:
+    return preview_data_source(request.data_source)
 
 
 @router.post("/inspect-header")

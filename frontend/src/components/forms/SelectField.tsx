@@ -85,10 +85,10 @@ export function SelectField({ value, options, onChange, ariaLabel, className = "
                 key={option.value}
                 onPointerEnter={() => setActiveIndex(index)}
                 onClick={() => choose(option)}
-                className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors duration-150 ${compact ? "text-xs" : "text-sm"} ${isSelected ? "bg-emerald-50 font-semibold text-emerald-800" : isActive ? "bg-slate-100 text-slate-950" : "text-slate-700 hover:bg-slate-100"}`}
+                className={`flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left transition-colors duration-150 ${compact ? "text-xs" : "text-sm"} ${isSelected ? "bg-emerald-50 font-semibold text-emerald-800" : isActive ? "bg-slate-100 text-slate-950" : "text-slate-700 hover:bg-slate-100"}`}
               >
-                <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                <Check aria-hidden="true" className={`size-4 shrink-0 text-emerald-700 ${isSelected ? "opacity-100" : "opacity-0"}`} />
+                <span className="min-w-0 flex-1 whitespace-normal break-words leading-5">{option.label}</span>
+                <Check aria-hidden="true" className={`mt-0.5 size-4 shrink-0 text-emerald-700 ${isSelected ? "opacity-100" : "opacity-0"}`} />
               </button>
             );
           })}

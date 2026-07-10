@@ -4,15 +4,15 @@ import type {
   ComparisonDataSource,
   ComparisonRule,
   DataSourcePreview,
-  PresetType,
+  PresetSelection,
   ValidationResult,
 } from "../../types/validation.types";
 
 interface WorkflowState {
   projectName: string;
   setProjectName: (value: string) => void;
-  preset: PresetType;
-  setPreset: (value: PresetType) => void;
+  preset: PresetSelection;
+  setPreset: (value: PresetSelection) => void;
   files: UploadedFile[];
   setFiles: (value: UploadedFile[]) => void;
   dataSources: ComparisonDataSource[];
@@ -21,6 +21,7 @@ interface WorkflowState {
   removeDataSource: (id: string) => void;
   sourcePreviews: Record<string, DataSourcePreview>;
   setSourcePreview: (id: string, value: DataSourcePreview) => void;
+  removeSourcePreview: (id: string) => void;
   rules: ComparisonRule[];
   setRules: (value: ComparisonRule[]) => void;
   updateRule: (id: string, value: ComparisonRule) => void;
@@ -32,8 +33,8 @@ interface WorkflowState {
 const Context = createContext<WorkflowState | null>(null);
 
 export function WorkflowProvider({ children }: PropsWithChildren) {
-  const [projectName, setProjectName] = useState("New procurement review");
-  const [preset, setPreset] = useState<PresetType>("reference_vs_copied");
+  const [projectName, setProjectName] = useState("");
+  const [preset, setPreset] = useState<PresetSelection>("");
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [dataSources, setDataSources] = useState<ComparisonDataSource[]>([]);
   const [sourcePreviews, setSourcePreviews] = useState<Record<string, DataSourcePreview>>({});
@@ -54,6 +55,12 @@ export function WorkflowProvider({ children }: PropsWithChildren) {
       removeDataSource: (id: string) => setDataSources((current) => current.filter((item) => item.id !== id)),
       sourcePreviews,
       setSourcePreview: (id: string, value: DataSourcePreview) => setSourcePreviews((current) => ({ ...current, [id]: value })),
+      removeSourcePreview: (id: string) =>
+        setSourcePreviews((current) => {
+          const next = { ...current };
+          delete next[id];
+          return next;
+        }),
       rules,
       setRules,
       updateRule: (id: string, value: ComparisonRule) => setRules((current) => current.map((item) => (item.id === id ? value : item))),
