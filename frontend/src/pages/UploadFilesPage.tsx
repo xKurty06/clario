@@ -12,6 +12,7 @@ import { isSupportedFileName } from "../utils/validators";
 
 const DEFAULT_SESSION_NAME = "New session";
 const requiredBadgeClass = "rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold leading-5 text-amber-700";
+const uploadCardClass = "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
 
 function nextSessionName(existingNames: string[]) {
   const names = new Set(existingNames.map((name) => name.trim()).filter(Boolean));
@@ -106,8 +107,8 @@ export function UploadFilesPage() {
         title="Choose comparison files"
         description="Select a comparison preset and local spreadsheets. Files are processed on this device and originals remain unchanged."
       />
-      <div className="grid grid-cols-[320px_minmax(0,1fr)] gap-8 pt-8">
-        <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="grid items-start gap-8 pt-8 xl:grid-cols-[320px_minmax(0,1fr)]">
+        <section className={`${uploadCardClass} self-start space-y-5`}>
           <div>
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-1">
@@ -163,7 +164,7 @@ export function UploadFilesPage() {
           </div>
         </section>
 
-        <section>
+        <section className={`${uploadCardClass} min-w-0 self-start`}>
           <div className="mb-2 flex items-center gap-1 text-sm font-semibold text-slate-700">
             Files to compare
             <HelpTip text="Choose the Excel or CSV files you want to inspect. The app reads a temporary local copy and does not modify the originals." />
@@ -203,11 +204,11 @@ export function UploadFilesPage() {
 
           <div className="mt-4 space-y-2">
             {selected.map((file, index) => (
-              <div key={`${file.name}-${index}`} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
-                <FileSpreadsheet className="size-5 text-emerald-700" />
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">{file.name}</span>
-                <span className="text-xs text-slate-500">{(file.size / 1024).toFixed(0)} KB</span>
-                <button title={`Remove ${file.name} from this review`} onClick={() => setSelected((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${file.name}`}>
+              <div key={`${file.name}-${index}`} className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                <FileSpreadsheet className="size-5 shrink-0 text-emerald-700" />
+                <span className="min-w-0 flex-1 text-sm font-medium break-anywhere">{file.name}</span>
+                <span className="shrink-0 text-xs text-slate-500">{(file.size / 1024).toFixed(0)} KB</span>
+                <button title={`Remove ${file.name} from this review`} onClick={() => setSelected((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${file.name}`} className="shrink-0">
                   <X className="size-4" />
                 </button>
               </div>
