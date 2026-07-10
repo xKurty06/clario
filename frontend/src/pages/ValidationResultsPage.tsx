@@ -2,9 +2,17 @@ import { FileSearch, Search } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState } from "../components/common/EmptyState";
-import { PageHeader } from "../components/layout/PageHeader";
 import { SelectField } from "../components/forms";
+import { PageHeader } from "../components/layout/PageHeader";
 import { useWorkflow } from "../features/files/WorkflowContext";
+import type { RuleType } from "../types/validation.types";
+
+const ruleLabels: Record<RuleType, string> = {
+  compare_values: "Compare two fields",
+  formula_check: "Formula check",
+  required_field_check: "Required field check",
+  duplicate_check: "Duplicate check",
+};
 
 export function ValidationResultsPage() {
   const { result } = useWorkflow();
@@ -61,7 +69,7 @@ export function ValidationResultsPage() {
                   <p className="text-sm font-semibold">{rule.rule_name}</p>
                   <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">{rule.discrepancy_count}</span>
                 </div>
-                <p className="mt-1 text-xs text-slate-500">{rule.rule_type.replaceAll("_", " ")} · {rule.severity}</p>
+                <p className="mt-1 text-xs text-slate-500">{ruleLabels[rule.rule_type]} - {rule.severity}</p>
               </div>
             ))}
           </div>
@@ -98,8 +106,8 @@ export function ValidationResultsPage() {
                 <tr>
                   <th className="p-3">Rule</th>
                   <th className="p-3">Severity</th>
-                  <th className="p-3">Left location</th>
-                  <th className="p-3">Right location</th>
+                  <th className="p-3">Expected location</th>
+                  <th className="p-3">Actual location</th>
                   <th className="p-3">Expected</th>
                   <th className="p-3">Actual</th>
                   <th className="p-3">Notes</th>
@@ -110,13 +118,13 @@ export function ValidationResultsPage() {
                   <tr key={`${item.rule_id}-${index}`} className="border-t border-slate-100 align-top">
                     <td className="p-3">
                       <p className="font-semibold">{item.rule_name}</p>
-                      <p className="mt-1 text-xs text-slate-500">{item.left_field_name ?? item.right_field_name ?? item.rule_type}</p>
+                      <p className="mt-1 text-xs text-slate-500">{item.left_field_name ?? item.right_field_name ?? ruleLabels[item.rule_type]}</p>
                     </td>
                     <td className="p-3">
                       <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.severity === "high" ? "bg-red-50 text-red-700" : item.severity === "medium" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-700"}`}>{item.severity}</span>
                     </td>
-                    <td className="p-3 text-xs text-slate-600">{item.left_file_name ?? "-"}<br />{item.left_sheet_name ?? "-"} · row {item.left_row_number ?? "-"}</td>
-                    <td className="p-3 text-xs text-slate-600">{item.right_file_name ?? "-"}<br />{item.right_sheet_name ?? "-"} · row {item.right_row_number ?? "-"}</td>
+                    <td className="p-3 text-xs text-slate-600">{item.left_file_name ?? "-"}<br />{item.left_sheet_name ?? "-"} - row {item.left_row_number ?? "-"}</td>
+                    <td className="p-3 text-xs text-slate-600">{item.right_file_name ?? "-"}<br />{item.right_sheet_name ?? "-"} - row {item.right_row_number ?? "-"}</td>
                     <td className="max-w-xs p-3">{item.expected_value ?? "-"}</td>
                     <td className="max-w-xs p-3">{item.actual_value ?? "-"}</td>
                     <td className="max-w-sm p-3 text-slate-600">{item.suggested_correction ?? item.notes ?? "Review item."}</td>

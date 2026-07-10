@@ -1,6 +1,7 @@
 node_modules/
 dist/
 target/
+*.tsbuildinfo
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -22,4 +23,3 @@ backend/reports/generated/
 .DS_Store
 Thumbs.db
 /docs/
-

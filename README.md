@@ -133,6 +133,7 @@ AI will never be the source of truth. The reserved provider interface is advisor
 - [Architecture overview](docs/architecture.md)
 - [Extension guide](docs/extending.md)
 - [Flexible Comparison Builder](docs/flexible-comparison-builder.md)
+- [Comparison Builder UI](docs/comparison-builder-ui.md)
 - [Template design](docs/templates.md)
 - [Rename guide](docs/renaming.md)
 - [Phase roadmap](docs/roadmap.md)
