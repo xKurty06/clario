@@ -31,9 +31,20 @@ main :where(.whitespace-nowrap) {
   white-space: normal;
 }
 
-main [class*="flex"][class*="flex-wrap"][class*="items-center"][class*="gap-y-1"] > h2.truncate {
-  flex: 0 1 auto;
-  max-width: calc(100% - 7.5rem);
+main :where(div:has(> h2.truncate + span.inline-flex)) {
+  display: block;
+}
+
+main :where(div:has(> h2.truncate + span.inline-flex) > h2.truncate) {
+  display: inline;
+  max-width: none;
+}
+
+main :where(div:has(> h2.truncate + span.inline-flex) > span.inline-flex) {
+  display: inline-flex;
+  margin-left: 0.5rem;
+  vertical-align: text-bottom;
+  white-space: nowrap;
 }
 
 @keyframes sidebar-expand-enter {
