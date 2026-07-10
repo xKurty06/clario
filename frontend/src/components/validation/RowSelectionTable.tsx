@@ -1,5 +1,5 @@
 import { Ban, CheckSquare, RotateCcw, Square, Table2 } from "lucide-react";
-import { useEffect, useState, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
 import type { PreviewRow } from "../../types/validation.types";
 
 interface RowSelectionTableProps {
@@ -36,6 +36,9 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
   const rowsContaining = (term: string) => rows.filter((row) => rowText(row).toLowerCase().includes(term)).map((row) => row.row_number);
   const blankRows = rows.filter((row) => !rowText(row)).map((row) => row.row_number);
   const [dragSelection, setDragSelection] = useState<DragSelectionState | null>(null);
+  const [rangeStart, setRangeStart] = useState("");
+  const [rangeEnd, setRangeEnd] = useState("");
+  const [rangeError, setRangeError] = useState("");
 
   useEffect(() => {
     if (!dragSelection) return undefined;
@@ -81,6 +84,29 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
     onToggleRow(rowNumber);
   };
 
+  const handleSelectRange = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const start = Number.parseInt(rangeStart, 10);
+    const end = Number.parseInt(rangeEnd, 10);
+
+    if (!Number.isInteger(start) || !Number.isInteger(end)) {
+      setRangeError("Enter valid Excel row numbers.");
+      return;
+    }
+
+    const lower = Math.min(start, end);
+    const upper = Math.max(start, end);
+    const rowsInRange = rows.filter((row) => row.row_number >= lower && row.row_number <= upper).map((row) => row.row_number);
+
+    if (!rowsInRange.length) {
+      setRangeError(`No preview rows found from Excel row ${lower} to ${upper}.`);
+      return;
+    }
+
+    onSelectRows([...new Set([...selectedRows, ...rowsInRange])]);
+    setRangeError("");
+  };
+
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3 text-xs font-semibold text-slate-700">
@@ -96,6 +122,49 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
         <button title="Select the rows shown in this preview table" aria-label="Select the rows shown in this preview table" onClick={() => onSelectRows(visibleRows)} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
           <Table2 className="size-3.5" /> Select visible
         </button>
+        <form className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5" onSubmit={handleSelectRange} title="Select preview rows by Excel row number range">
+          <span className="font-semibold text-slate-700">Select range</span>
+          <label className="sr-only" htmlFor="row-range-start">Start Excel row</label>
+          <input
+            id="row-range-start"
+            type="number"
+            min={1}
+            inputMode="numeric"
+            placeholder="Start"
+            value={rangeStart}
+            onChange={(event) => {
+              setRangeStart(event.target.value);
+              setRangeError("");
+            }}
+            className="h-8 w-20 rounded-md border border-slate-300 bg-white px-2 text-xs font-medium text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+            title="Starting Excel row number"
+          />
+          <span className="text-slate-400">to</span>
+          <label className="sr-only" htmlFor="row-range-end">End Excel row</label>
+          <input
+            id="row-range-end"
+            type="number"
+            min={1}
+            inputMode="numeric"
+            placeholder="End"
+            value={rangeEnd}
+            onChange={(event) => {
+              setRangeEnd(event.target.value);
+              setRangeError("");
+            }}
+            className="h-8 w-20 rounded-md border border-slate-300 bg-white px-2 text-xs font-medium text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+            title="Ending Excel row number"
+          />
+          <button
+            type="submit"
+            className="h-8 rounded-md bg-emerald-700 px-3 text-xs font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600"
+            title="Select all preview rows between the entered Excel row numbers"
+            aria-label="Select Excel row range"
+          >
+            Confirm
+          </button>
+          {rangeError ? <span className="basis-full text-[11px] font-medium text-red-700" role="alert">{rangeError}</span> : null}
+        </form>
         <span className="mx-1 h-5 w-px bg-slate-200" />
         <button title="Ignore blank preview rows so they are skipped during validation" aria-label="Exclude blank rows from validation" onClick={() => onIgnoreRows(blankRows)} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">Exclude blank rows</button>
         <button title="Ignore rows containing the word total" aria-label="Exclude total rows from validation" onClick={() => onIgnoreRows(rowsContaining("total"))} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">Exclude total rows</button>
