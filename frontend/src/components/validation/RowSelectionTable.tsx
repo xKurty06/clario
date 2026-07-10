@@ -16,6 +16,9 @@ interface DragSelectionState {
   selectedRows: Set<number>;
 }
 
+const toolbarButtonClass = "inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600";
+const rangeInputClass = "h-6 w-14 rounded-md border border-slate-200 bg-white px-1.5 text-center text-xs font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
+
 function rowText(row: PreviewRow) {
   return Object.values(row.cells).map((value) => String(value ?? "")).join(" ").trim();
 }
@@ -110,20 +113,20 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3 text-xs font-semibold text-slate-700">
-        <button title="Select all rows in this preview" aria-label="Select all rows in this preview" onClick={() => onSelectRows(visibleRows)} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
+        <button title="Select all rows in this preview" aria-label="Select all rows in this preview" onClick={() => onSelectRows(visibleRows)} className={toolbarButtonClass}>
           <CheckSquare className="size-3.5" /> Select all
         </button>
-        <button title="Clear the current row selection" aria-label="Clear the current row selection" onClick={() => onSelectRows([])} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
+        <button title="Clear the current row selection" aria-label="Clear the current row selection" onClick={() => onSelectRows([])} className={toolbarButtonClass}>
           <Square className="size-3.5" /> Select none
         </button>
-        <button title="Invert which preview rows are selected" aria-label="Invert which preview rows are selected" onClick={() => onSelectRows(rows.filter((row) => !row.selected).map((row) => row.row_number))} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
+        <button title="Invert which preview rows are selected" aria-label="Invert which preview rows are selected" onClick={() => onSelectRows(rows.filter((row) => !row.selected).map((row) => row.row_number))} className={toolbarButtonClass}>
           <RotateCcw className="size-3.5" /> Invert
         </button>
-        <button title="Select the rows shown in this preview table" aria-label="Select the rows shown in this preview table" onClick={() => onSelectRows(visibleRows)} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
+        <button title="Select the rows shown in this preview table" aria-label="Select the rows shown in this preview table" onClick={() => onSelectRows(visibleRows)} className={toolbarButtonClass}>
           <Table2 className="size-3.5" /> Select visible
         </button>
-        <form className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5" onSubmit={handleSelectRange} title="Select preview rows by Excel row number range">
-          <span className="font-semibold text-slate-700">Select range</span>
+        <form className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 hover:bg-slate-50 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100" onSubmit={handleSelectRange} title="Select preview rows by Excel row number range">
+          <span className="text-xs font-semibold text-slate-700">Range</span>
           <label className="sr-only" htmlFor="row-range-start">Start Excel row</label>
           <input
             id="row-range-start"
@@ -136,10 +139,10 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
               setRangeStart(event.target.value);
               setRangeError("");
             }}
-            className="h-8 w-20 rounded-md border border-slate-300 bg-white px-2 text-xs font-medium text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+            className={rangeInputClass}
             title="Starting Excel row number"
           />
-          <span className="text-slate-400">to</span>
+          <span className="text-slate-400">–</span>
           <label className="sr-only" htmlFor="row-range-end">End Excel row</label>
           <input
             id="row-range-end"
@@ -152,29 +155,29 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
               setRangeEnd(event.target.value);
               setRangeError("");
             }}
-            className="h-8 w-20 rounded-md border border-slate-300 bg-white px-2 text-xs font-medium text-slate-800 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+            className={rangeInputClass}
             title="Ending Excel row number"
           />
           <button
             type="submit"
-            className="h-8 rounded-md bg-emerald-700 px-3 text-xs font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600"
+            className="rounded-md bg-emerald-700 px-2 py-1 text-[11px] font-semibold leading-4 text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600"
             title="Select all preview rows between the entered Excel row numbers"
             aria-label="Select Excel row range"
           >
-            Confirm
+            Select
           </button>
-          {rangeError ? <span className="basis-full text-[11px] font-medium text-red-700" role="alert">{rangeError}</span> : null}
         </form>
+        {rangeError ? <span className="rounded-lg bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700" role="alert">{rangeError}</span> : null}
         <span className="mx-1 h-5 w-px bg-slate-200" />
-        <button title="Ignore blank preview rows so they are skipped during validation" aria-label="Exclude blank rows from validation" onClick={() => onIgnoreRows(blankRows)} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">Exclude blank rows</button>
-        <button title="Ignore rows containing the word total" aria-label="Exclude total rows from validation" onClick={() => onIgnoreRows(rowsContaining("total"))} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">Exclude total rows</button>
-        <button title="Ignore rows containing the word subtotal" aria-label="Exclude subtotal rows from validation" onClick={() => onIgnoreRows(rowsContaining("subtotal"))} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">Exclude subtotal rows</button>
-        <button title="Ignore rows containing the phrase grand total" aria-label="Exclude grand total rows from validation" onClick={() => onIgnoreRows(rowsContaining("grand total"))} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">Exclude grand total rows</button>
+        <button title="Ignore blank preview rows so they are skipped during validation" aria-label="Exclude blank rows from validation" onClick={() => onIgnoreRows(blankRows)} className={toolbarButtonClass}>Exclude blank rows</button>
+        <button title="Ignore rows containing the word total" aria-label="Exclude total rows from validation" onClick={() => onIgnoreRows(rowsContaining("total"))} className={toolbarButtonClass}>Exclude total rows</button>
+        <button title="Ignore rows containing the word subtotal" aria-label="Exclude subtotal rows from validation" onClick={() => onIgnoreRows(rowsContaining("subtotal"))} className={toolbarButtonClass}>Exclude subtotal rows</button>
+        <button title="Ignore rows containing the phrase grand total" aria-label="Exclude grand total rows from validation" onClick={() => onIgnoreRows(rowsContaining("grand total"))} className={toolbarButtonClass}>Exclude grand total rows</button>
         <span className="mx-1 h-5 w-px bg-slate-200" />
-        <button title="Mark the selected preview rows as ignored" aria-label="Mark selected rows as ignored" onClick={() => onIgnoreRows(selectedRows)} className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">
+        <button title="Mark the selected preview rows as ignored" aria-label="Mark selected rows as ignored" onClick={() => onIgnoreRows(selectedRows)} className={toolbarButtonClass}>
           <Ban className="size-3.5" /> Mark selected as ignored
         </button>
-        <button title="Mark the selected preview rows as data rows" aria-label="Mark selected rows as data" onClick={() => onMarkDataRows(selectedRows)} className="rounded-lg border border-slate-300 px-3 py-1.5 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600">Mark selected as data</button>
+        <button title="Mark the selected preview rows as data rows" aria-label="Mark selected rows as data" onClick={() => onMarkDataRows(selectedRows)} className={toolbarButtonClass}>Mark selected as data</button>
       </div>
       <div className="max-h-[520px] overflow-auto">
         <table className={`w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs ${dragSelection ? "select-none" : ""}`}>
