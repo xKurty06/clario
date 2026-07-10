@@ -1,20 +1,17 @@
 from pydantic import BaseModel
 
-from app.models.row_models import ExtractedRow
-from app.models.template_models import MappingTemplate
+from app.models.comparison_models import ComparisonDataSource, DataSourcePreview
 
 
-class PreviewRequest(BaseModel):
-    file_id: str
-    template: MappingTemplate
-
-
-class PreviewResponse(BaseModel):
-    rows: list[ExtractedRow]
-    total: int
+class DataSourcePreviewRequest(BaseModel):
+    data_source: ComparisonDataSource
 
 
 class HeaderInspectionRequest(BaseModel):
     file_id: str
     sheet_name: str
     header_row: int
+
+
+class DataSourcePreviewResponse(DataSourcePreview):
+    pass

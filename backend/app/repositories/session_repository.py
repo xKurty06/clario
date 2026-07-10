@@ -8,7 +8,7 @@ class SessionRepository:
     def save(self, result: ValidationResult, file_names: list[str]) -> None:
         with database() as connection:
             connection.execute("INSERT OR REPLACE INTO sessions(id,project_name,mode,file_names,discrepancy_count,created_at) VALUES(?,?,?,?,?,?)",
-                (result.id, result.project_name, result.mode, json.dumps(file_names), len(result.discrepancies), result.created_at))
+                (result.id, result.project_name, result.preset, json.dumps(file_names), len(result.discrepancies), result.created_at))
 
     def list_recent(self, limit: int = 10) -> list[dict[str, object]]:
         with database() as connection:

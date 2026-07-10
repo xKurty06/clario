@@ -9,14 +9,13 @@ router = APIRouter(prefix="/validation", tags=["validation"])
 
 @router.get("/capabilities")
 async def validation_capabilities() -> dict[str, str]:
-    return {"status": "ready", "matching": "strict"}
+    return {"status": "ready", "matching": "strict", "workflow": "comparison_builder"}
 
 
 @router.post("/run", response_model=ValidationResult)
 async def validate(request: ValidationRequest) -> ValidationResult:
     result = run_validation(request)
-    file_names = sorted({row.source_file_name for row in request.reference_rows + request.comparison_rows + request.bidder_rows + request.abstract_rows})
-    SessionRepository().save(result, file_names)
+    SessionRepository().save(result, result.file_names)
     return result
 
 

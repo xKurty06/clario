@@ -4,6 +4,64 @@ import { EmptyState } from "../components/common/EmptyState";
 import { PageHeader } from "../components/layout/PageHeader";
 import { useWorkflow } from "../features/files/WorkflowContext";
 import { exportPdf } from "../services/reportApi";
-export function ReportExportPage(){const {result}=useWorkflow();const [busy,setBusy]=useState(false);const [message,setMessage]=useState("");if(!result)return <div><PageHeader eyebrow="Step 5 of 5" title="Export a local report" description="Complete validation first."/><div className="pt-8"><EmptyState icon={FileOutput} title="No report data" description="A completed validation result is required for PDF export."/></div></div>;
-  const download=async()=>{setBusy(true);setMessage("");try{const blob=await exportPdf(result);const url=URL.createObjectURL(blob);const anchor=document.createElement("a");anchor.href=url;anchor.download=`${result.project_name.replace(/[^a-z0-9]+/gi,"-")}-report.pdf`;anchor.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setMessage("PDF report created. Choose the save location in your browser or desktop download prompt.")}catch(e){setMessage(e instanceof Error?e.message:"Could not create report.")}finally{setBusy(false)}};
-  return <div><PageHeader eyebrow="Step 5 of 5" title="Export a local report" description="Create a formal summary and detailed discrepancy table from the completed result. Export does not re-run validation."/><section className="mt-8 max-w-2xl rounded-2xl border border-slate-200 bg-white p-6"><FileOutput className="size-7 text-emerald-700"/><h2 className="mt-4 text-lg font-semibold">{result.project_name}</h2><dl className="mt-5 grid grid-cols-3 gap-4 border-y border-slate-200 py-5"><div><dt className="text-xs text-slate-500">Rows</dt><dd className="mt-1 font-semibold">{result.total_rows}</dd></div><div><dt className="text-xs text-slate-500">Discrepancies</dt><dd className="mt-1 font-semibold">{result.discrepancies.length}</dd></div><div><dt className="text-xs text-slate-500">Format</dt><dd className="mt-1 font-semibold">PDF</dd></div></dl><button disabled={busy} onClick={download} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50"><Download className="size-4"/>{busy?"Creating report…":"Export PDF report"}</button><button disabled title="Planned non-destructive extension" className="ml-3 rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-semibold text-slate-400">Highlighted copy — planned</button>{message&&<p className="mt-4 text-sm text-slate-600" role="status">{message}</p>}</section></div>}
+
+export function ReportExportPage() {
+  const { result } = useWorkflow();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+
+  if (!result) {
+    return (
+      <div>
+        <PageHeader eyebrow="Step 4 of 4" title="Export local report" description="Complete validation first." />
+        <div className="pt-8">
+          <EmptyState icon={FileOutput} title="No report data" description="A completed validation result is required for PDF export." />
+        </div>
+      </div>
+    );
+  }
+
+  const download = async () => {
+    setBusy(true);
+    setMessage("");
+    try {
+      const blob = await exportPdf(result);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${result.project_name.replace(/[^a-z0-9]+/gi, "-")}-comparison-report.pdf`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setMessage("PDF report created from the completed validation result. Validation was not re-run.");
+    } catch (cause) {
+      setMessage(cause instanceof Error ? cause.message : "Could not create report.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      <PageHeader
+        eyebrow="Step 4 of 4"
+        title="Export local report"
+        description="Create a formal PDF summary of the selected data sources, extracted fields, comparison rules, and detailed discrepancies. Export uses the completed result only."
+      />
+      <section className="mt-8 max-w-3xl rounded-2xl border border-slate-200 bg-white p-6">
+        <FileOutput className="size-7 text-emerald-700" />
+        <h2 className="mt-4 text-lg font-semibold">{result.project_name}</h2>
+        <dl className="mt-5 grid grid-cols-4 gap-4 border-y border-slate-200 py-5">
+          <div><dt className="text-xs text-slate-500">Selected rows</dt><dd className="mt-1 font-semibold">{result.total_selected_rows}</dd></div>
+          <div><dt className="text-xs text-slate-500">Data sources</dt><dd className="mt-1 font-semibold">{result.data_sources.length}</dd></div>
+          <div><dt className="text-xs text-slate-500">Rules</dt><dd className="mt-1 font-semibold">{result.rule_summaries.length}</dd></div>
+          <div><dt className="text-xs text-slate-500">Discrepancies</dt><dd className="mt-1 font-semibold">{result.discrepancies.length}</dd></div>
+        </dl>
+        <button disabled={busy} onClick={download} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+          <Download className="size-4" />
+          {busy ? "Creating report..." : "Export PDF report"}
+        </button>
+        {message && <p className="mt-4 text-sm text-slate-600" role="status">{message}</p>}
+      </section>
+    </div>
+  );
+}

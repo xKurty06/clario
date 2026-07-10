@@ -9,6 +9,7 @@ Temporary project name for a working local-first Windows application that compar
 - FastAPI backend bound to loopback by default
 - Centralized display/package naming
 - Connected upload, mapping, preview, validation, template, and report pages
+- Comparison Builder workflow with flexible data sources, row selection, custom fields, and rule-based validation
 - `.xlsx`, `.xls`, and `.csv` extraction
 - Strict description, quantity, unit-cost, total-cost, duplicate, missing, and extra-item checks
 - SQLite template persistence and local PDF reports
@@ -109,11 +110,11 @@ npm run build
 ## Intended application workflow
 
 1. Select local `.xlsx`, `.xls`, or `.csv` files.
-2. Choose sheets and confirm column mappings.
-3. Preview extracted item rows with source sheet and row numbers.
-4. Run transparent rule-based validation.
-5. Review and filter discrepancies.
-6. Export a local PDF report.
+2. Create one or more data sources from those files and sheets.
+3. Review and adjust selected rows.
+4. Add custom fields and comparison rules.
+5. Run transparent backend validation.
+6. Review discrepancies and export a local PDF report.
 
 None of the core workflows require login, cloud storage, or internet access. Version 1 will not modify source files.
 
@@ -131,6 +132,7 @@ AI will never be the source of truth. The reserved provider interface is advisor
 
 - [Architecture overview](docs/architecture.md)
 - [Extension guide](docs/extending.md)
+- [Flexible Comparison Builder](docs/flexible-comparison-builder.md)
 - [Template design](docs/templates.md)
 - [Rename guide](docs/renaming.md)
 - [Phase roadmap](docs/roadmap.md)

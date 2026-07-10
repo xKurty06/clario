@@ -1,70 +1,334 @@
+from __future__ import annotations
+
 from collections import Counter
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import uuid4
 
-from app.models.row_models import ExtractedRow
-from app.models.validation_models import Discrepancy, ValidationRequest, ValidationResult
+from app.models.comparison_models import (
+    ComparisonDataSource,
+    ComparisonRule,
+    ExtractedRecord,
+    FieldType,
+    RuleDiscrepancy,
+    RuleSummary,
+    ValidationRequest,
+    ValidationResult,
+)
+from app.services.extraction_service import extract_records, get_field, get_field_value
 from app.normalizers.text_normalizer import normalize_text
-from app.validators.description_validator import DescriptionValidator
-from app.validators.duplicate_validator import DuplicateValidator
-from app.validators.quantity_validator import QuantityValidator
-from app.validators.total_cost_validator import TotalCostValidator
-from app.validators.unit_cost_validator import UnitCostValidator
 
 
-def _pair(reference: list[ExtractedRow], comparison: list[ExtractedRow]):
-    used: set[int] = set()
-    for index, ref in enumerate(reference):
-        match = None
-        if ref.item_number:
-            match = next((i for i, row in enumerate(comparison) if i not in used and row.item_number and normalize_text(row.item_number, True) == normalize_text(ref.item_number, True)), None)
-        if match is None and index < len(comparison) and index not in used: match = index
-        if match is None: yield ref, None
-        else: used.add(match); yield ref, comparison[match]
-    for i, row in enumerate(comparison):
-        if i not in used: yield None, row
+def _stringify(value: object) -> str | None:
+    if value is None:
+        return None
+    return str(value)
+
+
+def _compare_values(left: object, right: object, rule: ComparisonRule, field_type: FieldType) -> bool:
+    if left is None and right is None:
+        return True
+    if rule.strictness == "exact":
+        return left == right
+    if rule.strictness == "normalized_exact":
+        if field_type == "text":
+            return normalize_text(left, True) == normalize_text(right, True)
+        return left == right
+    if rule.strictness == "numeric_tolerance":
+        if left is None or right is None:
+            return False
+        tolerance = rule.numeric_tolerance or Decimal("0")
+        return abs(Decimal(left) - Decimal(right)) <= tolerance
+    if rule.strictness == "currency_tolerance":
+        if left is None or right is None:
+            return False
+        tolerance = rule.currency_tolerance or Decimal("0")
+        return abs(Decimal(left) - Decimal(right)) <= tolerance
+    return left == right
+
+
+def _key_for_record(record: ExtractedRecord, field_ids: list[str]) -> tuple[str, ...]:
+    values: list[str] = []
+    for field_id in field_ids:
+        field_value = get_field_value(record, field_id)
+        values.append(normalize_text(field_value.normalized_value if field_value else "", True))
+    return tuple(values)
+
+
+def _matched_pairs(
+    left_records: list[ExtractedRecord],
+    right_records: list[ExtractedRecord],
+    rule: ComparisonRule,
+) -> list[tuple[ExtractedRecord | None, ExtractedRecord | None]]:
+    if rule.match_strategy == "by_row_order":
+        size = max(len(left_records), len(right_records))
+        return [
+            (left_records[index] if index < len(left_records) else None, right_records[index] if index < len(right_records) else None)
+            for index in range(size)
+        ]
+
+    left_keys = rule.left_match_field_ids or ([rule.left_field_id] if rule.left_field_id else [])
+    right_keys = rule.right_match_field_ids or ([rule.right_field_id] if rule.right_field_id else [])
+    remaining = list(right_records)
+    pairs: list[tuple[ExtractedRecord | None, ExtractedRecord | None]] = []
+    for left_record in left_records:
+        left_key = _key_for_record(left_record, left_keys)
+        match_index = next(
+            (
+                index
+                for index, candidate in enumerate(remaining)
+                if _key_for_record(candidate, right_keys) == left_key
+            ),
+            None,
+        )
+        if match_index is None:
+            pairs.append((left_record, None))
+            continue
+        pairs.append((left_record, remaining.pop(match_index)))
+    pairs.extend((None, record) for record in remaining)
+    return pairs
+
+
+def _data_source_map(data_sources: list[ComparisonDataSource]) -> dict[str, ComparisonDataSource]:
+    return {data_source.id: data_source for data_source in data_sources}
+
+
+def _rule_records(records: list[ExtractedRecord], data_source_id: str | None) -> list[ExtractedRecord]:
+    if not data_source_id:
+        return []
+    return [record for record in records if record.data_source_id == data_source_id]
+
+
+def _compare_rule(
+    rule: ComparisonRule,
+    data_sources: list[ComparisonDataSource],
+    records: list[ExtractedRecord],
+) -> list[RuleDiscrepancy]:
+    left_records = _rule_records(records, rule.left_data_source_id)
+    right_records = _rule_records(records, rule.right_data_source_id)
+    left_field = get_field(data_sources, rule.left_field_id) if rule.left_field_id else None
+    discrepancies: list[RuleDiscrepancy] = []
+
+    for left_record, right_record in _matched_pairs(left_records, right_records, rule):
+        if not left_record or not right_record:
+            missing_side = "right" if left_record else "left"
+            source = left_record or right_record
+            discrepancies.append(
+                RuleDiscrepancy(
+                    rule_id=rule.id,
+                    rule_name=rule.rule_name,
+                    rule_type=rule.rule_type,
+                    severity=rule.severity,
+                    left_file_name=left_record.source_file_name if left_record else None,
+                    left_sheet_name=left_record.sheet_name if left_record else None,
+                    left_row_number=left_record.excel_row_number if left_record else None,
+                    right_file_name=right_record.source_file_name if right_record else None,
+                    right_sheet_name=right_record.sheet_name if right_record else None,
+                    right_row_number=right_record.excel_row_number if right_record else None,
+                    expected_value="Matching row",
+                    actual_value=f"Missing {missing_side} match",
+                    suggested_correction="Confirm the selected rows and match fields.",
+                    notes=f"No matching row was found using {rule.match_strategy}.",
+                )
+            )
+            continue
+
+        left_value = get_field_value(left_record, rule.left_field_id) if rule.left_field_id else None
+        right_value = get_field_value(right_record, rule.right_field_id) if rule.right_field_id else None
+        if left_value is None or right_value is None:
+            continue
+        if _compare_values(left_value.normalized_value, right_value.normalized_value, rule, left_field.field_type if left_field else "text"):
+            continue
+        discrepancies.append(
+            RuleDiscrepancy(
+                rule_id=rule.id,
+                rule_name=rule.rule_name,
+                rule_type=rule.rule_type,
+                severity=rule.severity,
+                left_file_name=left_record.source_file_name,
+                left_sheet_name=left_record.sheet_name,
+                left_row_number=left_record.excel_row_number,
+                left_field_name=left_value.display_name,
+                right_file_name=right_record.source_file_name,
+                right_sheet_name=right_record.sheet_name,
+                right_row_number=right_record.excel_row_number,
+                right_field_name=right_value.display_name,
+                expected_value=_stringify(left_value.raw_value),
+                actual_value=_stringify(right_value.raw_value),
+                suggested_correction=f"Align {right_value.display_name} with {left_value.display_name}.",
+                notes=f"Compared using {rule.strictness}.",
+            )
+        )
+    return discrepancies
+
+
+def _formula_result(operator: str, left: Decimal | None, right: Decimal | None) -> Decimal | None:
+    if left is None or right is None:
+        return None
+    if operator == "add":
+        return left + right
+    if operator == "subtract":
+        return left - right
+    if operator == "divide":
+        if right == 0:
+            return None
+        return left / right
+    return left * right
+
+
+def _formula_rule(
+    rule: ComparisonRule,
+    data_sources: list[ComparisonDataSource],
+    records: list[ExtractedRecord],
+) -> list[RuleDiscrepancy]:
+    if not rule.formula_settings or not rule.left_data_source_id:
+        return []
+    source_records = _rule_records(records, rule.left_data_source_id)
+    operand_fields = [get_field(data_sources, field_id) for field_id in rule.formula_settings.operand_field_ids]
+    result_field = get_field(data_sources, rule.formula_settings.result_field_id)
+    discrepancies: list[RuleDiscrepancy] = []
+    for record in source_records:
+        operands = [get_field_value(record, field.id) for field in operand_fields]
+        result_value = get_field_value(record, result_field.id)
+        numbers = [value.normalized_value if value else None for value in operands]
+        expected = _formula_result(rule.formula_settings.operator, numbers[0], numbers[1])
+        actual = result_value.normalized_value if result_value else None
+        if _compare_values(expected, actual, rule, result_field.field_type):
+            continue
+        discrepancies.append(
+            RuleDiscrepancy(
+                rule_id=rule.id,
+                rule_name=rule.rule_name,
+                rule_type=rule.rule_type,
+                severity=rule.severity,
+                left_file_name=record.source_file_name,
+                left_sheet_name=record.sheet_name,
+                left_row_number=record.excel_row_number,
+                left_field_name=result_field.display_name,
+                expected_value=_stringify(expected),
+                actual_value=_stringify(result_value.raw_value if result_value else None),
+                suggested_correction=f"Review the formula for {result_field.display_name}.",
+                notes=f"Expected {operand_fields[0].display_name} {rule.formula_settings.operator} {operand_fields[1].display_name}.",
+            )
+        )
+    return discrepancies
+
+
+def _required_field_rule(rule: ComparisonRule, records: list[ExtractedRecord]) -> list[RuleDiscrepancy]:
+    source_records = _rule_records(records, rule.left_data_source_id)
+    discrepancies: list[RuleDiscrepancy] = []
+    for record in source_records:
+        field_value = get_field_value(record, rule.left_field_id) if rule.left_field_id else None
+        if field_value and field_value.normalized_value not in (None, ""):
+            continue
+        discrepancies.append(
+            RuleDiscrepancy(
+                rule_id=rule.id,
+                rule_name=rule.rule_name,
+                rule_type=rule.rule_type,
+                severity=rule.severity,
+                left_file_name=record.source_file_name,
+                left_sheet_name=record.sheet_name,
+                left_row_number=record.excel_row_number,
+                left_field_name=field_value.display_name if field_value else None,
+                expected_value="Required value",
+                actual_value="Blank",
+                suggested_correction="Fill in the required field or exclude the row.",
+                notes="Required field check.",
+            )
+        )
+    return discrepancies
+
+
+def _duplicate_rule(rule: ComparisonRule, records: list[ExtractedRecord]) -> list[RuleDiscrepancy]:
+    source_records = _rule_records(records, rule.left_data_source_id)
+    key_fields = rule.left_match_field_ids or ([rule.left_field_id] if rule.left_field_id else [])
+    counts = Counter(_key_for_record(record, key_fields) for record in source_records)
+    duplicates = {key for key, count in counts.items() if key and count > 1}
+    discrepancies: list[RuleDiscrepancy] = []
+    for record in source_records:
+        key = _key_for_record(record, key_fields)
+        if key not in duplicates:
+            continue
+        discrepancies.append(
+            RuleDiscrepancy(
+                rule_id=rule.id,
+                rule_name=rule.rule_name,
+                rule_type=rule.rule_type,
+                severity=rule.severity,
+                left_file_name=record.source_file_name,
+                left_sheet_name=record.sheet_name,
+                left_row_number=record.excel_row_number,
+                expected_value="Unique value",
+                actual_value=", ".join(key),
+                suggested_correction="Remove or merge duplicate rows.",
+                notes="Duplicate check matched another selected row.",
+            )
+        )
+    return discrepancies
 
 
 def run_validation(request: ValidationRequest) -> ValidationResult:
-    discrepancies: list[Discrepancy] = []
-    comparison = request.comparison_rows
-    if request.mode == "reference_bidder_abstract": comparison = request.abstract_rows
-    fields = set(request.compare_fields)
-    for reference, candidate in _pair(request.reference_rows, comparison):
-        if reference is None and candidate:
-            discrepancies.append(Discrepancy(issue_type="extra_item", severity="medium", source_file_name=candidate.source_file_name,
-                comparison_sheet=candidate.sheet_name, comparison_row=candidate.excel_row_number, comparison_description=candidate.item_description,
-                suggested_correction="Confirm or remove the extra item.")); continue
-        if candidate is None and reference:
-            discrepancies.append(Discrepancy(issue_type="missing_item", severity="high", source_file_name=reference.source_file_name,
-                reference_sheet=reference.sheet_name, reference_row=reference.excel_row_number, reference_description=reference.item_description,
-                suggested_correction="Add the missing reference item.")); continue
-        assert reference and candidate
-        if "description" in fields: discrepancies.extend(DescriptionValidator().validate((reference, candidate, request.case_insensitive)))
-        if "quantity" in fields: discrepancies.extend(QuantityValidator().validate((reference, candidate)))
-        if "unit" in fields and normalize_text(reference.unit, True) != normalize_text(candidate.unit, True):
-            discrepancies.append(Discrepancy(issue_type="unit_mismatch", severity="medium", source_file_name=candidate.source_file_name,
-                reference_sheet=reference.sheet_name, reference_row=reference.excel_row_number, comparison_sheet=candidate.sheet_name,
-                comparison_row=candidate.excel_row_number, reference_description=reference.item_description,
-                expected_value=reference.unit, actual_value=candidate.unit, suggested_correction=f"Use reference unit {reference.unit}."))
-        if request.mode == "reference_bidder_abstract":
-            bidder = next((row for row in request.bidder_rows if (row.item_number and reference.item_number and normalize_text(row.item_number, True) == normalize_text(reference.item_number, True)) or normalize_text(row.item_description, request.case_insensitive) == normalize_text(reference.item_description, request.case_insensitive)), None)
-            if bidder:
-                discrepancies.extend(UnitCostValidator().validate((bidder, candidate)))
-                expected = reference.quantity * bidder.unit_cost if reference.quantity is not None and bidder.unit_cost is not None else None
-                discrepancies.extend(TotalCostValidator().validate((candidate, expected)))
-        else:
-            if "unit_cost" in fields: discrepancies.extend(UnitCostValidator().validate((reference, candidate)))
-            if "total_cost" in fields:
-                expected = candidate.quantity * candidate.unit_cost if candidate.quantity is not None and candidate.unit_cost is not None else reference.total_cost
-                discrepancies.extend(TotalCostValidator().validate((candidate, expected)))
-    for rows in [request.reference_rows, comparison]: discrepancies.extend(DuplicateValidator().validate(rows))
-    for row in request.reference_rows + comparison:
-        for issue in row.extraction_issues:
-            discrepancies.append(Discrepancy(issue_type="invalid_number_format", severity="high", source_file_name=row.source_file_name,
-                comparison_sheet=row.sheet_name, comparison_row=row.excel_row_number, comparison_description=row.item_description, notes=issue))
-    breakdown = dict(Counter(item.issue_type for item in discrepancies))
-    result = ValidationResult(id=uuid4().hex, project_name=request.project_name, mode=request.mode,
-        created_at=datetime.now(timezone.utc).isoformat(), total_rows=len(request.reference_rows) + len(comparison),
-        discrepancies=discrepancies, breakdown=breakdown)
-    return result
+    data_sources = request.data_sources
+    records: list[ExtractedRecord] = []
+    for data_source in data_sources:
+        records.extend(extract_records(data_source))
+
+    discrepancies: list[RuleDiscrepancy] = []
+    for rule in request.rules:
+        if not rule.enabled:
+            continue
+        if rule.rule_type == "compare_values":
+            discrepancies.extend(_compare_rule(rule, data_sources, records))
+        elif rule.rule_type == "formula_check":
+            discrepancies.extend(_formula_rule(rule, data_sources, records))
+        elif rule.rule_type == "required_field_check":
+            discrepancies.extend(_required_field_rule(rule, records))
+        elif rule.rule_type == "duplicate_check":
+            discrepancies.extend(_duplicate_rule(rule, records))
+
+    for record in records:
+        for issue in record.extraction_issues:
+            discrepancies.append(
+                RuleDiscrepancy(
+                    rule_id="extraction",
+                    rule_name="Extraction issue",
+                    rule_type="required_field_check",
+                    severity="high",
+                    left_file_name=record.source_file_name,
+                    left_sheet_name=record.sheet_name,
+                    left_row_number=record.excel_row_number,
+                    expected_value="Valid extracted row",
+                    actual_value=issue,
+                    suggested_correction="Review the field mapping and source row selection.",
+                    notes="Raised during extraction before rule comparison.",
+                )
+            )
+
+    rule_counts = Counter(item.rule_id for item in discrepancies)
+    summaries = [
+        RuleSummary(
+            rule_id=rule.id,
+            rule_name=rule.rule_name,
+            rule_type=rule.rule_type,
+            severity=rule.severity,
+            discrepancy_count=rule_counts.get(rule.id, 0),
+        )
+        for rule in request.rules
+        if rule.enabled
+    ]
+    file_names = sorted({record.source_file_name for record in records})
+    breakdown = dict(Counter(item.severity for item in discrepancies))
+    return ValidationResult(
+        id=uuid4().hex,
+        project_name=request.project_name,
+        preset=request.preset,
+        created_at=datetime.now(timezone.utc).isoformat(),
+        file_names=file_names,
+        total_selected_rows=len(records),
+        data_sources=data_sources,
+        extracted_records=records,
+        rule_summaries=summaries,
+        discrepancies=discrepancies,
+        breakdown=breakdown,
+    )

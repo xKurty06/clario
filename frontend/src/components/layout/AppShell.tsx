@@ -6,7 +6,6 @@ import {
   LockKeyhole,
   Menu,
   PanelRightOpen,
-  Rows3,
   Settings2,
   SlidersHorizontal,
 } from "lucide-react";
@@ -29,10 +28,9 @@ const navigation: NavigationSection[] = [
     label: "Validation workflow",
     items: [
       { to: "/upload", label: "Upload files", icon: Files },
-      { to: "/mapping", label: "Map columns", icon: SlidersHorizontal },
-      { to: "/preview", label: "Preview rows", icon: Rows3 },
-      { to: "/results", label: "Results", icon: FileSearch },
-      { to: "/reports", label: "Reports", icon: FileOutput },
+      { to: "/mapping", label: "Comparison builder", icon: SlidersHorizontal },
+      { to: "/results", label: "Validation results", icon: FileSearch },
+      { to: "/reports", label: "Export report", icon: FileOutput },
     ],
   },
   {

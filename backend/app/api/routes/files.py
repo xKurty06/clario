@@ -2,12 +2,11 @@ from fastapi import APIRouter, File, UploadFile
 
 from app.config.constants import MAX_FILES_PER_SESSION
 from app.core.exceptions import AppError
-from app.extractors.row_extractor import extract_rows
 from app.models.file_models import UploadedFile
-from app.schemas.file_schemas import HeaderInspectionRequest, PreviewRequest, PreviewResponse
+from app.schemas.file_schemas import DataSourcePreviewRequest, DataSourcePreviewResponse, HeaderInspectionRequest
+from app.services.extraction_service import preview_data_source
 from app.services.file_service import get_file, save_upload
 from app.services.sheet_service import inspect_header, inspect_sheets
-from app.utils.column_utils import suggest_columns
 
 router = APIRouter(prefix="/files", tags=["files"])
 
@@ -33,18 +32,9 @@ async def upload_files(files: list[UploadFile] = File(...)) -> list[UploadedFile
     return results
 
 
-@router.post("/suggest-columns")
-async def column_suggestions(payload: dict[str, object]) -> dict[str, object]:
-    headers = [str(value) for value in payload.get("headers", [])]
-    sample_rows = payload.get("sample_rows", [])
-    return {"suggestions": suggest_columns(headers, sample_rows if isinstance(sample_rows, list) else [])}
-
-
-@router.post("/preview", response_model=PreviewResponse)
-async def preview_rows(request: PreviewRequest) -> PreviewResponse:
-    name, path, _ = get_file(request.file_id)
-    rows = extract_rows(request.file_id, name, path, request.template)
-    return PreviewResponse(rows=rows[:500], total=len(rows))
+@router.post("/data-source-preview", response_model=DataSourcePreviewResponse)
+async def data_source_preview(request: DataSourcePreviewRequest) -> DataSourcePreviewResponse:
+    return DataSourcePreviewResponse.model_validate(preview_data_source(request.data_source))
 
 
 @router.post("/inspect-header")

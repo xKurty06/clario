@@ -1,1 +1,3 @@
-"""Validation API schema placeholder for Phase 3."""
+from app.models.comparison_models import ValidationRequest, ValidationResult
+
+__all__ = ["ValidationRequest", "ValidationResult"]

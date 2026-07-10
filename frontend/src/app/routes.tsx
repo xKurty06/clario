@@ -1,7 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "../components/layout/AppShell";
 import { DashboardPage } from "../pages/DashboardPage";
-import { PreviewRowsPage } from "../pages/PreviewRowsPage";
 import { ReportExportPage } from "../pages/ReportExportPage";
 import { TemplateManagerPage } from "../pages/TemplateManagerPage";
 import { TemplateMappingPage } from "../pages/TemplateMappingPage";
@@ -15,7 +14,7 @@ export function AppRoutes() {
         <Route index element={<DashboardPage />} />
         <Route path="upload" element={<UploadFilesPage />} />
         <Route path="mapping" element={<TemplateMappingPage />} />
-        <Route path="preview" element={<PreviewRowsPage />} />
+        <Route path="preview" element={<Navigate to="/mapping" replace />} />
         <Route path="results" element={<ValidationResultsPage />} />
         <Route path="reports" element={<ReportExportPage />} />
         <Route path="templates" element={<TemplateManagerPage />} />
@@ -24,4 +23,3 @@ export function AppRoutes() {
     </Routes>
   );
 }
-
