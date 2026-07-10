@@ -21,6 +21,23 @@ main :where(button, a, span) {
   min-width: 0;
 }
 
+main :where(.truncate) {
+  overflow: visible !important;
+  text-overflow: clip !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+main :where([class*="whitespace-nowrap"]) {
+  white-space: normal !important;
+}
+
+main :where([class*="break-normal"]) {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 @keyframes sidebar-expand-enter {
   from { opacity: 0; transform: translateX(-8px); }
   to { opacity: 1; transform: translateX(0); }
