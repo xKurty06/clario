@@ -22,20 +22,18 @@ main :where(button, a, span) {
 }
 
 main :where(.truncate) {
-  overflow: visible !important;
-  text-overflow: clip !important;
-  white-space: normal !important;
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
 }
 
-main :where([class*="whitespace-nowrap"]) {
-  white-space: normal !important;
+main :where(.whitespace-nowrap) {
+  white-space: normal;
 }
 
-main :where([class*="break-normal"]) {
-  overflow-wrap: anywhere;
-  word-break: break-word;
+main [class*="flex"][class*="flex-wrap"][class*="items-center"][class*="gap-y-1"] > h2.truncate {
+  flex: 0 1 auto;
+  max-width: calc(100% - 7.5rem);
 }
 
 @keyframes sidebar-expand-enter {
