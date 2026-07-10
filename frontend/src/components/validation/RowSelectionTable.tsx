@@ -1,5 +1,5 @@
-import { Ban, CheckSquare, RotateCcw, Square, Table2 } from "lucide-react";
-import { useEffect, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { Ban, CheckSquare, ChevronDown, MoreHorizontal, RotateCcw, Square, Table2 } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
 import type { PreviewRow } from "../../types/validation.types";
 
 interface RowSelectionTableProps {
@@ -18,6 +18,8 @@ interface DragSelectionState {
 
 const toolbarButtonClass = "inline-flex h-8 items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600";
 const rangeInputClass = "h-6 w-14 rounded-md border border-slate-200 bg-white px-1.5 text-center text-xs font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
+const menuItemClass = "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus:bg-slate-50 focus:outline-none";
+const menuSectionClass = "px-3 pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400";
 
 function rowText(row: PreviewRow) {
   return Object.values(row.cells).map((value) => String(value ?? "")).join(" ").trim();
@@ -25,12 +27,12 @@ function rowText(row: PreviewRow) {
 
 function rowStatus(row: PreviewRow, headers: string[]) {
   const text = rowText(row);
-  if (row.ignored) return { label: "Ignored", className: "bg-slate-100 text-slate-600" };
+  if (row.ignored) return { label: "Excluded", className: "bg-slate-100 text-slate-600" };
   if (!text) return { label: "Blank", className: "bg-zinc-100 text-zinc-600" };
   const headerHits = headers.filter((header) => header && text.toLowerCase().includes(header.toLowerCase())).length;
   if (headerHits >= Math.min(2, headers.length)) return { label: "Header-like", className: "bg-amber-50 text-amber-700" };
-  if (row.selected) return { label: "Selected", className: "bg-emerald-50 text-emerald-700" };
-  return { label: "Not selected", className: "bg-slate-50 text-slate-500" };
+  if (row.selected) return { label: "Included", className: "bg-emerald-50 text-emerald-700" };
+  return { label: "Not included", className: "bg-slate-50 text-slate-500" };
 }
 
 export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, onIgnoreRows, onMarkDataRows }: RowSelectionTableProps) {
@@ -42,6 +44,8 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
   const [rangeStart, setRangeStart] = useState("");
   const [rangeEnd, setRangeEnd] = useState("");
   const [rangeError, setRangeError] = useState("");
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const moreActionsRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!dragSelection) return undefined;
@@ -53,6 +57,23 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
       window.removeEventListener("blur", endDrag);
     };
   }, [dragSelection]);
+
+  useEffect(() => {
+    if (!moreActionsOpen) return undefined;
+    const closeOnOutsideClick = (event: globalThis.MouseEvent) => {
+      if (moreActionsRef.current?.contains(event.target as Node)) return;
+      setMoreActionsOpen(false);
+    };
+    const closeOnEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") setMoreActionsOpen(false);
+    };
+    window.addEventListener("mousedown", closeOnOutsideClick);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("mousedown", closeOnOutsideClick);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [moreActionsOpen]);
 
   const applyDragSelection = (rowNumber: number, selecting: boolean, selectedRowsSet: Set<number>) => {
     const nextSelectedRows = new Set(selectedRowsSet);
@@ -110,20 +131,22 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
     setRangeError("");
   };
 
+  const runMoreAction = (action: () => void) => {
+    action();
+    setMoreActionsOpen(false);
+  };
+
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+    <div className="rounded-2xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3 text-xs font-semibold text-slate-700">
-        <button title="Select all rows in this preview" aria-label="Select all rows in this preview" onClick={() => onSelectRows(visibleRows)} className={toolbarButtonClass}>
+        <button title="Include all rows in this preview" aria-label="Include all rows in this preview" onClick={() => onSelectRows(visibleRows)} className={toolbarButtonClass}>
           <CheckSquare className="size-3.5" /> Select all
         </button>
         <button title="Clear the current row selection" aria-label="Clear the current row selection" onClick={() => onSelectRows([])} className={toolbarButtonClass}>
           <Square className="size-3.5" /> Select none
         </button>
-        <button title="Invert which preview rows are selected" aria-label="Invert which preview rows are selected" onClick={() => onSelectRows(rows.filter((row) => !row.selected).map((row) => row.row_number))} className={toolbarButtonClass}>
+        <button title="Invert which preview rows are included" aria-label="Invert which preview rows are included" onClick={() => onSelectRows(rows.filter((row) => !row.selected).map((row) => row.row_number))} className={toolbarButtonClass}>
           <RotateCcw className="size-3.5" /> Invert
-        </button>
-        <button title="Select the rows shown in this preview table" aria-label="Select the rows shown in this preview table" onClick={() => onSelectRows(visibleRows)} className={toolbarButtonClass}>
-          <Table2 className="size-3.5" /> Select visible
         </button>
         <form
           className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100"
@@ -177,15 +200,52 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
         </form>
         {rangeError ? <span className="rounded-lg bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700" role="alert">{rangeError}</span> : null}
         <span className="mx-1 h-5 w-px bg-slate-200" />
-        <button title="Ignore blank preview rows so they are skipped during validation" aria-label="Exclude blank rows from validation" onClick={() => onIgnoreRows(blankRows)} className={toolbarButtonClass}>Exclude blank rows</button>
-        <button title="Ignore rows containing the word total" aria-label="Exclude total rows from validation" onClick={() => onIgnoreRows(rowsContaining("total"))} className={toolbarButtonClass}>Exclude total rows</button>
-        <button title="Ignore rows containing the word subtotal" aria-label="Exclude subtotal rows from validation" onClick={() => onIgnoreRows(rowsContaining("subtotal"))} className={toolbarButtonClass}>Exclude subtotal rows</button>
-        <button title="Ignore rows containing the phrase grand total" aria-label="Exclude grand total rows from validation" onClick={() => onIgnoreRows(rowsContaining("grand total"))} className={toolbarButtonClass}>Exclude grand total rows</button>
-        <span className="mx-1 h-5 w-px bg-slate-200" />
-        <button title="Mark the selected preview rows as ignored" aria-label="Mark selected rows as ignored" onClick={() => onIgnoreRows(selectedRows)} className={toolbarButtonClass}>
-          <Ban className="size-3.5" /> Mark selected as ignored
-        </button>
-        <button title="Mark the selected preview rows as data rows" aria-label="Mark selected rows as data" onClick={() => onMarkDataRows(selectedRows)} className={toolbarButtonClass}>Mark selected as data</button>
+        <div ref={moreActionsRef} className="relative">
+          <button
+            type="button"
+            title="Open extra row cleanup and include/exclude actions"
+            aria-label="Open more row actions"
+            aria-haspopup="menu"
+            aria-expanded={moreActionsOpen}
+            onClick={() => setMoreActionsOpen((open) => !open)}
+            className={toolbarButtonClass}
+          >
+            <MoreHorizontal className="size-3.5" /> More row actions <ChevronDown className={`size-3.5 transition ${moreActionsOpen ? "rotate-180" : ""}`} />
+          </button>
+          {moreActionsOpen ? (
+            <div
+              role="menu"
+              className="absolute right-0 top-full z-30 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/70"
+            >
+              <p className="px-3 py-2 text-xs leading-5 text-slate-500">Extra actions for cleaning detected rows without crowding the main toolbar.</p>
+              <div className="my-1 h-px bg-slate-100" />
+              <p className={menuSectionClass}>Selection</p>
+              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onSelectRows(visibleRows))} className={menuItemClass} title="Include the rows currently shown in this preview table">
+                <Table2 className="size-3.5" /> Select visible
+              </button>
+              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(selectedRows))} className={menuItemClass} title="Move the currently selected rows to excluded rows so validation skips them">
+                <Ban className="size-3.5" /> Exclude selected
+              </button>
+              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onMarkDataRows(selectedRows))} className={menuItemClass} title="Move selected rows back into included data rows">
+                <CheckSquare className="size-3.5" /> Include selected
+              </button>
+              <div className="my-1 h-px bg-slate-100" />
+              <p className={menuSectionClass}>Clean rows</p>
+              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(blankRows))} className={menuItemClass} title="Exclude blank preview rows so they are skipped during validation">
+                Exclude blank rows
+              </button>
+              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsContaining("total")))} className={menuItemClass} title="Exclude rows containing the word total">
+                Exclude rows containing total
+              </button>
+              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsContaining("subtotal")))} className={menuItemClass} title="Exclude rows containing the word subtotal">
+                Exclude rows containing subtotal
+              </button>
+              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsContaining("grand total")))} className={menuItemClass} title="Exclude rows containing the phrase grand total">
+                Exclude rows containing grand total
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
       <div className="max-h-[520px] overflow-auto">
         <table className={`w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs ${dragSelection ? "select-none" : ""}`}>
@@ -206,7 +266,7 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
                   tabIndex={0}
                   role="button"
                   aria-label={`${row.selected ? "Unselect" : "Select"} Excel row ${row.row_number}`}
-                  title="Click or drag across rows to select or unselect them"
+                  title="Click or drag across rows to include or exclude them from validation"
                   onMouseDown={(event) => handleRowMouseDown(event, row)}
                   onMouseEnter={() => handleRowMouseEnter(row.row_number)}
                   onKeyDown={(event) => handleRowKeyDown(event, row.row_number)}
