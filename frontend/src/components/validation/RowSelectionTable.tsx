@@ -1,4 +1,5 @@
 import { Ban, CheckSquare, RotateCcw, Square, Table2 } from "lucide-react";
+import type { KeyboardEvent } from "react";
 import type { PreviewRow } from "../../types/validation.types";
 
 interface RowSelectionTableProps {
@@ -30,6 +31,12 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
   const rowsContaining = (term: string) => rows.filter((row) => rowText(row).toLowerCase().includes(term)).map((row) => row.row_number);
   const blankRows = rows.filter((row) => !rowText(row)).map((row) => row.row_number);
 
+  const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, rowNumber: number) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onToggleRow(rowNumber);
+  };
+
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3 text-xs font-semibold text-slate-700">
@@ -60,7 +67,7 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
         <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs">
           <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600">
             <tr>
-              <th className="w-12 border-b border-slate-200 p-2.5">Use</th>
+              <th className="w-12 border-b border-slate-200 p-2.5 text-center">Use</th>
               <th className="w-24 border-b border-slate-200 p-2.5">Excel row</th>
               <th className="w-28 border-b border-slate-200 p-2.5">Status</th>
               {headers.map((header) => <th key={header} className="max-w-64 border-b border-slate-200 p-2.5">{header || "Blank header"}</th>)}
@@ -70,16 +77,34 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
             {rows.map((row) => {
               const status = rowStatus(row, headers);
               return (
-                <tr key={row.row_number} className={`group border-t border-slate-100 align-top hover:bg-slate-50 ${row.selected ? "bg-emerald-50/50" : ""} ${row.ignored ? "opacity-60" : ""}`}>
-                  <td className="border-b border-slate-100 p-2.5">
-                    <input type="checkbox" checked={row.selected} onChange={() => onToggleRow(row.row_number)} />
+                <tr
+                  key={row.row_number}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`${row.selected ? "Unselect" : "Select"} Excel row ${row.row_number}`}
+                  title="Click anywhere on this row to select or unselect it"
+                  onClick={() => onToggleRow(row.row_number)}
+                  onKeyDown={(event) => handleRowKeyDown(event, row.row_number)}
+                  className={`group cursor-pointer border-t border-slate-100 align-middle transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${row.selected ? "bg-emerald-50/50" : ""} ${row.ignored ? "opacity-60" : ""}`}
+                >
+                  <td className="border-b border-slate-100 p-0 align-middle">
+                    <div className="flex min-h-11 items-center justify-center px-2.5 py-2">
+                      <input
+                        type="checkbox"
+                        aria-label={`${row.selected ? "Unselect" : "Select"} Excel row ${row.row_number}`}
+                        checked={row.selected}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => onToggleRow(row.row_number)}
+                        className="size-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
+                      />
+                    </div>
                   </td>
-                  <td className="border-b border-slate-100 p-2.5 font-semibold text-slate-700">{row.row_number}</td>
-                  <td className="border-b border-slate-100 p-2.5">
+                  <td className="border-b border-slate-100 p-2.5 align-middle font-semibold text-slate-700">{row.row_number}</td>
+                  <td className="border-b border-slate-100 p-2.5 align-middle">
                     <span className={`inline-flex rounded-full px-2 py-1 font-semibold ${status.className}`}>{status.label}</span>
                   </td>
                   {headers.map((header) => (
-                    <td key={`${row.row_number}-${header}`} className="max-w-64 truncate border-b border-slate-100 p-2.5 text-slate-700" title={String(row.cells[header] ?? "")}>
+                    <td key={`${row.row_number}-${header}`} className="max-w-64 truncate border-b border-slate-100 p-2.5 align-middle text-slate-700" title={String(row.cells[header] ?? "")}>
                       {String(row.cells[header] ?? "")}
                     </td>
                   ))}
