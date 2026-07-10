@@ -56,7 +56,7 @@ export function BuilderStepper({ steps, activeStep, onStepChange }: BuilderStepp
         </div>
       </div>
 
-      <footer className="fixed bottom-4 right-4 left-[calc(var(--app-sidebar-offset,0px)+1rem)] z-40 transition-[left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)]">
+      <footer className="fixed bottom-4 left-[var(--app-sidebar-offset,0px)] right-0 z-40 px-4 transition-[left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-[1400px] flex-col gap-3 rounded-3xl border border-slate-200 bg-white/95 p-2 shadow-[0_18px_55px_rgba(15,23,42,0.16)] backdrop-blur sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
