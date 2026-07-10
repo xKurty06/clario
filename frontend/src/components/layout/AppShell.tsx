@@ -10,7 +10,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { appConfig } from "../../app/config";
 
@@ -41,9 +41,10 @@ const navigation: NavigationSection[] = [
 
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
+  const shellStyle = { "--app-sidebar-offset": collapsed ? "72px" : "272px" } as CSSProperties;
 
   return (
-    <div className="min-h-[100dvh] bg-slate-50 text-slate-950">
+    <div className="min-h-[100dvh] bg-slate-50 text-slate-950" style={shellStyle}>
       <aside
         className={`fixed inset-y-0 left-0 z-30 flex flex-col overflow-hidden border-r border-slate-200 bg-white transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${collapsed ? "w-[72px]" : "w-[272px]"}`}
       >
