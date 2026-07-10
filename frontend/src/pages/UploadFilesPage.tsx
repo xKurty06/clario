@@ -11,6 +11,7 @@ import type { PresetSelection } from "../types/validation.types";
 import { isSupportedFileName } from "../utils/validators";
 
 const DEFAULT_SESSION_NAME = "New session";
+const requiredBadgeClass = "rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold leading-5 text-amber-700";
 
 function nextSessionName(existingNames: string[]) {
   const names = new Set(existingNames.map((name) => name.trim()).filter(Boolean));
@@ -113,7 +114,7 @@ export function UploadFilesPage() {
                 <label htmlFor="session-name" className="text-sm font-semibold text-slate-900">Session name</label>
                 <HelpTip text="Give this review a clear name. The same name is used in the validation result and PDF report." />
               </div>
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700">Required</span>
+              <span className={requiredBadgeClass}>Required</span>
             </div>
             <input
               id="session-name"
@@ -135,7 +136,7 @@ export function UploadFilesPage() {
               >
                 Comparison preset
               </FieldLabel>
-              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-700">Required</span>
+              <span className={requiredBadgeClass}>Required</span>
             </div>
             <SelectField
               className="mt-2"
