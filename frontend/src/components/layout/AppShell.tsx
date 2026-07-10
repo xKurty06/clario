@@ -44,7 +44,7 @@ export function AppShell() {
   const shellStyle = { "--app-sidebar-offset": collapsed ? "72px" : "272px" } as CSSProperties;
 
   return (
-    <div className="min-h-[100dvh] bg-slate-50 text-slate-950" style={shellStyle}>
+    <div className="min-h-[100dvh] overflow-x-hidden bg-slate-50 text-slate-950" style={shellStyle}>
       <aside
         className={`fixed inset-y-0 left-0 z-30 flex flex-col overflow-hidden border-r border-slate-200 bg-white transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${collapsed ? "w-[72px]" : "w-[272px]"}`}
       >
@@ -65,9 +65,9 @@ export function AppShell() {
           ) : (
             <>
               <div className="sidebar-expand-enter grid size-8 shrink-0 place-items-center rounded-[10px] bg-emerald-700 text-xs font-bold text-white">PV</div>
-              <div className="sidebar-expand-enter absolute left-[60px] right-[56px] min-w-0 whitespace-nowrap">
-                <p className="whitespace-nowrap text-sm font-semibold">{appConfig.displayName}</p>
-                <p className="whitespace-nowrap text-xs text-slate-500">Local desktop workspace</p>
+              <div className="sidebar-expand-enter absolute left-[60px] right-[56px] min-w-0">
+                <p className="truncate text-sm font-semibold" title={appConfig.displayName}>{appConfig.displayName}</p>
+                <p className="truncate text-xs text-slate-500" title="Local desktop workspace">Local desktop workspace</p>
               </div>
               <button
                 type="button"
@@ -103,7 +103,7 @@ export function AppShell() {
                     to={to}
                   >
                     <Icon aria-hidden="true" className="size-[18px] shrink-0" />
-                    <span className={`overflow-hidden whitespace-nowrap transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${collapsed ? "w-0 -translate-x-2 opacity-0" : "w-[150px] translate-x-0 opacity-100 delay-75"}`}>{label}</span>
+                    <span className={`min-w-0 overflow-hidden truncate transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${collapsed ? "w-0 -translate-x-2 opacity-0" : "w-[150px] translate-x-0 opacity-100 delay-75"}`}>{label}</span>
                   </NavLink>
                 ))}
               </div>
@@ -117,19 +117,19 @@ export function AppShell() {
               <LockKeyhole aria-hidden="true" className="size-4" />
             ) : (
               <>
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-center gap-2">
                   <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
-                  <span className="w-[160px] whitespace-nowrap text-xs font-semibold">Local-only by design</span>
+                  <span className="min-w-0 truncate text-xs font-semibold" title="Local-only by design">Local-only by design</span>
                 </div>
-                <p className="mt-2 h-5 whitespace-nowrap text-xs leading-5 text-emerald-700">Files stay on this Windows device.</p>
+                <p className="mt-2 truncate text-xs leading-5 text-emerald-700" title="Files stay on this Windows device.">Files stay on this Windows device.</p>
               </>
             )}
           </div>
         </div>
       </aside>
 
-      <main className={`min-w-0 p-8 transition-[margin-left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${collapsed ? "ml-[72px]" : "ml-[272px]"}`}>
-        <div className="mx-auto max-w-[1400px]">
+      <main className={`min-w-0 px-4 py-6 pb-32 transition-[margin-left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] sm:px-6 lg:px-8 lg:py-8 lg:pb-32 ${collapsed ? "ml-[72px]" : "ml-[272px]"}`}>
+        <div className="mx-auto min-w-0 max-w-[1400px]">
           <Outlet />
         </div>
       </main>
