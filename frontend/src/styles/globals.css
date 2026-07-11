@@ -32,6 +32,21 @@ main thead.sticky {
   z-index: 30;
 }
 
+main :where(div:has(> button[aria-label="Include all rows in this preview"])) {
+  position: relative;
+  z-index: 60;
+  isolation: isolate;
+}
+
+main :where(div:has(> button[aria-label="Include all rows in this preview"]) + div) {
+  position: relative;
+  z-index: 0;
+}
+
+main :where([role="menu"]) {
+  z-index: 90;
+}
+
 main :where(.truncate) {
   white-space: normal;
   overflow: visible;
