@@ -1,5 +1,6 @@
 import { Wand2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { SelectField } from "../components/forms/SelectField";
 import { ComparisonBuilderPage } from "./ComparisonBuilderPage";
 import { useWorkflow } from "../features/files/WorkflowContext";
 import type { UploadedFile } from "../types/file.types";
@@ -151,6 +152,10 @@ function PresetRoleChooser({
     : hasDuplicateChoice
       ? "Choose a different uploaded file for each role."
       : "";
+  const fileOptions = [
+    { value: "", label: "Select uploaded file", description: "Choose which workbook should use this preset role." },
+    ...files.map((file) => ({ value: file.id, label: file.name, description: `${file.extension.toUpperCase()} • ${file.sheets.length} sheet${file.sheets.length === 1 ? "" : "s"}` })),
+  ];
 
   return (
     <div data-preset-role-dialog className="fixed inset-0 z-[70] flex items-center justify-center px-4">
@@ -168,31 +173,33 @@ function PresetRoleChooser({
           <div className="min-w-0">
             <h2 id="preset-role-title" className="text-lg font-semibold text-slate-950">Choose preset file roles</h2>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              Select which uploaded file should be used for each preset role. This avoids relying on upload order.
+              Select which uploaded file should be used for each preset role.
             </p>
           </div>
         </div>
 
         <div className="mt-5 space-y-3">
           {roles.map((role, index) => (
-            <label key={role} className="block rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <span className="text-sm font-semibold text-slate-950">{role}</span>
-              <span className="mt-1 block text-xs text-slate-500">Choose the workbook that should be labeled as {role.toLowerCase()}.</span>
-              <select
+            <section key={role} className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-4 shadow-sm">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-950">{role}</h3>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">Choose the workbook that should be labeled as {role.toLowerCase()}.</p>
+                </div>
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">Role {index + 1}</span>
+              </div>
+              <SelectField
+                ariaLabel={`${role} uploaded file`}
+                helpText={`Choose the uploaded workbook for ${role}.`}
                 value={roleFileIds[index] ?? ""}
-                onChange={(event) => {
+                options={fileOptions}
+                onChange={(value) => {
                   const next = [...roleFileIds];
-                  next[index] = event.target.value;
+                  next[index] = value;
                   setRoleFileIds(next);
                 }}
-                className="mt-3 w-full rounded-2xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 outline-none transition focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100"
-              >
-                <option value="">Select uploaded file</option>
-                {files.map((file) => (
-                  <option key={file.id} value={file.id}>{file.name}</option>
-                ))}
-              </select>
-            </label>
+              />
+            </section>
           ))}
         </div>
 
