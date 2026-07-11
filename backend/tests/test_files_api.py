@@ -20,6 +20,24 @@ def make_preview_workbook(path: Path) -> None:
     book.save(path)
 
 
+def preview_payload(file_id: str, file_name: str) -> dict[str, object]:
+    return {
+        "data_source": {
+            "id": "source-1",
+            "name": "Items source",
+            "file_id": file_id,
+            "file_name": file_name,
+            "sheet_name": "Items",
+            "header_row": 1,
+            "first_data_row": 2,
+            "selected_row_numbers": [],
+            "ignored_row_numbers": [],
+            "row_selection_mode": "auto_detected",
+            "fields": [],
+        }
+    }
+
+
 def test_data_source_preview_route_returns_preview(tmp_path: Path) -> None:
     path = tmp_path / "preview.xlsx"
     make_preview_workbook(path)
@@ -27,21 +45,7 @@ def test_data_source_preview_route_returns_preview(tmp_path: Path) -> None:
 
     response = TestClient(app).post(
         "/api/v1/files/data-source-preview",
-        json={
-            "data_source": {
-                "id": "source-1",
-                "name": "Items source",
-                "file_id": "file-1",
-                "file_name": "preview.xlsx",
-                "sheet_name": "Items",
-                "header_row": 1,
-                "first_data_row": 2,
-                "selected_row_numbers": [],
-                "ignored_row_numbers": [],
-                "row_selection_mode": "auto_detected",
-                "fields": [],
-            }
-        },
+        json=preview_payload("file-1", "preview.xlsx"),
     )
 
     assert response.status_code == 200
@@ -49,6 +53,21 @@ def test_data_source_preview_route_returns_preview(tmp_path: Path) -> None:
     assert body["data_source"]["selected_row_numbers"] == [2]
     assert body["columns"][1]["letter"] == "B"
     assert body["rows"][0]["cells"]["Description"] == "Bond Paper"
+
+
+def test_data_source_preview_keeps_uploaded_display_name(tmp_path: Path) -> None:
+    path = tmp_path / "abc123.xlsx"
+    make_preview_workbook(path)
+    register_file("file-1", path)
+
+    response = TestClient(app).post(
+        "/api/v1/files/data-source-preview",
+        json=preview_payload("file-1", "original-upload-name.xlsx"),
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["data_source"]["file_name"] == "original-upload-name.xlsx"
 
 
 def test_get_file_recovers_persisted_upload_metadata(tmp_path: Path, monkeypatch) -> None:
