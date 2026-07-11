@@ -43,28 +43,6 @@ function rowStatus(row: PreviewRow, headers: string[]) {
   return { label: "Not included", className: "bg-slate-50 text-slate-500" };
 }
 
-function isBlankHeaderLabel(header: string) {
-  return !header.trim() || /^Blank header(?: \(\d+\))?$/i.test(header.trim());
-}
-
-function blankHeaderSuffix(header: string) {
-  return header.trim().match(/^Blank header(?: \((\d+)\))?$/i)?.[1];
-}
-
-function renderHeaderLabel(header: string) {
-  if (!isBlankHeaderLabel(header)) return header;
-  const suffix = blankHeaderSuffix(header);
-  return (
-    <span
-      className="inline-flex items-center gap-1 rounded-md border border-dashed border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[11px] font-medium italic text-slate-400"
-      title="This column has no visible header in the selected Excel header row."
-    >
-      Blank header
-      {suffix ? <span className="not-italic text-[10px] font-semibold text-slate-300">#{suffix}</span> : null}
-    </span>
-  );
-}
-
 function normalizedSelectionBox(selection: DragSelectionState) {
   const left = Math.min(selection.startClientX, selection.currentClientX);
   const right = Math.max(selection.startClientX, selection.currentClientX);
@@ -424,7 +402,7 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
               <th className="w-12 border-b border-slate-200 p-2.5 text-center">Use</th>
               <th className="w-24 border-b border-slate-200 p-2.5">Excel row</th>
               <th className="w-28 border-b border-slate-200 p-2.5">Status</th>
-              {headers.map((header) => <th key={header} className="max-w-64 border-b border-slate-200 p-2.5">{renderHeaderLabel(header)}</th>)}
+              {headers.map((header) => <th key={header} className="max-w-64 border-b border-slate-200 p-2.5">{header}</th>)}
             </tr>
           </thead>
           <tbody>
