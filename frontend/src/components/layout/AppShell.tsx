@@ -14,6 +14,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { appConfig } from "../../app/config";
 import { CommonFieldsChooser } from "../validation/CommonFieldsChooser";
+import { RowPreviewControls } from "../validation/RowPreviewControls";
 
 interface NavigationSection {
   label: string;
@@ -191,6 +192,7 @@ export function AppShell() {
           </div>
         </div>
       </main>
+      <RowPreviewControls />
       <CommonFieldsChooser />
     </div>
   );
