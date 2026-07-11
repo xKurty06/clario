@@ -1,5 +1,6 @@
 import { X, type LucideIcon } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 interface BuilderDrawerProps {
   title: string;
@@ -99,10 +100,10 @@ export function BuilderDrawer({
 
   if (!rendered) return null;
 
-  return (
-    <div className="fixed inset-0 z-50">
+  const drawer = (
+    <div className="fixed inset-0 z-[90]">
       <button
-        className={`absolute inset-0 bg-slate-950/30 backdrop-blur-[2px] ${closing ? "animate-[builder-backdrop-out_220ms_cubic-bezier(0.16,1,0.3,1)_forwards]" : "animate-[builder-backdrop-in_220ms_cubic-bezier(0.16,1,0.3,1)_forwards]"}`}
+        className={`absolute inset-0 bg-slate-950/45 backdrop-blur-[3px] ${closing ? "animate-[builder-backdrop-out_220ms_cubic-bezier(0.16,1,0.3,1)_forwards]" : "animate-[builder-backdrop-in_220ms_cubic-bezier(0.16,1,0.3,1)_forwards]"}`}
         aria-label="Close drawer"
         onClick={requestCancel}
       />
@@ -194,4 +195,6 @@ export function BuilderDrawer({
       </aside>
     </div>
   );
+
+  return createPortal(drawer, document.body);
 }
