@@ -10,7 +10,6 @@ from app.models.file_models import SheetInfo
 from app.normalizers.text_normalizer import normalize_text
 
 HEADER_TERMS = ("item", "description", "particular", "specification", "qty", "quantity", "unit", "cost", "price", "amount", "total")
-BLANK_HEADER_LABEL = "Blank header"
 SHEET_PREVIEW_ROW_LIMIT = 60
 
 
@@ -24,8 +23,8 @@ def _clean_header_value(value: object) -> str:
 def clean_headers(values: list[object]) -> list[str]:
     headers: list[str] = []
     counts: dict[str, int] = {}
-    for value in values:
-        base = _clean_header_value(value) or BLANK_HEADER_LABEL
+    for index, value in enumerate(values):
+        base = _clean_header_value(value) or f"Column {index + 1}"
         count = counts.get(base.casefold(), 0) + 1
         counts[base.casefold()] = count
         headers.append(base if count == 1 else f"{base} ({count})")
@@ -56,57 +55,11 @@ def _pad_values(values: list[Any], column_count: int) -> list[Any]:
     return values + [None] * (column_count - len(values))
 
 
-def _selected_header_values(path: Path, sheet_name: str, frame: pd.DataFrame, header_row: int) -> list[str]:
-    """Read the selected header row exactly as Excel shows it.
-
-    Pandas and workbook engines can sometimes make merged headers look duplicated.
-    For header detection we need the real row values, especially for non-anchor
-    merged cells that look blank in Excel.
-    """
-    row_index = header_row - 1
-    column_count = len(frame.columns)
-    if row_index < 0 or row_index >= len(frame) or column_count <= 0:
-        return []
-
-    suffix = path.suffix.lower()
-    values: list[Any]
-    try:
-        if suffix == ".xlsx":
-            import openpyxl
-            workbook = openpyxl.load_workbook(path, read_only=True, data_only=True)
-            try:
-                worksheet = workbook[sheet_name]
-                values = [cell.value for cell in next(worksheet.iter_rows(min_row=header_row, max_row=header_row, max_col=column_count))]
-            finally:
-                workbook.close()
-            return [_clean_header_value(value) for value in _pad_values(values, column_count)]
-        if suffix == ".xls":
-            import xlrd
-            workbook = xlrd.open_workbook(path, on_demand=True)
-            try:
-                worksheet = workbook.sheet_by_name(sheet_name)
-                values = worksheet.row_values(row_index, 0, min(column_count, worksheet.ncols)) if row_index < worksheet.nrows else []
-            finally:
-                workbook.release_resources()
-            return [_clean_header_value(value) for value in _pad_values(values, column_count)]
-    except Exception:
-        pass
-
-    return [_clean_header_value(value) for value in frame.iloc[row_index].tolist()]
-
-
 def composite_headers(path: Path, sheet_name: str, frame: pd.DataFrame, header_row: int) -> list[str]:
-    """Combine split headings ending at the user-selected header row.
-
-    Blank cells on the selected header row intentionally stay blank. This avoids
-    showing duplicated merged labels for columns that look empty in Excel.
-    Parent merged headings are only used when the selected header row has its own
-    visible child header for that column.
-    """
+    """Combine split headings ending at the user-selected header row."""
     end_index = header_row - 1
     if end_index < 0 or end_index >= len(frame):
         raise ValueError("Header row is outside the worksheet")
-    selected_header_values = _selected_header_values(path, sheet_name, frame, header_row)
     ranges = _merged_ranges(path, sheet_name)
     starts = [row_start for row_start, row_end, _, _ in ranges if row_start <= end_index < row_end]
     start_index = min(starts) if starts else end_index
@@ -122,17 +75,12 @@ def composite_headers(path: Path, sheet_name: str, frame: pd.DataFrame, header_r
                 matrix.iat[row - start_index, column] = anchor
     combined: list[str] = []
     for column in range(len(frame.columns)):
-        selected_header_text = selected_header_values[column] if column < len(selected_header_values) else ""
-        if not selected_header_text:
-            combined.append("")
-            continue
-
         parts: list[str] = []
         for value in matrix.iloc[:, column].tolist():
             text = _clean_header_value(value)
             if text and text.casefold() not in {part.casefold() for part in parts}:
                 parts.append(text)
-        combined.append(" / ".join(parts) if parts else selected_header_text)
+        combined.append(" / ".join(parts))
     return clean_headers(combined)
 
 
