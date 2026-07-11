@@ -302,8 +302,8 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
   })();
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white p-3 text-xs font-semibold text-slate-700">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="flex flex-wrap items-center gap-2 rounded-t-2xl border-b border-slate-200 bg-white p-3 text-xs font-semibold text-slate-700">
         <button title="Include all rows in this preview" aria-label="Include all rows in this preview" onClick={() => onSelectRows(visibleRows)} className={toolbarButtonClass}>
           <CheckSquare className="size-3.5" /> Select all
         </button>
@@ -410,7 +410,7 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
           ) : null}
         </div>
       </div>
-      <div ref={scrollContainerRef} className="relative max-h-[520px] overflow-auto">
+      <div ref={scrollContainerRef} className="relative max-h-[520px] overflow-auto rounded-b-2xl bg-white">
         {selectionBoxStyle ? (
           <div
             aria-hidden="true"
