@@ -77,11 +77,10 @@ function prepareCollapsibleElement(element: HTMLElement) {
   element.style.transition = [
     `max-height ${smoothCollapseTiming}`,
     `opacity ${smoothCollapseTiming}`,
-    `filter ${smoothFeedbackTiming}`,
     `transform ${smoothCollapseTiming}`,
     `box-shadow ${smoothFeedbackTiming}`,
   ].join(", ");
-  element.style.willChange = "max-height, opacity, filter, transform, box-shadow";
+  element.style.willChange = "max-height, opacity, transform, box-shadow";
 }
 
 function applyReloadVisualState(article: HTMLElement, state?: ReloadVisualState) {
@@ -90,22 +89,19 @@ function applyReloadVisualState(article: HTMLElement, state?: ReloadVisualState)
     if (element.dataset.rowPreviewAnimating === "true") continue;
 
     if (state === "loading") {
-      element.style.opacity = "0.62";
-      element.style.filter = "blur(0.6px) saturate(0.94)";
-      element.style.transform = "scale(0.998)";
+      element.style.opacity = "1";
+      element.style.transform = "none";
       element.style.boxShadow = "inset 0 0 0 1px rgba(16, 185, 129, 0.12)";
       continue;
     }
 
     if (state === "reloaded") {
       element.style.opacity = "1";
-      element.style.filter = "none";
-      element.style.transform = "scale(1)";
+      element.style.transform = "none";
       element.style.boxShadow = "inset 0 0 0 1px rgba(16, 185, 129, 0.28), 0 16px 40px rgba(16, 185, 129, 0.08)";
       continue;
     }
 
-    element.style.filter = "";
     element.style.boxShadow = "";
     if (element.dataset.rowPreviewCollapsed !== "true") {
       element.style.opacity = "";
@@ -120,7 +116,6 @@ function finishExpandedElement(element: HTMLElement) {
   element.hidden = false;
   element.style.maxHeight = "";
   element.style.opacity = "";
-  element.style.filter = "";
   element.style.transform = "";
   element.style.boxShadow = "";
   element.style.pointerEvents = "";
@@ -132,7 +127,6 @@ function finishCollapsedElement(element: HTMLElement) {
   element.hidden = true;
   element.style.maxHeight = "0px";
   element.style.opacity = "0";
-  element.style.filter = "";
   element.style.transform = "translateY(-4px)";
   element.style.boxShadow = "";
   element.style.pointerEvents = "none";
@@ -182,7 +176,6 @@ function setCollapsibleElementState(element: HTMLElement, collapsed: boolean) {
     element.hidden = false;
     element.style.maxHeight = `${element.scrollHeight}px`;
     element.style.opacity = "1";
-    element.style.filter = "";
     element.style.transform = "translateY(0)";
     element.style.boxShadow = "";
     element.style.pointerEvents = "none";
@@ -201,7 +194,6 @@ function setCollapsibleElementState(element: HTMLElement, collapsed: boolean) {
   element.hidden = false;
   element.style.maxHeight = "0px";
   element.style.opacity = "0";
-  element.style.filter = "";
   element.style.transform = "translateY(-4px)";
   element.style.boxShadow = "";
   element.style.pointerEvents = "";
@@ -240,7 +232,6 @@ function cleanupInactiveSlots(activeMounts: HTMLElement[], activeFeedbackMounts:
     element.ontransitionend = null;
     element.style.maxHeight = "";
     element.style.opacity = "";
-    element.style.filter = "";
     element.style.overflow = "";
     element.style.pointerEvents = "";
     element.style.transform = "";
@@ -374,7 +365,7 @@ export function RowPreviewControls() {
               target.mount,
             )}
             {target.feedbackMount && reloadState ? createPortal(
-              <div className={`absolute inset-0 flex items-center justify-center rounded-2xl transition duration-300 ${reloadState === "loading" ? "bg-white/70 backdrop-blur-[2px]" : "bg-emerald-50/45"}`}>
+              <div className={`absolute inset-0 flex items-center justify-center rounded-2xl transition duration-300 ${reloadState === "loading" ? "bg-white/55" : "bg-emerald-50/45"}`}>
                 <div className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold shadow-lg shadow-slate-200/60 animate-[app-section-fade-in_180ms_cubic-bezier(0.16,1,0.3,1)_both] ${reloadState === "loading" ? "border-slate-200 bg-white text-slate-700" : "border-emerald-100 bg-white text-emerald-700"}`}>
                   {reloadState === "loading" ? <LoaderCircle className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                   {reloadState === "loading" ? "Reloading preview..." : "Preview reloaded"}
