@@ -11,6 +11,11 @@ interface RowPreviewTarget {
 }
 
 const toolbarButtonClass = "inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-60";
+const smoothCollapseTiming = "220ms cubic-bezier(0.16, 1, 0.3, 1)";
+
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
 
 function findRowPreviewArticle(source: ComparisonDataSource) {
   const headings = Array.from(document.querySelectorAll<HTMLElement>("main article h2"));
@@ -41,11 +46,109 @@ function ensureControlsMount(article: HTMLElement, sourceId: string) {
   return mount;
 }
 
+function prepareCollapsibleElement(element: HTMLElement) {
+  element.dataset.rowPreviewCollapsible = "true";
+  element.style.overflow = "hidden";
+  element.style.transition = [
+    `max-height ${smoothCollapseTiming}`,
+    `opacity ${smoothCollapseTiming}`,
+    `transform ${smoothCollapseTiming}`,
+  ].join(", ");
+  element.style.willChange = "max-height, opacity, transform";
+}
+
+function finishExpandedElement(element: HTMLElement) {
+  if (element.dataset.rowPreviewCollapsed === "true") return;
+  element.hidden = false;
+  element.style.maxHeight = "";
+  element.style.opacity = "";
+  element.style.transform = "";
+  element.style.pointerEvents = "";
+}
+
+function setCollapsibleElementState(element: HTMLElement, collapsed: boolean) {
+  if (element.dataset.rowPreviewCollapsible !== "true") {
+    prepareCollapsibleElement(element);
+    element.dataset.rowPreviewCollapsed = String(collapsed);
+    if (collapsed) {
+      element.hidden = true;
+      element.style.maxHeight = "0px";
+      element.style.opacity = "0";
+      element.style.transform = "translateY(-4px)";
+      element.style.pointerEvents = "none";
+    } else {
+      finishExpandedElement(element);
+    }
+    return;
+  }
+
+  const wasCollapsed = element.dataset.rowPreviewCollapsed === "true";
+  if (wasCollapsed === collapsed) {
+    if (collapsed) {
+      element.hidden = true;
+      element.style.maxHeight = "0px";
+      element.style.opacity = "0";
+      element.style.transform = "translateY(-4px)";
+      element.style.pointerEvents = "none";
+    } else {
+      finishExpandedElement(element);
+    }
+    return;
+  }
+
+  element.dataset.rowPreviewCollapsed = String(collapsed);
+
+  if (prefersReducedMotion()) {
+    if (collapsed) {
+      element.hidden = true;
+      element.style.maxHeight = "0px";
+      element.style.opacity = "0";
+      element.style.transform = "translateY(-4px)";
+      element.style.pointerEvents = "none";
+    } else {
+      finishExpandedElement(element);
+    }
+    return;
+  }
+
+  if (collapsed) {
+    element.hidden = false;
+    element.style.maxHeight = `${element.scrollHeight}px`;
+    element.style.opacity = "1";
+    element.style.transform = "translateY(0)";
+    element.style.pointerEvents = "none";
+    window.requestAnimationFrame(() => {
+      element.style.maxHeight = "0px";
+      element.style.opacity = "0";
+      element.style.transform = "translateY(-4px)";
+    });
+    element.ontransitionend = (event) => {
+      if (event.target !== element || event.propertyName !== "max-height") return;
+      if (element.dataset.rowPreviewCollapsed === "true") element.hidden = true;
+    };
+    return;
+  }
+
+  element.hidden = false;
+  element.style.maxHeight = "0px";
+  element.style.opacity = "0";
+  element.style.transform = "translateY(-4px)";
+  element.style.pointerEvents = "";
+  window.requestAnimationFrame(() => {
+    element.style.maxHeight = `${element.scrollHeight}px`;
+    element.style.opacity = "1";
+    element.style.transform = "translateY(0)";
+  });
+  element.ontransitionend = (event) => {
+    if (event.target !== element || event.propertyName !== "max-height") return;
+    finishExpandedElement(element);
+  };
+}
+
 function applyCollapsedState(article: HTMLElement, collapsed: boolean) {
   Array.from(article.children).slice(1).forEach((child) => {
     if (!(child instanceof HTMLElement)) return;
-    child.dataset.rowPreviewCollapsible = "true";
-    child.hidden = collapsed;
+    setCollapsibleElementState(child, collapsed);
   });
   article.dataset.rowPreviewCollapsed = String(collapsed);
 }
@@ -59,7 +162,16 @@ function cleanupInactiveSlots(activeMounts: HTMLElement[]) {
     const article = element.closest("article") as HTMLElement | null;
     if (article?.querySelector("[data-row-preview-controls-slot]")) return;
     element.hidden = false;
+    element.ontransitionend = null;
+    element.style.maxHeight = "";
+    element.style.opacity = "";
+    element.style.overflow = "";
+    element.style.pointerEvents = "";
+    element.style.transform = "";
+    element.style.transition = "";
+    element.style.willChange = "";
     delete element.dataset.rowPreviewCollapsible;
+    delete element.dataset.rowPreviewCollapsed;
   });
 }
 
@@ -131,7 +243,7 @@ export function RowPreviewControls() {
         const error = sourceErrors[source.id];
 
         return createPortal(
-          <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2 animate-[app-section-fade-in_140ms_cubic-bezier(0.16,1,0.3,1)_both]">
             {error ? <span className="max-w-64 rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-700" title={error}>{error}</span> : null}
             <button
               type="button"
@@ -150,7 +262,7 @@ export function RowPreviewControls() {
               onClick={() => setCollapsedSources((current) => ({ ...current, [source.id]: !collapsed }))}
               className={toolbarButtonClass}
             >
-              <ChevronDown className={`size-4 transition ${collapsed ? "-rotate-90" : ""}`} />
+              <ChevronDown className={`size-4 transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${collapsed ? "-rotate-90" : ""}`} />
               {collapsed ? "Expand" : "Collapse"}
             </button>
           </div>,
