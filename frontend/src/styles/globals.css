@@ -93,7 +93,6 @@ main :where(div:has(> h2.truncate + span.inline-flex) > span.inline-flex) {
 
 .app-route-fade {
   animation: app-route-fade-in 120ms ease-out both;
-  will-change: opacity;
 }
 
 .app-route-fade :where(section, article, [data-fade-section]) {
