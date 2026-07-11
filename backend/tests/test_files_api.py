@@ -11,14 +11,18 @@ def register_file(file_id: str, path: Path) -> None:
     file_service._files[file_id] = (path.name, path, path.stat().st_size)
 
 
-def test_data_source_preview_route_returns_preview(tmp_path: Path) -> None:
-    path = tmp_path / "preview.xlsx"
+def make_preview_workbook(path: Path) -> None:
     book = openpyxl.Workbook()
     sheet = book.active
     sheet.title = "Items"
     sheet.append(["Item Number", "Description", "Quantity"])
     sheet.append(["1", "Bond Paper", 2])
     book.save(path)
+
+
+def test_data_source_preview_route_returns_preview(tmp_path: Path) -> None:
+    path = tmp_path / "preview.xlsx"
+    make_preview_workbook(path)
     register_file("file-1", path)
 
     response = TestClient(app).post(
@@ -45,3 +49,37 @@ def test_data_source_preview_route_returns_preview(tmp_path: Path) -> None:
     assert body["data_source"]["selected_row_numbers"] == [2]
     assert body["columns"][1]["letter"] == "B"
     assert body["rows"][0]["cells"]["Description"] == "Bond Paper"
+
+
+def test_get_file_recovers_persisted_upload_metadata(tmp_path: Path, monkeypatch) -> None:
+    upload_dir = tmp_path / "working-files"
+    upload_dir.mkdir()
+    path = upload_dir / "abc123.xlsx"
+    make_preview_workbook(path)
+
+    monkeypatch.setattr(file_service.get_settings(), "data_directory", tmp_path)
+    file_service._files.clear()
+    file_service._write_file_metadata("abc123", "original.xlsx", path, path.stat().st_size)
+    file_service._files.clear()
+
+    name, recovered_path, size = file_service.get_file("abc123")
+
+    assert name == "original.xlsx"
+    assert recovered_path == path
+    assert size == path.stat().st_size
+
+
+def test_get_file_recovers_existing_disk_file_without_metadata(tmp_path: Path, monkeypatch) -> None:
+    upload_dir = tmp_path / "working-files"
+    upload_dir.mkdir()
+    path = upload_dir / "abc123.xlsx"
+    make_preview_workbook(path)
+
+    monkeypatch.setattr(file_service.get_settings(), "data_directory", tmp_path)
+    file_service._files.clear()
+
+    name, recovered_path, size = file_service.get_file("abc123")
+
+    assert name == "abc123.xlsx"
+    assert recovered_path == path
+    assert size == path.stat().st_size
