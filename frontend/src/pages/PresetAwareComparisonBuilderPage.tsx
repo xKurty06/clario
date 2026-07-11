@@ -1,5 +1,6 @@
 import { Wand2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { SelectField } from "../components/forms/SelectField";
 import { ComparisonBuilderPage } from "./ComparisonBuilderPage";
 import { useWorkflow } from "../features/files/WorkflowContext";
@@ -157,9 +158,9 @@ function PresetRoleChooser({
     ...files.map((file) => ({ value: file.id, label: file.name, description: `${file.extension.toUpperCase()} • ${file.sheets.length} sheet${file.sheets.length === 1 ? "" : "s"}` })),
   ];
 
-  return (
-    <div data-preset-role-dialog className="fixed inset-0 z-[70] flex items-center justify-center px-4">
-      <button aria-label="Close preset setup chooser" className="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px]" onClick={onClose} />
+  const dialog = (
+    <div data-preset-role-dialog className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+      <button aria-label="Close preset setup chooser" className="absolute inset-0 bg-slate-950/45 backdrop-blur-[3px]" onClick={onClose} />
       <div
         role="dialog"
         aria-modal="true"
@@ -214,4 +215,6 @@ function PresetRoleChooser({
       </div>
     </div>
   );
+
+  return createPortal(dialog, document.body);
 }
