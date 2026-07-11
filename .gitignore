@@ -22,3 +22,12 @@ backend/reports/generated/
 *.log
 .DS_Store
 Thumbs.db
+
+# Playwright test outputs
+/frontend/test-results/
+/frontend/playwright-report/
+/frontend/blob-report/
+/frontend/.playwright/
+
+# Local sample/testing spreadsheets
+/sample_files/
