@@ -10,7 +10,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { appConfig } from "../../app/config";
 
@@ -39,9 +39,63 @@ const navigation: NavigationSection[] = [
   },
 ];
 
+const previewCopyReplacements = [
+  ["Preview rows to detect candidate data rows and prepare field mapping", "Load a row preview to detect candidate data rows and prepare field mapping"],
+  ["Preview rows for this source to enable row selection", "Load a row preview for this source to enable row selection"],
+  ["Preview rows before selecting data rows.", "Load a preview before selecting data rows."],
+  ["Preview this source before adding fields.", "Load this source preview before adding fields."],
+  ["Refresh preview", "Reload preview"],
+  ["Preview rows", "Load preview"],
+] as const;
+
+function applyPreviewCopy(value: string) {
+  return previewCopyReplacements.reduce((text, [from, to]) => text.replaceAll(from, to), value);
+}
+
+function applyPreviewCopyAliases(root: ParentNode) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  let node = walker.nextNode();
+  while (node) {
+    const nextValue = applyPreviewCopy(node.nodeValue ?? "");
+    if (nextValue !== node.nodeValue) node.nodeValue = nextValue;
+    node = walker.nextNode();
+  }
+
+  if (root instanceof Element || root instanceof Document || root instanceof DocumentFragment) {
+    root.querySelectorAll<HTMLElement>("[title], [aria-label]").forEach((element) => {
+      for (const attribute of ["title", "aria-label"]) {
+        const value = element.getAttribute(attribute);
+        if (!value) continue;
+        const nextValue = applyPreviewCopy(value);
+        if (nextValue !== value) element.setAttribute(attribute, nextValue);
+      }
+    });
+  }
+}
+
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
   const shellStyle = { "--app-sidebar-offset": collapsed ? "72px" : "272px" } as CSSProperties;
+
+  useEffect(() => {
+    let frame: number | null = null;
+    const scheduleCopyUpdate = () => {
+      if (frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        applyPreviewCopyAliases(document.body);
+      });
+    };
+
+    scheduleCopyUpdate();
+    const observer = new MutationObserver(scheduleCopyUpdate);
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+
+    return () => {
+      observer.disconnect();
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, []);
 
   return (
     <div className="min-h-[100dvh] overflow-x-hidden bg-slate-50 text-slate-950" style={shellStyle}>
