@@ -16,6 +16,10 @@ interface DragSelectionState {
   startClientY: number;
   currentClientX: number;
   currentClientY: number;
+  startContentX: number;
+  startContentY: number;
+  currentContentX: number;
+  currentContentY: number;
   baseSelectedRows: number[];
   mode: "include" | "exclude";
   hasMoved: boolean;
@@ -44,15 +48,34 @@ function rowStatus(row: PreviewRow, headers: string[]) {
 }
 
 function normalizedSelectionBox(selection: DragSelectionState) {
-  const left = Math.min(selection.startClientX, selection.currentClientX);
-  const right = Math.max(selection.startClientX, selection.currentClientX);
-  const top = Math.min(selection.startClientY, selection.currentClientY);
-  const bottom = Math.max(selection.startClientY, selection.currentClientY);
+  const left = Math.min(selection.startContentX, selection.currentContentX);
+  const right = Math.max(selection.startContentX, selection.currentContentX);
+  const top = Math.min(selection.startContentY, selection.currentContentY);
+  const bottom = Math.max(selection.startContentY, selection.currentContentY);
   return { left, right, top, bottom };
 }
 
-function boxesIntersect(first: DOMRect | { left: number; right: number; top: number; bottom: number }, second: { left: number; right: number; top: number; bottom: number }) {
+function boxesIntersect(first: { left: number; right: number; top: number; bottom: number }, second: { left: number; right: number; top: number; bottom: number }) {
   return first.left <= second.right && first.right >= second.left && first.top <= second.bottom && first.bottom >= second.top;
+}
+
+function clientPointToContent(container: HTMLDivElement, clientX: number, clientY: number) {
+  const bounds = container.getBoundingClientRect();
+  return {
+    x: clientX - bounds.left + container.scrollLeft,
+    y: clientY - bounds.top + container.scrollTop,
+  };
+}
+
+function elementContentBox(element: HTMLElement, container: HTMLDivElement) {
+  const elementBounds = element.getBoundingClientRect();
+  const containerBounds = container.getBoundingClientRect();
+  return {
+    left: elementBounds.left - containerBounds.left + container.scrollLeft,
+    right: elementBounds.right - containerBounds.left + container.scrollLeft,
+    top: elementBounds.top - containerBounds.top + container.scrollTop,
+    bottom: elementBounds.bottom - containerBounds.top + container.scrollTop,
+  };
 }
 
 export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, onIgnoreRows, onMarkDataRows }: RowSelectionTableProps) {
@@ -77,12 +100,14 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
   }, [dragSelection]);
 
   const rowsInsideSelection = (selection: DragSelectionState) => {
+    const container = scrollContainerRef.current;
+    if (!container) return [];
     const box = normalizedSelectionBox(selection);
     return rows
       .filter((row) => {
         const element = rowRefs.current.get(row.row_number);
         if (!element) return false;
-        return boxesIntersect(element.getBoundingClientRect(), box);
+        return boxesIntersect(elementContentBox(element, container), box);
       })
       .map((row) => row.row_number);
   };
@@ -137,7 +162,14 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
       if (deltaY || deltaX) {
         container.scrollTop += deltaY;
         container.scrollLeft += deltaX;
-        const nextSelection = { ...selection, currentClientX: pointer.x, currentClientY: pointer.y };
+        const contentPoint = clientPointToContent(container, pointer.x, pointer.y);
+        const nextSelection = {
+          ...selection,
+          currentClientX: pointer.x,
+          currentClientY: pointer.y,
+          currentContentX: contentPoint.x,
+          currentContentY: contentPoint.y,
+        };
         dragSelectionRef.current = nextSelection;
         setDragSelection(nextSelection);
         applyBoxSelection(nextSelection);
@@ -156,14 +188,18 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
 
     const handleMouseMove = (event: globalThis.MouseEvent) => {
       const current = dragSelectionRef.current;
-      if (!current) return;
+      const container = scrollContainerRef.current;
+      if (!current || !container) return;
       lastPointerRef.current = { x: event.clientX, y: event.clientY };
       const distance = Math.hypot(event.clientX - current.startClientX, event.clientY - current.startClientY);
       const hasMoved = current.hasMoved || distance > dragThreshold;
+      const contentPoint = clientPointToContent(container, event.clientX, event.clientY);
       const nextSelection = {
         ...current,
         currentClientX: event.clientX,
         currentClientY: event.clientY,
+        currentContentX: contentPoint.x,
+        currentContentY: contentPoint.y,
         hasMoved,
       };
       dragSelectionRef.current = nextSelection;
@@ -215,13 +251,20 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
 
   const handleRowMouseDown = (event: MouseEvent<HTMLTableRowElement>, row: PreviewRow) => {
     if (event.button !== 0) return;
+    const container = scrollContainerRef.current;
+    if (!container) return;
     event.preventDefault();
     const mode = row.selected ? "exclude" : "include";
+    const contentPoint = clientPointToContent(container, event.clientX, event.clientY);
     const initialSelection = {
       startClientX: event.clientX,
       startClientY: event.clientY,
       currentClientX: event.clientX,
       currentClientY: event.clientY,
+      startContentX: contentPoint.x,
+      startContentY: contentPoint.y,
+      currentContentX: contentPoint.x,
+      currentContentY: contentPoint.y,
       baseSelectedRows: selectedRows,
       mode,
       hasMoved: false,
@@ -267,13 +310,11 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
   };
 
   const selectionBoxStyle = (() => {
-    if (!dragSelection?.hasMoved || !scrollContainerRef.current) return undefined;
-    const container = scrollContainerRef.current;
-    const containerBounds = container.getBoundingClientRect();
+    if (!dragSelection?.hasMoved) return undefined;
     const box = normalizedSelectionBox(dragSelection);
     return {
-      left: box.left - containerBounds.left + container.scrollLeft,
-      top: box.top - containerBounds.top + container.scrollTop,
+      left: box.left,
+      top: box.top,
       width: Math.max(box.right - box.left, 1),
       height: Math.max(box.bottom - box.top, 1),
     } satisfies CSSProperties;
