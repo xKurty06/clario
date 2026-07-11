@@ -61,6 +61,11 @@ def _columns(headers: list[str]) -> list[ColumnReference]:
     ]
 
 
+def _display_file_name(data_source: ComparisonDataSource, recovered_file_name: str) -> str:
+    """Prefer the user-facing uploaded name over the internal working-file name."""
+    return data_source.file_name or recovered_file_name
+
+
 def _normalize_value(value: Any, field: ComparisonField) -> Any:
     field_type = field.field_type
     if field_type == "text":
@@ -98,7 +103,8 @@ def _auto_selected_rows(frame: pd.DataFrame, headers: list[str], data_source: Co
 
 
 def preview_data_source(data_source: ComparisonDataSource) -> DataSourcePreview:
-    file_name, path, _ = get_file(data_source.file_id)
+    recovered_file_name, path, _ = get_file(data_source.file_id)
+    display_file_name = _display_file_name(data_source, recovered_file_name)
     frame = _load_frame(path, data_source.sheet_name)
     headers = composite_headers(path, data_source.sheet_name, frame, data_source.header_row)
     selected_rows = set(data_source.selected_row_numbers or _auto_selected_rows(frame, headers, data_source))
@@ -116,7 +122,7 @@ def preview_data_source(data_source: ComparisonDataSource) -> DataSourcePreview:
                 cells=cells,
             )
         )
-    source = data_source.model_copy(update={"file_name": file_name, "selected_row_numbers": sorted(selected_rows)})
+    source = data_source.model_copy(update={"file_name": display_file_name, "selected_row_numbers": sorted(selected_rows)})
     return DataSourcePreview(
         data_source=source,
         columns=_columns(headers),
