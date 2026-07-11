@@ -29,7 +29,15 @@ main :where(a, button).rounded-xl:where(.bg-emerald-700, .border-slate-300) {
 }
 
 main thead.sticky {
+  top: -1px;
   z-index: 30;
+  background: #f1f5f9;
+  box-shadow: 0 -2px 0 #f1f5f9, 0 1px 0 #e2e8f0;
+}
+
+main thead.sticky th {
+  background: #f1f5f9;
+  box-shadow: 0 -1px 0 #f1f5f9, 0 1px 0 #e2e8f0;
 }
 
 main :where(div:has(> button[aria-label="Include all rows in this preview"])) {
