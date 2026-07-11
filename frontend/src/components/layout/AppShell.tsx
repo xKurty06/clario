@@ -13,6 +13,7 @@ import type { LucideIcon } from "lucide-react";
 import { useEffect, useState, type CSSProperties } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { appConfig } from "../../app/config";
+import { CommonFieldsChooser } from "../validation/CommonFieldsChooser";
 
 interface NavigationSection {
   label: string;
@@ -190,6 +191,7 @@ export function AppShell() {
           </div>
         </div>
       </main>
+      <CommonFieldsChooser />
     </div>
   );
 }
