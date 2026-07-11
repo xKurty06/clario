@@ -21,6 +21,13 @@ main :where(button, a, span) {
   min-width: 0;
 }
 
+main :where(a, button).rounded-xl:where(.bg-emerald-700, .border-slate-300) {
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.25rem;
+}
+
 main :where(.truncate) {
   white-space: normal;
   overflow: visible;
