@@ -12,7 +12,6 @@ interface RowPreviewTarget {
 
 const toolbarButtonClass = "inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-60";
 const smoothCollapseTiming = "360ms cubic-bezier(0.16, 1, 0.3, 1)";
-const smoothControlTiming = "240ms cubic-bezier(0.16, 1, 0.3, 1)";
 
 function prefersReducedMotion() {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -60,6 +59,7 @@ function prepareCollapsibleElement(element: HTMLElement) {
 
 function finishExpandedElement(element: HTMLElement) {
   if (element.dataset.rowPreviewCollapsed === "true") return;
+  delete element.dataset.rowPreviewAnimating;
   element.hidden = false;
   element.style.maxHeight = "";
   element.style.opacity = "";
@@ -67,16 +67,22 @@ function finishExpandedElement(element: HTMLElement) {
   element.style.pointerEvents = "";
 }
 
+function finishCollapsedElement(element: HTMLElement) {
+  delete element.dataset.rowPreviewAnimating;
+  if (element.dataset.rowPreviewCollapsed !== "true") return;
+  element.hidden = true;
+  element.style.maxHeight = "0px";
+  element.style.opacity = "0";
+  element.style.transform = "translateY(-4px)";
+  element.style.pointerEvents = "none";
+}
+
 function setCollapsibleElementState(element: HTMLElement, collapsed: boolean) {
   if (element.dataset.rowPreviewCollapsible !== "true") {
     prepareCollapsibleElement(element);
     element.dataset.rowPreviewCollapsed = String(collapsed);
     if (collapsed) {
-      element.hidden = true;
-      element.style.maxHeight = "0px";
-      element.style.opacity = "0";
-      element.style.transform = "translateY(-4px)";
-      element.style.pointerEvents = "none";
+      finishCollapsedElement(element);
     } else {
       finishExpandedElement(element);
     }
@@ -85,12 +91,12 @@ function setCollapsibleElementState(element: HTMLElement, collapsed: boolean) {
 
   const wasCollapsed = element.dataset.rowPreviewCollapsed === "true";
   if (wasCollapsed === collapsed) {
+    // MutationObserver syncs can run several times while an animation is still in
+    // progress. Do not re-apply the final hidden/open state during that window,
+    // or later preview tables can appear to collapse instantly.
+    if (element.dataset.rowPreviewAnimating === "true") return;
     if (collapsed) {
-      element.hidden = true;
-      element.style.maxHeight = "0px";
-      element.style.opacity = "0";
-      element.style.transform = "translateY(-4px)";
-      element.style.pointerEvents = "none";
+      finishCollapsedElement(element);
     } else {
       finishExpandedElement(element);
     }
@@ -101,16 +107,15 @@ function setCollapsibleElementState(element: HTMLElement, collapsed: boolean) {
 
   if (prefersReducedMotion()) {
     if (collapsed) {
-      element.hidden = true;
-      element.style.maxHeight = "0px";
-      element.style.opacity = "0";
-      element.style.transform = "translateY(-4px)";
-      element.style.pointerEvents = "none";
+      finishCollapsedElement(element);
     } else {
       finishExpandedElement(element);
     }
     return;
   }
+
+  element.dataset.rowPreviewAnimating = "true";
+  element.ontransitionend = null;
 
   if (collapsed) {
     element.hidden = false;
@@ -125,7 +130,7 @@ function setCollapsibleElementState(element: HTMLElement, collapsed: boolean) {
     });
     element.ontransitionend = (event) => {
       if (event.target !== element || event.propertyName !== "max-height") return;
-      if (element.dataset.rowPreviewCollapsed === "true") element.hidden = true;
+      finishCollapsedElement(element);
     };
     return;
   }
@@ -171,6 +176,7 @@ function cleanupInactiveSlots(activeMounts: HTMLElement[]) {
     element.style.transform = "";
     element.style.transition = "";
     element.style.willChange = "";
+    delete element.dataset.rowPreviewAnimating;
     delete element.dataset.rowPreviewCollapsible;
     delete element.dataset.rowPreviewCollapsed;
   });
