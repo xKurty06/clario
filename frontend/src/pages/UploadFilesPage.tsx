@@ -158,9 +158,9 @@ export function UploadFilesPage() {
             {presetError && <p className="mt-2 text-xs font-medium text-red-700" role="alert">{presetError}</p>}
             <p className="mt-2 text-xs leading-5 text-slate-500">The preset only creates a starting structure. You can still customize sources, rows, fields, and rules later.</p>
           </div>
-          <div className="rounded-xl bg-emerald-50 p-3 text-xs leading-5 text-emerald-800">
-            <LockKeyhole className="mb-2 size-4" />
-            No cloud upload, account, or internet connection is used.
+          <div className="flex items-start gap-2 rounded-xl bg-emerald-50 p-3 text-xs leading-5 text-emerald-800">
+            <LockKeyhole className="mt-0.5 size-4 shrink-0" />
+            <span>No cloud upload, account, or internet connection is used.</span>
           </div>
         </section>
 
