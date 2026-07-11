@@ -1,4 +1,4 @@
-import { CheckSquare, Search, Wand2, X } from "lucide-react";
+import { Search, Wand2, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useWorkflow } from "../../features/files/WorkflowContext";
 import type { ComparisonDataSource, ComparisonField, DataSourcePreview, FieldType } from "../../types/validation.types";
@@ -198,9 +198,8 @@ export function CommonFieldsChooser() {
                       className="mt-1 size-4 rounded border-slate-300 accent-emerald-700"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-2 font-semibold text-slate-950">
+                      <span className="block font-semibold text-slate-950">
                         {choice.template.field_name}
-                        {checked && !disabled ? <CheckSquare className="size-3.5 text-emerald-700" /> : null}
                       </span>
                       <span className="mt-1 block text-xs leading-5 text-slate-500">
                         {choice.inferredField
