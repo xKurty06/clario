@@ -28,6 +28,10 @@ main :where(a, button).rounded-xl:where(.bg-emerald-700, .border-slate-300) {
   line-height: 1.25rem;
 }
 
+main thead.sticky {
+  z-index: 30;
+}
+
 main :where(.truncate) {
   white-space: normal;
   overflow: visible;
