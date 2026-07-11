@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -21,6 +22,8 @@ from app.normalizers.number_normalizer import normalize_number
 from app.normalizers.text_normalizer import normalize_text
 from app.services.file_service import get_file
 from app.services.sheet_service import composite_headers
+
+_INTERNAL_WORKING_FILE_PATTERN = re.compile(r"^[0-9a-f]{32}\.[A-Za-z0-9]+$", re.IGNORECASE)
 
 
 def _load_frame(path: Path, sheet_name: str) -> pd.DataFrame:
@@ -63,7 +66,10 @@ def _columns(headers: list[str]) -> list[ColumnReference]:
 
 def _display_file_name(data_source: ComparisonDataSource, recovered_file_name: str) -> str:
     """Prefer the user-facing uploaded name over the internal working-file name."""
-    return data_source.file_name or recovered_file_name
+    current_name = data_source.file_name or ""
+    if current_name and not _INTERNAL_WORKING_FILE_PATTERN.fullmatch(current_name):
+        return current_name
+    return recovered_file_name
 
 
 def _normalize_value(value: Any, field: ComparisonField) -> Any:
