@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState, type CSSProperties } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { appConfig } from "../../app/config";
 
 interface NavigationSection {
@@ -75,6 +75,7 @@ function applyPreviewCopyAliases(root: ParentNode) {
 
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
+  const location = useLocation();
   const shellStyle = { "--app-sidebar-offset": collapsed ? "72px" : "272px" } as CSSProperties;
 
   useEffect(() => {
@@ -184,7 +185,9 @@ export function AppShell() {
 
       <main className={`min-w-0 px-4 py-6 pb-32 transition-[margin-left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] sm:px-6 lg:px-8 lg:py-8 lg:pb-32 ${collapsed ? "ml-[72px]" : "ml-[272px]"}`}>
         <div className="mx-auto min-w-0 max-w-[1400px]">
-          <Outlet />
+          <div key={location.pathname} className="app-route-fade">
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>
