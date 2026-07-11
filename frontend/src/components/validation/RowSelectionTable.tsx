@@ -22,6 +22,12 @@ interface DragSelectionState {
   originRowNumber: number;
 }
 
+interface HeaderGroup {
+  label: string;
+  startIndex: number;
+  colSpan: number;
+}
+
 const toolbarButtonClass = "inline-flex h-8 items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600";
 const rangeInputClass = "h-6 w-14 rounded-md border border-slate-200 bg-white px-1.5 text-center text-xs font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 const menuItemClass = "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus:bg-slate-50 focus:outline-none";
@@ -43,6 +49,33 @@ function rowStatus(row: PreviewRow, headers: string[]) {
   return { label: "Not included", className: "bg-slate-50 text-slate-500" };
 }
 
+function duplicateBaseLabel(header: string) {
+  return header.trim().replace(/\s+\(\d+\)$/u, "");
+}
+
+function groupAdjacentDuplicateHeaders(headers: string[]): HeaderGroup[] {
+  const groups: HeaderGroup[] = [];
+
+  headers.forEach((header, index) => {
+    const label = duplicateBaseLabel(header);
+    const previous = groups[groups.length - 1];
+
+    if (previous && previous.label.casefold?.() === label.casefold?.()) {
+      previous.colSpan += 1;
+      return;
+    }
+
+    if (previous && previous.label.toLowerCase() === label.toLowerCase()) {
+      previous.colSpan += 1;
+      return;
+    }
+
+    groups.push({ label, startIndex: index, colSpan: 1 });
+  });
+
+  return groups;
+}
+
 function normalizedSelectionBox(selection: DragSelectionState) {
   const left = Math.min(selection.startClientX, selection.currentClientX);
   const right = Math.max(selection.startClientX, selection.currentClientX);
@@ -60,6 +93,7 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
   const selectedRows = rows.filter((row) => row.selected).map((row) => row.row_number);
   const rowsContaining = (term: string) => rows.filter((row) => rowText(row).toLowerCase().includes(term)).map((row) => row.row_number);
   const blankRows = rows.filter((row) => !rowText(row)).map((row) => row.row_number);
+  const headerGroups = groupAdjacentDuplicateHeaders(headers);
   const [dragSelection, setDragSelection] = useState<DragSelectionState | null>(null);
   const [rangeStart, setRangeStart] = useState("");
   const [rangeEnd, setRangeEnd] = useState("");
@@ -402,7 +436,16 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
               <th className="w-12 border-b border-slate-200 p-2.5 text-center">Use</th>
               <th className="w-24 border-b border-slate-200 p-2.5">Excel row</th>
               <th className="w-28 border-b border-slate-200 p-2.5">Status</th>
-              {headers.map((header) => <th key={header} className="max-w-64 border-b border-slate-200 p-2.5">{header}</th>)}
+              {headerGroups.map((group) => (
+                <th
+                  key={`${group.label}-${group.startIndex}`}
+                  colSpan={group.colSpan}
+                  className={`max-w-64 border-b border-slate-200 p-2.5 ${group.colSpan > 1 ? "text-center" : ""}`}
+                  title={group.colSpan > 1 ? `${group.label} spans ${group.colSpan} preview columns from a merged or duplicated Excel header.` : group.label}
+                >
+                  {group.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
