@@ -4,7 +4,7 @@ import openpyxl
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.services import file_service
+from app.services import file_service, sheet_service
 
 
 def register_file(file_id: str, path: Path) -> None:
@@ -68,6 +68,26 @@ def test_data_source_preview_keeps_uploaded_display_name(tmp_path: Path) -> None
     assert response.status_code == 200
     body = response.json()
     assert body["data_source"]["file_name"] == "original-upload-name.xlsx"
+
+
+def test_inspect_sheets_returns_fast_basic_metadata(tmp_path: Path) -> None:
+    path = tmp_path / "multi-sheet.xlsx"
+    book = openpyxl.Workbook()
+    first = book.active
+    first.title = "Cover"
+    first.append(["Document title"])
+    first.append(["Item No", "Description", "Qty"])
+    first.append([1, "Bond Paper", 2])
+    second = book.create_sheet("Other")
+    second.append(["Header A", "Header B"])
+    book.save(path)
+
+    sheets = sheet_service.inspect_sheets(path)
+
+    assert [sheet.name for sheet in sheets] == ["Cover", "Other"]
+    assert sheets[0].detected_header_row == 2
+    assert sheets[0].headers == []
+    assert sheets[0].sample_rows == []
 
 
 def test_get_file_recovers_persisted_upload_metadata(tmp_path: Path, monkeypatch) -> None:
