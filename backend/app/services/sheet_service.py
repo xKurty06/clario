@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
@@ -42,8 +43,41 @@ def _merged_ranges(path: Path, sheet_name: str) -> list[tuple[int, int, int, int
     return []
 
 
+def _actual_cell_value(path: Path, sheet_name: str, frame: pd.DataFrame, row_index: int, column_index: int) -> Any:
+    """Read the visible source cell without pandas' merged-cell fill behavior.
+
+    Pandas and workbook engines can sometimes make merged headers look duplicated.
+    For header detection we need the real cell value, especially for non-anchor
+    merged cells that look blank in Excel.
+    """
+    if row_index < 0 or row_index >= len(frame) or column_index < 0 or column_index >= len(frame.columns):
+        return None
+
+    suffix = path.suffix.lower()
+    try:
+        if suffix == ".xlsx":
+            import openpyxl
+            worksheet = openpyxl.load_workbook(path, read_only=False, data_only=True)[sheet_name]
+            return worksheet.cell(row=row_index + 1, column=column_index + 1).value
+        if suffix == ".xls":
+            import xlrd
+            worksheet = xlrd.open_workbook(path, formatting_info=True).sheet_by_name(sheet_name)
+            if row_index >= worksheet.nrows or column_index >= worksheet.ncols:
+                return None
+            return worksheet.cell_value(row_index, column_index)
+    except Exception:
+        return frame.iat[row_index, column_index]
+
+    return frame.iat[row_index, column_index]
+
+
+def _selected_header_values(path: Path, sheet_name: str, frame: pd.DataFrame, header_row: int) -> list[str]:
+    row_index = header_row - 1
+    return [_clean_header_value(_actual_cell_value(path, sheet_name, frame, row_index, column_index)) for column_index in range(len(frame.columns))]
+
+
 def composite_headers(path: Path, sheet_name: str, frame: pd.DataFrame, header_row: int) -> list[str]:
-    """Combine split and merged headings ending at the user-selected header row.
+    """Combine split headings ending at the user-selected header row.
 
     Blank cells on the selected header row intentionally stay blank. This avoids
     showing duplicated merged labels for columns that look empty in Excel.
@@ -53,6 +87,7 @@ def composite_headers(path: Path, sheet_name: str, frame: pd.DataFrame, header_r
     end_index = header_row - 1
     if end_index < 0 or end_index >= len(frame):
         raise ValueError("Header row is outside the worksheet")
+    selected_header_values = _selected_header_values(path, sheet_name, frame, header_row)
     ranges = _merged_ranges(path, sheet_name)
     starts = [row_start for row_start, row_end, _, _ in ranges if row_start <= end_index < row_end]
     start_index = min(starts) if starts else end_index
@@ -68,7 +103,7 @@ def composite_headers(path: Path, sheet_name: str, frame: pd.DataFrame, header_r
                 matrix.iat[row - start_index, column] = anchor
     combined: list[str] = []
     for column in range(len(frame.columns)):
-        selected_header_text = _clean_header_value(frame.iat[end_index, column])
+        selected_header_text = selected_header_values[column]
         if not selected_header_text:
             combined.append("")
             continue
