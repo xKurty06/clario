@@ -101,6 +101,25 @@ main :where(.max-h-\[34rem\] table tbody tr) {
   border-left-width: 0 !important;
 }
 
+main :where(.max-h-\[34rem\] table tbody tr[aria-selected="true"] > td) {
+  background: #d1fae5 !important;
+  border-top: 1px solid #34d399 !important;
+  border-bottom: 1px solid #34d399 !important;
+  color: #064e3b;
+}
+
+main :where(.max-h-\[34rem\] table tbody tr[aria-selected="true"] > td:first-child) {
+  box-shadow: inset 4px 0 0 #059669 !important;
+}
+
+main :where(.max-h-\[34rem\] table tbody tr[aria-selected="true"] > td:first-child span.bg-emerald-600) {
+  display: none !important;
+}
+
+main :where(.max-h-\[34rem\] table tbody tr[aria-selected="true"] > td:first-child span.font-semibold) {
+  color: #064e3b;
+}
+
 main :where(.truncate) {
   white-space: normal;
   overflow: visible;
