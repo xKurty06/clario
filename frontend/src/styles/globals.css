@@ -55,6 +55,13 @@ main :where([role="menu"]) {
   z-index: 90;
 }
 
+main :where(.fixed.inset-0.z-\[70\]) {
+  left: calc(var(--app-sidebar-offset, 272px) * -1);
+  right: auto;
+  width: 100vw;
+  z-index: 120;
+}
+
 main :where(.truncate) {
   white-space: normal;
   overflow: visible;
