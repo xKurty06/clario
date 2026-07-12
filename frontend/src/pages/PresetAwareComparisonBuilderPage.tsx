@@ -21,7 +21,7 @@ function makeId(prefix: string) {
 }
 
 function sourceCount(files: UploadedFile[], preset: string) {
-  if (isConfigurablePreset(preset)) return Math.min(presetRoleLabels[preset].length, files.length);
+  if (isConfigurablePreset(preset)) return presetRoleLabels[preset].length;
   return Math.max(1, Math.min(3, files.length));
 }
 
@@ -51,7 +51,10 @@ function createDataSource(file: UploadedFile, index: number, preset: string): Co
 
 function scaffoldSources(files: UploadedFile[], preset: string) {
   const count = sourceCount(files, preset);
-  return files.slice(0, count).map((file, index) => createDataSource(file, index, preset));
+  return Array.from({ length: count }, (_, index) => {
+    const file = files[index] ?? files[0];
+    return file ? createDataSource(file, index, preset) : null;
+  }).filter((source): source is ComparisonDataSource => Boolean(source));
 }
 
 function closePresetBanner() {
