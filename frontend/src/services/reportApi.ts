@@ -7,7 +7,6 @@ export interface ExportedPdfReport {
   filename: string;
   savedPath: string | null;
   openUrl: string;
-  downloadUrl: string;
 }
 
 function filenameFromDisposition(disposition: string | null) {
@@ -23,10 +22,9 @@ function fallbackReportFileName(projectName: string) {
   return `${safeName || "validation"}-comparison-report.pdf`;
 }
 
-function reportUrl(resultId: string, download = false) {
+function reportUrl(resultId: string) {
   const encodedId = encodeURIComponent(resultId);
-  const suffix = download ? "?download=true" : "";
-  return `${appConfig.apiBaseUrl}/reports/${encodedId}/pdf${suffix}`;
+  return `${appConfig.apiBaseUrl}/reports/${encodedId}/pdf`;
 }
 
 export async function exportPdf(result: ValidationResult): Promise<ExportedPdfReport> {
@@ -36,6 +34,5 @@ export async function exportPdf(result: ValidationResult): Promise<ExportedPdfRe
     filename: filenameFromDisposition(response.headers.get("Content-Disposition")) ?? fallbackReportFileName(result.project_name),
     savedPath: response.headers.get("X-Report-Path"),
     openUrl: reportUrl(result.id),
-    downloadUrl: reportUrl(result.id, true),
   };
 }
