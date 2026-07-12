@@ -59,9 +59,11 @@ main :where(.fixed.inset-0.z-\[70\]) {
   z-index: 120;
 }
 
-main :where(label .help-tip),
-main :where(label [class~="help-tip"]) {
-  display: none !important;
+main :where(input + p.text-slate-500),
+main :where(.relative + p.text-slate-500),
+main :where(.relative + p.text-xs.leading-5.text-slate-500),
+main :where(label > span > span.block.text-sm.text-slate-500) {
+  display: none;
 }
 
 main :where(.truncate) {
