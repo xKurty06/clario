@@ -217,13 +217,13 @@ export function UploadFilesPage() {
 
           {formError && <p className="mt-3 text-sm text-red-700" role="alert">{formError}</p>}
           <button
-            title="Read the selected files and continue to the comparison builder"
+            title="Read the selected files and continue to row setup"
             disabled={busy}
             onClick={submit}
             className="mt-5 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           >
             {busy ? <LoaderCircle className="size-4 animate-spin" /> : null}
-            {busy ? "Inspecting files..." : "Continue to comparison builder"}
+            {busy ? "Inspecting files..." : "Continue to row setup"}
           </button>
           {files.length > 0 && <p className="mt-3 text-xs text-slate-500">{files.length} previously inspected file(s) in this session.</p>}
         </section>
