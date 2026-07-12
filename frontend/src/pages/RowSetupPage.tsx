@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, FileSpreadsheet, LoaderCircle, Play, RefreshCw, Rows3, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, FileSpreadsheet, LoaderCircle, Play, RefreshCw, Rows3, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SelectField } from "../components/forms/SelectField";
 import { PageHeader } from "../components/layout/PageHeader";
@@ -109,6 +109,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
   } = useWorkflow();
   const [busySourceId, setBusySourceId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [collapsedSourceIds, setCollapsedSourceIds] = useState<Set<string>>(() => new Set());
   const autoPreviewed = useRef<Set<string>>(new Set());
 
   const allConfirmed = dataSources.length > 0 && dataSources.every((source) => source.row_setup_confirmed);
@@ -149,6 +150,23 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
   const updateSourceSetup = (source: ComparisonDataSource, next: ComparisonDataSource, clearPreview = true) => {
     updateDataSource(source.id, { ...next, row_setup_confirmed: false });
     if (clearPreview) removeSourcePreview(source.id);
+    setCollapsedSourceIds((current) => {
+      const nextSet = new Set(current);
+      nextSet.delete(source.id);
+      return nextSet;
+    });
+  };
+
+  const toggleSource = (sourceId: string) => {
+    setCollapsedSourceIds((current) => {
+      const next = new Set(current);
+      if (next.has(sourceId)) {
+        next.delete(sourceId);
+      } else {
+        next.add(sourceId);
+      }
+      return next;
+    });
   };
 
   const changeFile = (source: ComparisonDataSource, fileId: string) => {
@@ -263,13 +281,19 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
             const columns = preview?.columns.slice(0, 8) ?? [];
             const hasMoreColumns = Boolean(preview && preview.columns.length > columns.length);
             const stalePreview = Boolean(preview && sourceSignature(preview.data_source) !== sourceSignature(source));
+            const collapsed = collapsedSourceIds.has(source.id);
 
             return (
               <section key={source.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" data-fade-section>
                 <div className="border-b border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-5">
                   <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="flex min-w-0 items-start gap-3">
-                      <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
+                    <button
+                      type="button"
+                      onClick={() => toggleSource(source.id)}
+                      aria-expanded={!collapsed}
+                      className="group flex min-w-0 flex-1 items-start gap-3 rounded-2xl text-left outline-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+                    >
+                      <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700 transition group-hover:bg-emerald-100">
                         <FileSpreadsheet className="size-5" />
                       </span>
                       <div className="min-w-0">
@@ -280,131 +304,148 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                           </span>
                         </div>
                         <p className="mt-1 text-sm leading-6 text-slate-500">{status.detail}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          Header row {source.header_row} · First data row {source.first_data_row} · {source.sheet_name || "No sheet selected"}
+                        </p>
                       </div>
+                    </button>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Source {index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleSource(source.id)}
+                        aria-label={collapsed ? `Expand ${source.name}` : `Collapse ${source.name}`}
+                        className="grid size-9 place-items-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+                      >
+                        {collapsed ? <ChevronRight className="size-4" /> : <ChevronDown className="size-4" />}
+                      </button>
                     </div>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Source {index + 1}</span>
                   </div>
                 </div>
 
-                <div className="grid gap-5 p-5 xl:grid-cols-[340px_minmax(0,1fr)]">
-                  <div className="space-y-4">
-                    <SelectField
-                      ariaLabel={`${source.name} file`}
-                      helpText="Choose which uploaded workbook this source should use."
-                      value={source.file_id}
-                      options={fileOptions}
-                      onChange={(value) => changeFile(source, value)}
-                    />
-                    <SelectField
-                      ariaLabel={`${source.name} sheet`}
-                      helpText="Choose the worksheet to inspect for this source."
-                      value={source.sheet_name}
-                      options={sheetOptions}
-                      onChange={(value) => changeSheet(source, value)}
-                    />
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className="block">
-                        <span className="text-xs font-semibold text-slate-600">Header row</span>
-                        <input
-                          type="number"
-                          min={1}
-                          value={source.header_row}
-                          onChange={(event) => changeHeaderRow(source, Number(event.target.value))}
-                          className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100"
+                <div className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${collapsed ? "grid-rows-[0fr] opacity-0" : "grid-rows-[1fr] opacity-100"}`}>
+                  <div className="overflow-hidden">
+                    <div className="grid gap-5 p-5 xl:grid-cols-[340px_minmax(0,1fr)]">
+                      <div className="space-y-4">
+                        <SelectField
+                          ariaLabel={`${source.name} file`}
+                          helpText="Choose which uploaded workbook this source should use."
+                          value={source.file_id}
+                          options={fileOptions}
+                          onChange={(value) => changeFile(source, value)}
                         />
-                      </label>
-                      <label className="block">
-                        <span className="text-xs font-semibold text-slate-600">First data row</span>
-                        <input
-                          type="number"
-                          min={source.header_row + 1}
-                          value={source.first_data_row}
-                          onChange={(event) => changeFirstDataRow(source, Number(event.target.value))}
-                          className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100"
+                        <SelectField
+                          ariaLabel={`${source.name} sheet`}
+                          helpText="Choose the worksheet to inspect for this source."
+                          value={source.sheet_name}
+                          options={sheetOptions}
+                          onChange={(value) => changeSheet(source, value)}
                         />
-                      </label>
-                    </div>
 
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
-                      Header row should contain column names. First data row should be the first real item row, not a title, lot header, blank row, or total row.
-                    </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="block">
+                            <span className="text-xs font-semibold text-slate-600">Header row</span>
+                            <input
+                              type="number"
+                              min={1}
+                              value={source.header_row}
+                              onChange={(event) => changeHeaderRow(source, Number(event.target.value))}
+                              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="text-xs font-semibold text-slate-600">First data row</span>
+                            <input
+                              type="number"
+                              min={source.header_row + 1}
+                              value={source.first_data_row}
+                              onChange={(event) => changeFirstDataRow(source, Number(event.target.value))}
+                              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100"
+                            />
+                          </label>
+                        </div>
 
-                    {errors[source.id] ? <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errors[source.id]}</p> : null}
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                          Header row should contain column names. First data row should be the first real item row, not a title, lot header, blank row, or total row.
+                        </div>
 
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => loadPreview(source)} disabled={busySourceId === source.id} className={secondaryButtonClass}>
-                        {busySourceId === source.id ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-                        {preview ? "Refresh preview" : "Load preview"}
-                      </button>
-                      <button type="button" onClick={() => confirmSource(source)} disabled={!preview || stalePreview} className={primaryButtonClass}>
-                        <CheckCircle2 className="size-4" /> Confirm setup
-                      </button>
-                    </div>
-                    {stalePreview ? <p className="text-xs leading-5 text-amber-700">Preview is stale. Refresh it before confirming this source.</p> : null}
-                  </div>
+                        {errors[source.id] ? <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errors[source.id]}</p> : null}
 
-                  <div className="min-w-0">
-                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <h3 className="text-sm font-semibold text-slate-900">Spreadsheet row preview</h3>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">Click a row action to set the header or first data row using the visible sheet content.</p>
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" onClick={() => loadPreview(source)} disabled={busySourceId === source.id} className={secondaryButtonClass}>
+                            {busySourceId === source.id ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                            {preview ? "Refresh preview" : "Load preview"}
+                          </button>
+                          <button type="button" onClick={() => confirmSource(source)} disabled={!preview || stalePreview} className={primaryButtonClass}>
+                            <CheckCircle2 className="size-4" /> Confirm setup
+                          </button>
+                        </div>
+                        {stalePreview ? <p className="text-xs leading-5 text-amber-700">Preview is stale. Refresh it before confirming this source.</p> : null}
                       </div>
-                      {preview ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Showing {preview.rows.length} rows</span> : null}
-                    </div>
 
-                    {preview ? (
-                      <div className="overflow-auto rounded-2xl border border-slate-200 bg-white">
-                        <table className="min-w-full text-left text-xs">
-                          <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600">
-                            <tr>
-                              <th className="w-28 p-3 font-semibold">Row</th>
-                              {columns.map((column) => (
-                                <th key={column.letter} className="min-w-36 p-3 font-semibold">{column.letter} · {column.header_label || "Blank header"}</th>
-                              ))}
-                              {hasMoreColumns ? <th className="min-w-24 p-3 font-semibold">More</th> : null}
-                              <th className="min-w-56 p-3 font-semibold">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {preview.rows.map((row) => (
-                              <tr key={row.row_number} className={`border-t border-l-4 border-slate-100 align-top transition ${rowTone(row, source)}`}>
-                                <td className="p-3">
-                                  <div className="space-y-1">
-                                    <p className="font-semibold text-slate-900">Row {row.row_number}</p>
-                                    {rowBadge(row, source)}
-                                  </div>
-                                </td>
-                                {columns.map((column) => (
-                                  <td key={`${row.row_number}-${column.letter}`} className="max-w-56 p-3 text-slate-700">
-                                    <span className="line-clamp-3">{displayCell(row.cells[column.header_label])}</span>
-                                  </td>
+                      <div className="min-w-0">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <h3 className="text-sm font-semibold text-slate-900">Spreadsheet row preview</h3>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">Click a row action to set the header or first data row using the visible sheet content.</p>
+                          </div>
+                          {preview ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Showing {preview.rows.length} rows</span> : null}
+                        </div>
+
+                        {preview ? (
+                          <div className="max-h-[42rem] overflow-auto rounded-2xl border border-slate-200 bg-white">
+                            <table className="min-w-full text-left text-xs">
+                              <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 shadow-[0_1px_0_#e2e8f0]">
+                                <tr>
+                                  <th className="w-28 p-3 font-semibold">Row</th>
+                                  {columns.map((column) => (
+                                    <th key={column.letter} className="min-w-36 p-3 font-semibold">{column.letter} · {column.header_label || "Blank header"}</th>
+                                  ))}
+                                  {hasMoreColumns ? <th className="min-w-24 p-3 font-semibold">More</th> : null}
+                                  <th className="min-w-56 p-3 font-semibold">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {preview.rows.map((row) => (
+                                  <tr key={row.row_number} className={`border-t border-l-4 border-slate-100 align-top transition ${rowTone(row, source)}`}>
+                                    <td className="p-3">
+                                      <div className="space-y-1">
+                                        <p className="font-semibold text-slate-900">Row {row.row_number}</p>
+                                        {rowBadge(row, source)}
+                                      </div>
+                                    </td>
+                                    {columns.map((column) => (
+                                      <td key={`${row.row_number}-${column.letter}`} className="max-w-56 p-3 text-slate-700">
+                                        <span className="line-clamp-3">{displayCell(row.cells[column.header_label])}</span>
+                                      </td>
+                                    ))}
+                                    {hasMoreColumns ? <td className="p-3 text-slate-400">+{preview.columns.length - columns.length}</td> : null}
+                                    <td className="p-3">
+                                      <div className="flex flex-wrap gap-2">
+                                        <button type="button" onClick={() => setHeaderFromRow(source, row.row_number)} className="rounded-lg border border-sky-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500">
+                                          Set as header
+                                        </button>
+                                        <button type="button" disabled={row.row_number <= source.header_row} onClick={() => setFirstDataFromRow(source, row.row_number)} className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
+                                          Set first data
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
                                 ))}
-                                {hasMoreColumns ? <td className="p-3 text-slate-400">+{preview.columns.length - columns.length}</td> : null}
-                                <td className="p-3">
-                                  <div className="flex flex-wrap gap-2">
-                                    <button type="button" onClick={() => setHeaderFromRow(source, row.row_number)} className="rounded-lg border border-sky-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500">
-                                      Set as header
-                                    </button>
-                                    <button type="button" disabled={row.row_number <= source.header_row} onClick={() => setFirstDataFromRow(source, row.row_number)} className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
-                                      Set first data
-                                    </button>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                              </tbody>
+                            </table>
+                          </div>
+                        ) : (
+                          <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                            <span>
+                              <Rows3 className="mx-auto size-7 text-slate-400" />
+                              <span className="mt-3 block text-sm font-semibold text-slate-800">Preview not loaded yet</span>
+                              <span className="mt-1 block text-sm text-slate-500">Load the preview to see the actual header and data rows.</span>
+                            </span>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-                        <span>
-                          <Rows3 className="mx-auto size-7 text-slate-400" />
-                          <span className="mt-3 block text-sm font-semibold text-slate-800">Preview not loaded yet</span>
-                          <span className="mt-1 block text-sm text-slate-500">Load the preview to see the actual header and data rows.</span>
-                        </span>
-                      </div>
-                    )}
+                    </div>
                   </div>
                 </div>
               </section>
