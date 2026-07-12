@@ -66,7 +66,7 @@ export function RowSetupConfirmationPanel({ dataSources, sourcePreviews, onConfi
       <button
         type="button"
         onClick={() => setCollapsed(false)}
-        className="fixed bottom-5 right-5 z-[80] inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-semibold text-amber-800 shadow-xl transition hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
+        className="fixed bottom-5 right-5 z-[50] inline-flex items-center gap-2 rounded-2xl border border-amber-200 bg-white px-4 py-3 text-sm font-semibold text-amber-800 shadow-xl transition hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500"
       >
         <AlertTriangle className="size-4" />
         {unconfirmed.length} row setup {unconfirmed.length === 1 ? "needs" : "need"} confirmation
@@ -76,7 +76,7 @@ export function RowSetupConfirmationPanel({ dataSources, sourcePreviews, onConfi
   }
 
   return (
-    <aside className="fixed bottom-5 right-5 z-[80] w-[min(440px,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-amber-200 bg-white shadow-2xl animate-[builder-dialog-in_180ms_cubic-bezier(0.16,1,0.3,1)_forwards]">
+    <aside className="fixed bottom-5 right-5 z-[50] w-[min(440px,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-amber-200 bg-white shadow-2xl animate-[builder-dialog-in_180ms_cubic-bezier(0.16,1,0.3,1)_forwards]">
       <div className="border-b border-amber-100 bg-[linear-gradient(135deg,_#fffbeb_0%,_#ffffff_100%)] p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3">
