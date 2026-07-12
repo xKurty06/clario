@@ -1,4 +1,3 @@
 fn main() {
-    procurement_validator_lib::run();
+    clario_lib::run();
 }
-

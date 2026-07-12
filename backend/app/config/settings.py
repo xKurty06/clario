@@ -5,12 +5,10 @@ from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 CLARIO_DATA_DIRECTORY = Path.home() / ".clario"
-LEGACY_DATA_DIRECTORY = Path.home() / ".procurement-validator"
+CLARIO_DATABASE_NAME = "clario.sqlite3"
 
 
 def default_data_directory() -> Path:
-    if LEGACY_DATA_DIRECTORY.exists() and not CLARIO_DATA_DIRECTORY.exists():
-        return LEGACY_DATA_DIRECTORY
     return CLARIO_DATA_DIRECTORY
 
 
@@ -20,6 +18,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         extra="ignore",
+        populate_by_name=True,
     )
 
     host: str = Field(
@@ -44,12 +43,7 @@ class Settings(BaseSettings):
 
     @property
     def database_path(self) -> Path:
-        database_name = (
-            "procurement-validator.sqlite3"
-            if self.data_directory == LEGACY_DATA_DIRECTORY
-            else "clario.sqlite3"
-        )
-        return self.data_directory / database_name
+        return self.data_directory / CLARIO_DATABASE_NAME
 
     @property
     def upload_directory(self) -> Path:
