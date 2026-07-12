@@ -33,6 +33,7 @@ export interface ComparisonDataSource {
   sheet_name: string;
   header_row: number;
   first_data_row: number;
+  row_setup_confirmed?: boolean;
   selected_row_numbers: number[];
   ignored_row_numbers: number[];
   row_selection_mode: RowSelectionMode;
