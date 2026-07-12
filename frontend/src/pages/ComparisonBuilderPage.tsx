@@ -15,6 +15,7 @@ import {
   Wand2,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { EmptyState } from "../components/common/EmptyState";
 import { StatusBadge } from "../components/common/StatusBadge";
@@ -1668,8 +1669,8 @@ function ConfirmationDialog({ state, onClose }: { state: ConfirmDialogState | nu
       ? "rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
       : "rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600";
 
-  return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center px-4">
+  const dialog = (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center px-4">
       <button aria-label="Close confirmation dialog" className="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px]" onClick={onClose} />
       <div
         role="dialog"
@@ -1699,4 +1700,6 @@ function ConfirmationDialog({ state, onClose }: { state: ConfirmDialogState | nu
       </div>
     </div>
   );
+
+  return createPortal(dialog, document.body);
 }
