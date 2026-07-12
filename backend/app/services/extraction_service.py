@@ -91,6 +91,33 @@ def _normalize_value(value: Any, field: ComparisonField) -> Any:
     return value
 
 
+def _is_repeated_section_row(values: list[Any]) -> bool:
+    normalized_values = [normalize_text(value, True) for value in values if not pd.isna(value)]
+    non_empty_values = [value for value in normalized_values if value]
+    return len(non_empty_values) >= 3 and len(set(non_empty_values)) == 1
+
+
+def _contains_header_word(row_text: str, header: str) -> bool:
+    header_text = normalize_text(header, True)
+    if not header_text:
+        return False
+    return re.search(rf"(?<![a-z0-9]){re.escape(header_text)}(?![a-z0-9])", row_text) is not None
+
+
+def _is_header_like_row(values: list[Any], headers: list[str]) -> bool:
+    row_values = [normalize_text(value, True) for value in values if not pd.isna(value)]
+    non_empty_values = [value for value in row_values if value]
+    if not non_empty_values:
+        return False
+    header_values = [normalize_text(header, True) for header in headers if header]
+    exact_hits = sum(1 for value in non_empty_values if value in header_values)
+    if exact_hits >= min(2, len(non_empty_values), len(header_values)):
+        return True
+    row_text = " / ".join(non_empty_values)
+    whole_word_hits = sum(1 for header in header_values if _contains_header_word(row_text, header))
+    return whole_word_hits >= min(2, len(header_values))
+
+
 def _auto_selected_rows(frame: pd.DataFrame, headers: list[str], data_source: ComparisonDataSource) -> list[int]:
     selected: list[int] = []
     for row_index in range(data_source.first_data_row - 1, len(frame)):
@@ -98,11 +125,12 @@ def _auto_selected_rows(frame: pd.DataFrame, headers: list[str], data_source: Co
         if row_number in data_source.ignored_row_numbers:
             continue
         values = frame.iloc[row_index].tolist()
+        if _is_repeated_section_row(values):
+            continue
         has_value = any(not pd.isna(value) and normalize_text(value) for value in values)
         if not has_value:
             continue
-        header_like = " / ".join(normalize_text(value, True) for value in values if not pd.isna(value))
-        if header_like and any(header.casefold() in header_like for header in headers if header):
+        if _is_header_like_row(values, headers):
             continue
         selected.append(row_number)
     return selected
@@ -124,9 +152,12 @@ def preview_data_source(data_source: ComparisonDataSource) -> DataSourcePreview:
     frame = _load_frame(path, data_source.sheet_name)
     headers = composite_headers(path, data_source.sheet_name, frame, data_source.header_row)
     boundary_ignored_rows = _boundary_ignored_rows(data_source)
-    candidate_selected_rows = set(data_source.selected_row_numbers or _auto_selected_rows(frame, headers, data_source))
-    selected_rows = {row_number for row_number in candidate_selected_rows if row_number >= data_source.first_data_row}
     ignored_rows = set(data_source.ignored_row_numbers) | boundary_ignored_rows
+    if data_source.row_selection_mode == "auto_detected":
+        candidate_selected_rows = set(_auto_selected_rows(frame, headers, data_source))
+    else:
+        candidate_selected_rows = set(data_source.selected_row_numbers or _auto_selected_rows(frame, headers, data_source))
+    selected_rows = {row_number for row_number in candidate_selected_rows if row_number >= data_source.first_data_row and row_number not in ignored_rows}
     rows: list[PreviewRow] = []
     start_index = _preview_start_row(data_source) - 1
     for row_index in range(start_index, len(frame)):

@@ -11,6 +11,9 @@ interface RowSetupPageProps {
   onContinue: () => void;
 }
 
+type ReloadVisualState = "loading" | "reloaded";
+type RowInputDrafts = Record<string, { headerRow?: string; firstDataRow?: string }>;
+
 const primaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:active:scale-100";
 const secondaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
 const setupActionButtonClass = "inline-flex items-center justify-center rounded-xl border bg-white px-3 py-2 text-xs font-semibold transition active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
@@ -31,16 +34,15 @@ function setupBoundaryRows(headerRow: number, firstDataRow: number) {
   return Array.from({ length: Math.max(firstDataRow - 1, 0) }, (_, index) => index + 1).filter((rowNumber) => rowNumber !== headerRow);
 }
 
-function applyRowBoundaries(source: ComparisonDataSource, headerRow: number, firstDataRow: number) {
+function applyRowBoundaries(source: ComparisonDataSource, headerRow: number, firstDataRow: number): ComparisonDataSource {
   const boundaryRows = setupBoundaryRows(headerRow, firstDataRow);
-  const boundarySet = new Set(boundaryRows);
   return {
     ...source,
     header_row: headerRow,
     first_data_row: firstDataRow,
-    selected_row_numbers: source.selected_row_numbers.filter((rowNumber) => rowNumber >= firstDataRow),
-    ignored_row_numbers: [...new Set([...source.ignored_row_numbers.filter((rowNumber) => rowNumber >= firstDataRow), ...boundaryRows])].sort((a, b) => a - b),
-    row_selection_mode: boundarySet.size ? "manual_include" : source.row_selection_mode,
+    selected_row_numbers: [],
+    ignored_row_numbers: boundaryRows,
+    row_selection_mode: "auto_detected",
   };
 }
 
@@ -49,9 +51,70 @@ function displayCell(value: unknown) {
   return String(value);
 }
 
-function rowTone(row: PreviewRow, source: ComparisonDataSource) {
+function normalizePreviewText(value: unknown) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function isRepeatedSectionRow(row: PreviewRow) {
+  const values = Object.values(row.cells).map(normalizePreviewText).filter(Boolean);
+  return values.length >= 3 && new Set(values).size === 1;
+}
+
+function isHeaderLikeRow(row: PreviewRow, headers: string[]) {
+  const values = Object.values(row.cells).map(normalizePreviewText).filter(Boolean);
+  if (!values.length) return false;
+  const normalizedHeaders = headers.map(normalizePreviewText).filter(Boolean);
+  const exactHits = values.filter((value) => normalizedHeaders.includes(value)).length;
+  if (exactHits >= Math.min(2, values.length, normalizedHeaders.length)) return true;
+  const rowText = values.join(" / ");
+  const wholeWordHits = normalizedHeaders.filter((header) => new RegExp(`(?<![a-z0-9])${escapeRegex(header)}(?![a-z0-9])`).test(rowText)).length;
+  return wholeWordHits >= Math.min(2, normalizedHeaders.length);
+}
+
+function sanitizeAutoDetectedPreview(preview: DataSourcePreview): DataSourcePreview {
+  const source = preview.data_source;
+  const headers = preview.columns.map((column) => column.header_label);
+  const ignoredRows = new Set(setupBoundaryRows(source.header_row, source.first_data_row));
+  const selectedRows = preview.rows
+    .filter((row) => {
+      if (row.row_number < source.first_data_row || ignoredRows.has(row.row_number)) return false;
+      if (isRepeatedSectionRow(row)) return false;
+      const hasValue = Object.values(row.cells).some((value) => normalizePreviewText(value));
+      return hasValue && !isHeaderLikeRow(row, headers);
+    })
+    .map((row) => row.row_number);
+  const selectedRowSet = new Set(selectedRows);
+  return {
+    ...preview,
+    data_source: {
+      ...source,
+      selected_row_numbers: selectedRows,
+      ignored_row_numbers: [...ignoredRows].sort((a, b) => a - b),
+      row_selection_mode: "auto_detected",
+    },
+    rows: preview.rows.map((row) => ({
+      ...row,
+      selected: selectedRowSet.has(row.row_number),
+      ignored: ignoredRows.has(row.row_number),
+    })),
+    detected_selected_rows: selectedRows,
+  };
+}
+
+function isVisualAutoExcludedRow(row: PreviewRow, source: ComparisonDataSource) {
+  return row.row_number >= source.first_data_row && isRepeatedSectionRow(row);
+}
+
+function rowTone(row: PreviewRow, source: ComparisonDataSource, selected: boolean) {
+  if (selected) return "!bg-blue-50 shadow-[inset_0_1px_0_#93c5fd,inset_0_-1px_0_#93c5fd]";
   if (row.row_number === source.header_row) return "bg-sky-50/90";
-  if (row.row_number === source.first_data_row) return "bg-emerald-50/90";
+  if (row.row_number === source.first_data_row) return "bg-amber-50/90";
+  if (isVisualAutoExcludedRow(row, source)) return "bg-white";
   if (row.selected) return "bg-emerald-50/40";
   return "bg-white";
 }
@@ -62,9 +125,9 @@ function rowBadge(row: PreviewRow, source: ComparisonDataSource) {
     return <span className={`${className} bg-sky-100 font-semibold text-sky-700`}>Header row</span>;
   }
   if (row.row_number === source.first_data_row) {
-    return <span className={`${className} bg-emerald-100 font-semibold text-emerald-700`}>First data row</span>;
+    return <span className={`${className} bg-amber-100 font-semibold text-amber-800`}>First data row</span>;
   }
-  if (row.ignored || row.row_number < source.first_data_row) {
+  if (row.ignored || row.row_number < source.first_data_row || isVisualAutoExcludedRow(row, source)) {
     return <span className={`${className} bg-slate-100 font-medium text-slate-500`}>Excluded row</span>;
   }
   if (row.selected) {
@@ -74,15 +137,16 @@ function rowBadge(row: PreviewRow, source: ComparisonDataSource) {
 }
 
 function rowAccentClass(row: PreviewRow, source: ComparisonDataSource, selected: boolean) {
-  if (selected) return "border-l-emerald-600";
+  if (selected) return "!border-l-transparent";
   if (row.row_number === source.header_row) return "border-l-sky-500";
-  if (row.row_number === source.first_data_row) return "border-l-emerald-500";
+  if (row.row_number === source.first_data_row) return "border-l-amber-500";
+  if (isVisualAutoExcludedRow(row, source)) return "border-l-transparent";
   if (row.selected) return "border-l-emerald-200";
   return "border-l-transparent";
 }
 
 function rowCellClass(selected: boolean) {
-  return selected ? "border-y border-emerald-300 bg-emerald-50/95" : "border-b border-slate-100";
+  return selected ? "border-y !border-blue-300 !bg-blue-50" : "border-b border-slate-100";
 }
 
 function confirmedStatus(source: ComparisonDataSource, preview?: DataSourcePreview) {
@@ -124,24 +188,58 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [collapsedSourceIds, setCollapsedSourceIds] = useState<Set<string>>(() => new Set());
   const [selectedRowsBySource, setSelectedRowsBySource] = useState<Record<string, number>>({});
+  const [reloadVisualStates, setReloadVisualStates] = useState<Record<string, ReloadVisualState | undefined>>({});
+  const [rowInputDrafts, setRowInputDrafts] = useState<RowInputDrafts>({});
   const autoPreviewed = useRef<Set<string>>(new Set());
+  const reloadTimersRef = useRef<Record<string, number>>({});
+  const rowInputTimersRef = useRef<Record<string, number>>({});
 
   const allConfirmed = dataSources.length > 0 && dataSources.every((source) => source.row_setup_confirmed);
   const confirmedCount = dataSources.filter((source) => source.row_setup_confirmed).length;
 
-  const loadPreview = useCallback(async (source: ComparisonDataSource) => {
+  useEffect(() => {
+    return () => {
+      Object.values(reloadTimersRef.current).forEach((timer) => window.clearTimeout(timer));
+      Object.values(rowInputTimersRef.current).forEach((timer) => window.clearTimeout(timer));
+    };
+  }, []);
+
+  const setReloadVisualState = useCallback((sourceId: string, state?: ReloadVisualState) => {
+    if (reloadTimersRef.current[sourceId]) {
+      window.clearTimeout(reloadTimersRef.current[sourceId]);
+      delete reloadTimersRef.current[sourceId];
+    }
+    setReloadVisualStates((current) => ({ ...current, [sourceId]: state }));
+  }, []);
+
+  const loadPreview = useCallback(async (source: ComparisonDataSource, showReloadVisual = false) => {
     if (!source.file_id || !source.sheet_name) return;
     setBusySourceId(source.id);
+    if (showReloadVisual) setReloadVisualState(source.id, "loading");
     setErrors((current) => ({ ...current, [source.id]: "" }));
     try {
-      const preview = await previewDataSource(source);
+      const rawPreview = await previewDataSource({
+        ...source,
+        selected_row_numbers: [],
+        ignored_row_numbers: [],
+        row_selection_mode: "auto_detected",
+      });
+      const preview = sanitizeAutoDetectedPreview(rawPreview);
       updateDataSource(source.id, preview.data_source);
       setSourcePreview(source.id, preview);
       setSelectedRowsBySource((current) => ({
         ...current,
         [source.id]: current[source.id] ?? preview.data_source.header_row ?? preview.rows[0]?.row_number ?? source.header_row,
       }));
+      if (showReloadVisual) {
+        setReloadVisualState(source.id, "reloaded");
+        reloadTimersRef.current[source.id] = window.setTimeout(() => {
+          setReloadVisualStates((current) => ({ ...current, [source.id]: undefined }));
+          delete reloadTimersRef.current[source.id];
+        }, 1100);
+      }
     } catch (cause) {
+      if (showReloadVisual) setReloadVisualState(source.id, undefined);
       setErrors((current) => ({
         ...current,
         [source.id]: cause instanceof Error ? cause.message : "Could not load the row preview.",
@@ -149,7 +247,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
     } finally {
       setBusySourceId(null);
     }
-  }, [setSourcePreview, updateDataSource]);
+  }, [setReloadVisualState, setSourcePreview, updateDataSource]);
 
   useEffect(() => {
     dataSources.forEach((source) => {
@@ -166,8 +264,20 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
   );
 
   const updateSourceSetup = (source: ComparisonDataSource, next: ComparisonDataSource, clearPreview = true) => {
+    for (const field of ["headerRow", "firstDataRow"] as const) {
+      const timerKey = `${source.id}:${field}`;
+      if (rowInputTimersRef.current[timerKey]) {
+        window.clearTimeout(rowInputTimersRef.current[timerKey]);
+        delete rowInputTimersRef.current[timerKey];
+      }
+    }
     updateDataSource(source.id, { ...next, row_setup_confirmed: false });
     if (clearPreview) removeSourcePreview(source.id);
+    setRowInputDrafts((current) => {
+      const nextDrafts = { ...current };
+      delete nextDrafts[source.id];
+      return nextDrafts;
+    });
     setSelectedRowsBySource((current) => {
       const nextRows = { ...current };
       delete nextRows[source.id];
@@ -228,34 +338,91 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
     });
   };
 
+  const applyRowSetupChange = (source: ComparisonDataSource, next: ComparisonDataSource, selectedRowNumber: number) => {
+    updateSourceSetup(source, { ...next, row_setup_confirmed: false }, false);
+    setSelectedRowsBySource((current) => ({ ...current, [source.id]: selectedRowNumber }));
+    void loadPreview(next, true);
+  };
+
   const changeHeaderRow = (source: ComparisonDataSource, value: number) => {
     const headerRow = clampRow(value);
-    updateSourceSetup(source, applyRowBoundaries(source, headerRow, Math.max(source.first_data_row, headerRow + 1)));
+    const next = applyRowBoundaries(source, headerRow, Math.max(source.first_data_row, headerRow + 1));
+    applyRowSetupChange(source, next, headerRow);
   };
 
   const changeFirstDataRow = (source: ComparisonDataSource, value: number) => {
     const firstDataRow = Math.max(clampRow(value), source.header_row + 1);
-    updateSourceSetup(source, applyRowBoundaries(source, source.header_row, firstDataRow));
+    const next = applyRowBoundaries(source, source.header_row, firstDataRow);
+    applyRowSetupChange(source, next, firstDataRow);
+  };
+
+  const clearRowInputDraft = (sourceId: string, field: "headerRow" | "firstDataRow") => {
+    setRowInputDrafts((current) => {
+      const sourceDraft = { ...current[sourceId] };
+      delete sourceDraft[field];
+      const next = { ...current };
+      if (sourceDraft.headerRow === undefined && sourceDraft.firstDataRow === undefined) {
+        delete next[sourceId];
+      } else {
+        next[sourceId] = sourceDraft;
+      }
+      return next;
+    });
+  };
+
+  const clearRowInputTimer = (sourceId: string, field: "headerRow" | "firstDataRow") => {
+    const timerKey = `${sourceId}:${field}`;
+    if (rowInputTimersRef.current[timerKey]) {
+      window.clearTimeout(rowInputTimersRef.current[timerKey]);
+      delete rowInputTimersRef.current[timerKey];
+    }
+  };
+
+  const commitRowInputValue = (source: ComparisonDataSource, field: "headerRow" | "firstDataRow", value: string) => {
+    const parsed = Number.parseInt(value, 10);
+    clearRowInputDraft(source.id, field);
+    if (!Number.isInteger(parsed)) return;
+    if (field === "headerRow") {
+      changeHeaderRow(source, parsed);
+    } else {
+      changeFirstDataRow(source, parsed);
+    }
+  };
+
+  const updateRowInputDraft = (source: ComparisonDataSource, field: "headerRow" | "firstDataRow", value: string) => {
+    if (value && !/^\d+$/.test(value)) return;
+    clearRowInputTimer(source.id, field);
+    setRowInputDrafts((current) => ({
+      ...current,
+      [source.id]: {
+        ...current[source.id],
+        [field]: value,
+      },
+    }));
+    if (!value) return;
+    const timerKey = `${source.id}:${field}`;
+    rowInputTimersRef.current[timerKey] = window.setTimeout(() => {
+      delete rowInputTimersRef.current[timerKey];
+      commitRowInputValue(source, field, value);
+    }, 1000);
+  };
+
+  const commitRowInputDraft = (source: ComparisonDataSource, field: "headerRow" | "firstDataRow") => {
+    clearRowInputTimer(source.id, field);
+    const value = rowInputDrafts[source.id]?.[field];
+    if (value === undefined) return;
+    commitRowInputValue(source, field, value);
   };
 
   const setHeaderFromRow = (source: ComparisonDataSource, rowNumber: number) => {
-    const next = {
-      ...applyRowBoundaries(source, rowNumber, Math.max(source.first_data_row, rowNumber + 1)),
-      row_setup_confirmed: false,
-    };
-    updateSourceSetup(source, next, false);
-    setSelectedRowsBySource((current) => ({ ...current, [source.id]: rowNumber }));
-    void loadPreview(next);
+    const next = applyRowBoundaries(source, rowNumber, Math.max(source.first_data_row, rowNumber + 1));
+    applyRowSetupChange(source, next, rowNumber);
   };
 
   const setFirstDataFromRow = (source: ComparisonDataSource, rowNumber: number) => {
-    const next = {
-      ...applyRowBoundaries(source, source.header_row, Math.max(rowNumber, source.header_row + 1)),
-      row_setup_confirmed: false,
-    };
-    updateSourceSetup(source, next, false);
-    setSelectedRowsBySource((current) => ({ ...current, [source.id]: rowNumber }));
-    void loadPreview(next);
+    const firstDataRow = Math.max(rowNumber, source.header_row + 1);
+    const next = applyRowBoundaries(source, source.header_row, firstDataRow);
+    applyRowSetupChange(source, next, firstDataRow);
   };
 
   const confirmSource = (source: ComparisonDataSource) => {
@@ -314,6 +481,8 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
             const selectedRowNumber = selectedRowsBySource[source.id] ?? (preview?.rows.some((row) => row.row_number === source.header_row) ? source.header_row : preview?.rows[0]?.row_number);
             const selectedRowNumberValue = typeof selectedRowNumber === "number" ? selectedRowNumber : null;
             const selectedRow = selectedRowNumberValue ? preview?.rows.find((row) => row.row_number === selectedRowNumberValue) : undefined;
+            const reloadState = reloadVisualStates[source.id];
+            const rowInputDraft = rowInputDrafts[source.id] ?? {};
 
             return (
               <section key={source.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" data-fade-section>
@@ -380,8 +549,12 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                             <input
                               type="number"
                               min={1}
-                              value={source.header_row}
-                              onChange={(event) => changeHeaderRow(source, Number(event.target.value))}
+                              value={rowInputDraft.headerRow ?? String(source.header_row)}
+                              onChange={(event) => updateRowInputDraft(source, "headerRow", event.target.value)}
+                              onBlur={() => commitRowInputDraft(source, "headerRow")}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") event.currentTarget.blur();
+                              }}
                               className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100"
                             />
                           </label>
@@ -390,8 +563,12 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                             <input
                               type="number"
                               min={source.header_row + 1}
-                              value={source.first_data_row}
-                              onChange={(event) => changeFirstDataRow(source, Number(event.target.value))}
+                              value={rowInputDraft.firstDataRow ?? String(source.first_data_row)}
+                              onChange={(event) => updateRowInputDraft(source, "firstDataRow", event.target.value)}
+                              onBlur={() => commitRowInputDraft(source, "firstDataRow")}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") event.currentTarget.blur();
+                              }}
                               className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100"
                             />
                           </label>
@@ -404,12 +581,17 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                         {errors[source.id] ? <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errors[source.id]}</p> : null}
 
                         <div className="flex flex-wrap gap-2">
-                          <button type="button" onClick={() => loadPreview(source)} disabled={busySourceId === source.id} className={secondaryButtonClass}>
+                          <button type="button" onClick={() => loadPreview(source, true)} disabled={busySourceId === source.id} className={secondaryButtonClass}>
                             {busySourceId === source.id ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-                            {preview ? "Refresh preview" : "Load preview"}
+                            {busySourceId === source.id ? "Reloading..." : preview ? "Refresh preview" : "Load preview"}
                           </button>
-                          <button type="button" onClick={() => confirmSource(source)} disabled={!preview || stalePreview} className={primaryButtonClass}>
-                            <CheckCircle2 className="size-4" /> Confirm setup
+                          <button
+                            type="button"
+                            onClick={() => confirmSource(source)}
+                            disabled={source.row_setup_confirmed || !preview || stalePreview}
+                            className={source.row_setup_confirmed ? "inline-flex cursor-default items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700" : primaryButtonClass}
+                          >
+                            <CheckCircle2 className="size-4" /> {source.row_setup_confirmed ? "Confirmed" : "Confirm setup"}
                           </button>
                         </div>
                         {stalePreview ? <p className="text-xs leading-5 text-amber-700">Preview is stale. Refresh it before confirming this source.</p> : null}
@@ -447,14 +629,15 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                                   type="button"
                                   disabled={!selectedRowNumberValue || selectedRowNumberValue <= source.header_row}
                                   onClick={() => selectedRowNumberValue && setFirstDataFromRow(source, selectedRowNumberValue)}
-                                  className={`${setupActionButtonClass} border-emerald-200 text-emerald-700 hover:bg-emerald-50 focus-visible:outline-emerald-500`}
+                                  className={`${setupActionButtonClass} border-amber-200 text-amber-800 hover:bg-amber-50 focus-visible:outline-amber-500`}
                                 >
                                   Set selected as first data
                                 </button>
                               </div>
                             </div>
-                            <div className="max-h-[34rem] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-                              <table className="min-w-full border-separate border-spacing-0 text-left text-xs">
+                            <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                              <div className={`max-h-[34rem] overflow-auto transition duration-300 ${reloadState === "loading" ? "scale-[0.998] opacity-65 blur-[0.7px] saturate-[0.96]" : reloadState === "reloaded" ? "shadow-[inset_0_0_0_1px_rgba(16,185,129,0.28),0_16px_40px_rgba(16,185,129,0.08)]" : ""}`}>
+                                <table className="min-w-full border-separate border-spacing-0 text-left text-xs">
                                 <tbody>
                                   {preview.rows.map((row) => {
                                     const selected = selectedRowNumberValue === row.row_number;
@@ -464,18 +647,17 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                                         key={row.row_number}
                                         aria-selected={selected}
                                         onClick={() => selectPreviewRow(source.id, row.row_number)}
-                                        className={`cursor-pointer align-top transition hover:bg-emerald-50/70 ${rowTone(row, source)}`}
+                                        className={`cursor-pointer align-top transition hover:bg-blue-50/70 ${rowTone(row, source, selected)}`}
                                       >
                                         <td className={`w-40 min-w-40 border-l-4 px-3 py-2.5 ${cellClass} ${rowAccentClass(row, source, selected)}`}>
                                           <div className="flex flex-wrap items-center gap-2">
                                             <span className="font-semibold text-slate-950">Row {row.row_number}</span>
-                                            {selected ? <span className="inline-flex w-fit whitespace-nowrap rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white">Selected</span> : null}
                                             {rowBadge(row, source)}
                                           </div>
                                         </td>
                                         {columns.map((column) => (
-                                          <td key={`${row.row_number}-${column.letter}`} className={`min-w-36 max-w-56 px-3 py-2.5 text-slate-700 ${cellClass}`}>
-                                            <span className="line-clamp-2 leading-5">{displayCell(row.cells[column.header_label])}</span>
+                                          <td key={`${row.row_number}-${column.letter}`} className={`min-w-52 px-3 py-2.5 text-slate-700 ${cellClass}`}>
+                                            <span className="block whitespace-normal leading-5">{displayCell(row.cells[column.header_label])}</span>
                                           </td>
                                         ))}
                                         {hasMoreColumns ? <td className={`min-w-32 px-3 py-2.5 text-xs font-medium text-slate-400 ${cellClass}`}>+{preview.columns.length - columns.length} columns</td> : null}
@@ -483,7 +665,16 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                                     );
                                   })}
                                 </tbody>
-                              </table>
+                                </table>
+                              </div>
+                              {reloadState ? (
+                                <div className={`pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl transition duration-300 ${reloadState === "loading" ? "bg-white/60 backdrop-blur-[2px]" : "bg-emerald-50/45"}`}>
+                                  <div className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold shadow-lg shadow-slate-200/60 animate-[app-section-fade-in_180ms_cubic-bezier(0.16,1,0.3,1)_both] ${reloadState === "loading" ? "border-slate-200 bg-white text-slate-700" : "border-emerald-100 bg-white text-emerald-700"}`}>
+                                    {reloadState === "loading" ? <LoaderCircle className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                                    {reloadState === "loading" ? "Reloading preview..." : "Preview reloaded"}
+                                  </div>
+                                </div>
+                              ) : null}
                             </div>
                           </>
                         ) : (

@@ -56,21 +56,21 @@ export function BuilderStepper({ steps, activeStep, onStepChange }: BuilderStepp
         </div>
       </div>
 
-      <footer className="fixed bottom-4 left-[var(--app-sidebar-offset,0px)] right-0 z-40 px-4 transition-[left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-[1400px] flex-col gap-3 rounded-3xl border border-slate-200 bg-white/95 p-2 shadow-[0_18px_55px_rgba(15,23,42,0.16)] backdrop-blur sm:flex-row sm:items-center sm:justify-between">
+      <footer className="fixed bottom-4 left-[var(--app-sidebar-offset,0px)] right-0 z-40 px-3 transition-[left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] sm:px-4 lg:px-6">
+        <div className="mx-auto flex max-w-[1320px] flex-col gap-2 rounded-3xl border border-slate-200 bg-white/95 p-1.5 shadow-[0_18px_55px_rgba(15,23,42,0.16)] backdrop-blur sm:flex-row sm:items-center sm:justify-between">
           <button
             type="button"
             onClick={() => previousStep && onStepChange(previousStep.id)}
             disabled={!previousStep}
             title={previousStep ? `Back to ${previousStep.label}` : "You are already on the first step"}
             aria-label={previousStep ? `Back to ${previousStep.label}` : "No previous step"}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-45"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-45"
           >
             <ArrowLeft className="size-4" />
             Back
           </button>
 
-          <div className="order-first min-w-0 px-4 py-1.5 text-center sm:order-none">
+          <div className="order-first min-w-0 px-3 py-1 text-center sm:order-none">
             <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400" title={`Current: ${activeStepLabel}`}>Current: {activeStepLabel}</p>
             <p className="mt-0.5 truncate text-sm font-medium text-slate-700" title={nextStep ? `Next: ${nextStep.label}` : "Final review step"}>
               {nextStep ? `Next: ${nextStep.label}` : "Final review step"}
@@ -83,7 +83,7 @@ export function BuilderStepper({ steps, activeStep, onStepChange }: BuilderStepp
             disabled={!nextStep}
             title={nextStep ? `Continue to ${nextStep.label}` : "You are already on the final step"}
             aria-label={nextStep ? `Continue to ${nextStep.label}` : "No next step"}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
             Next step
             <ArrowRight className="size-4" />

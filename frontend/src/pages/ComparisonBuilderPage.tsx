@@ -353,7 +353,11 @@ function titleCaseStrictness(strictness: RuleStrictness) {
   return strictnessLabels[strictness];
 }
 
-export function ComparisonBuilderPage() {
+interface ComparisonBuilderPageProps {
+  onBackToRowSetup?: () => void;
+}
+
+export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPageProps) {
   const navigate = useNavigate();
   const {
     files,
@@ -618,7 +622,7 @@ export function ComparisonBuilderPage() {
         }
       />
 
-      <div className="space-y-6 pt-6">
+      <div className="space-y-6 pt-6 pb-24 lg:pb-28">
         <BuilderStepper steps={steps} activeStep={activeStep} onStepChange={(step) => setActiveStep(step as BuilderStepId)} />
         {error ? <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
 
@@ -643,6 +647,19 @@ export function ComparisonBuilderPage() {
 
         {activeStep === "sources" ? (
           <section className="space-y-4">
+            {onBackToRowSetup ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div>
+                  <p className="text-sm font-semibold text-slate-950">Row setup review</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-500">
+                    Use the visual row setup screen to confirm header and first data rows across every source.
+                  </p>
+                </div>
+                <button type="button" onClick={onBackToRowSetup} className={secondaryButtonClass} title="Return to the visual row setup review">
+                  <Rows3 className="size-4" /> Review row setup
+                </button>
+              </div>
+            ) : null}
             <div className="grid gap-4 lg:grid-cols-2">
               {dataSources.map((source) => {
                 const preview = sourcePreviews[source.id];
@@ -691,12 +708,6 @@ export function ComparisonBuilderPage() {
                       <Metric label="Selected rows" value={String(source.selected_row_numbers.length)} />
                       <Metric label="Fields" value={String(source.fields.length)} />
                     </dl>
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      <button title="Preview rows to detect candidate data rows and prepare field mapping" onClick={() => refreshPreview(source)} className={secondaryButtonClass}>
-                        {busy === source.id ? <LoaderCircle className="size-4 animate-spin" /> : <Rows3 className="size-4" />}
-                        {preview ? "Refresh preview" : "Preview rows"}
-                      </button>
-                    </div>
                   </article>
                 );
               })}
@@ -724,6 +735,7 @@ export function ComparisonBuilderPage() {
                 );
               }
               const headers = preview.columns.map((column) => column.header_label);
+              const dataRows = preview.rows.filter((row) => row.row_number >= source.first_data_row);
               return (
                 <article key={source.id} className="space-y-3">
                   <div className="flex items-end justify-between gap-4">
@@ -734,7 +746,7 @@ export function ComparisonBuilderPage() {
                   </div>
                   <RowSelectionTable
                     headers={headers}
-                    rows={preview.rows}
+                    rows={dataRows}
                     onToggleRow={(rowNumber) => {
                       const selected = source.selected_row_numbers.includes(rowNumber) ? source.selected_row_numbers.filter((item) => item !== rowNumber) : [...source.selected_row_numbers, rowNumber];
                       setRowsForSource(source, preview, selected);
@@ -1003,21 +1015,13 @@ function SourceDrawer({
   requestConfirm: (state: ConfirmDialogState) => void;
 }) {
   const { draft, setDraft, dirty, reset } = useDraftEditor(editor?.initial ?? null);
-  const [draftPreview, setDraftPreview] = useState<DataSourcePreview | null>(editor?.preview ?? null);
-  const [previewBusy, setPreviewBusy] = useState(false);
-  const [previewSignature, setPreviewSignature] = useState(editor?.preview ? sourceConfigSignature(editor.preview.data_source) : editor?.initial ? sourceConfigSignature(editor.initial) : "");
-
-  useEffect(() => {
-    setDraftPreview(editor?.preview ?? null);
-    setPreviewSignature(editor?.preview ? sourceConfigSignature(editor.preview.data_source) : editor?.initial ? sourceConfigSignature(editor.initial) : "");
-  }, [editor]);
 
   if (!editor || !draft) return null;
   const file = files.find((item) => item.id === draft.file_id) ?? files[0];
   const sheets = file?.sheets ?? [];
   const errors = validateSource(draft, files);
-  const previewIsStale = Boolean(draftPreview) && previewSignature !== sourceConfigSignature(draft);
-  const footerMessage = errors[0] ?? (previewIsStale ? "Preview rows again before saving if you changed the file, sheet, header row, or first data row." : dirty ? "Save changes to update the source card and downstream workflow." : undefined);
+  const configChanged = sourceConfigSignature(editor.initial) !== sourceConfigSignature(draft);
+  const footerMessage = errors[0] ?? (configChanged ? "Saving workbook or row-boundary changes clears the current preview. Review row setup from Step 1 or refresh rows in Step 2." : dirty ? "Save changes to update the source card and downstream workflow." : undefined);
 
   const updateDraft = (next: ComparisonDataSource) => {
     setDraft(next);
@@ -1054,18 +1058,6 @@ function SourceDrawer({
     });
   };
 
-  const handlePreview = async () => {
-    setPreviewBusy(true);
-    try {
-      const preview = await previewDataSource(draft);
-      setDraft(preview.data_source);
-      setDraftPreview(preview);
-      setPreviewSignature(sourceConfigSignature(preview.data_source));
-    } finally {
-      setPreviewBusy(false);
-    }
-  };
-
   return (
     <BuilderDrawer
       title={editor.mode === "create" ? "Create source" : "Edit source"}
@@ -1075,7 +1067,7 @@ function SourceDrawer({
       dirty={dirty}
       onCancel={handleCancel}
       onDiscard={handleDiscard}
-      onSave={() => onSave(draft, previewIsStale ? null : draftPreview)}
+      onSave={() => onSave(draft)}
       saveLabel={editor.mode === "create" ? "Create source" : "Save changes"}
       disableSave={errors.length > 0}
       warningMessage={footerMessage}
@@ -1138,21 +1130,6 @@ function SourceDrawer({
               onChange={(value) => updateDraft({ ...draft, first_data_row: Number(value) || 0, selected_row_numbers: [], ignored_row_numbers: [] })}
               error={draft.first_data_row <= draft.header_row ? "First data row must be greater than the header row." : undefined}
             />
-          </div>
-        </EditorSection>
-
-        <EditorSection title="Preview action" description="Preview rows after changing the file, sheet, or row boundaries so row selection and field mapping stay aligned.">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">Preview rows</p>
-                <p className="mt-1 text-sm text-slate-500">Preview detects candidate rows and prepares the source for row selection and field setup.</p>
-              </div>
-              <button type="button" title="Preview rows for this draft source before saving it" onClick={handlePreview} className={primaryButtonClass}>
-                {previewBusy ? <LoaderCircle className="size-4 animate-spin" /> : <Rows3 className="size-4" />}
-                Preview rows
-              </button>
-            </div>
           </div>
         </EditorSection>
       </div>

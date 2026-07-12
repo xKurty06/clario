@@ -78,8 +78,104 @@ def test_preview_excludes_rows_before_first_data_row(tmp_path: Path) -> None:
     preview = preview_data_source(source)
     records = extract_records(source)
 
+    assert preview.rows[0].row_number == 1
     assert preview.data_source.selected_row_numbers == [7, 8]
     assert preview.data_source.ignored_row_numbers == [1, 2, 3, 4, 6]
     assert [row.row_number for row in preview.rows if row.selected] == [7, 8]
-    assert [row.row_number for row in preview.rows if row.ignored] == [2, 3, 4, 6]
+    assert [row.row_number for row in preview.rows if row.ignored] == [1, 2, 3, 4, 6]
     assert [record.excel_row_number for record in records] == [7, 8]
+
+
+def test_preview_leaves_repeated_section_rows_unselected_but_not_ignored(tmp_path: Path) -> None:
+    path = tmp_path / "section-rows.xlsx"
+    book = openpyxl.Workbook()
+    sheet = book.active
+    sheet.title = "Items"
+    sheet.append(["Line", "SKU", "Description", "Pack Size", "UOM"])
+    sheet.append([1, "CLD-GEL-500", "Reusable gel pack", "24 pcs / carton", "carton"])
+    sheet.append([2, "CLD-BOX-032", "Thermal box insert", "50 sets / bundle", "bundle"])
+    sheet.append(["ZONE B - WAREHOUSE CONSUMABLES"] * 5)
+    sheet.append([3, "WRP-STRETCH-18", "Stretch film roll", "6 rolls / case", "case"])
+    book.save(path)
+    register_file("file-section", path)
+
+    source = ComparisonDataSource(
+        id="source-section",
+        name="Section source",
+        file_id="file-section",
+        sheet_name="Items",
+        header_row=1,
+        first_data_row=2,
+        selected_row_numbers=[],
+        ignored_row_numbers=[],
+        fields=[],
+    )
+
+    preview = preview_data_source(source)
+    records = extract_records(source)
+
+    assert preview.data_source.selected_row_numbers == [2, 3, 5]
+    assert preview.data_source.ignored_row_numbers == []
+    assert [row.row_number for row in preview.rows if row.ignored] == []
+    assert [row.row_number for row in preview.rows if row.selected] == [2, 3, 5]
+    assert [record.excel_row_number for record in records] == [2, 3, 5]
+
+
+def test_preview_does_not_treat_header_words_inside_data_as_header_rows(tmp_path: Path) -> None:
+    path = tmp_path / "line-substring.xlsx"
+    book = openpyxl.Workbook()
+    sheet = book.active
+    sheet.title = "Items"
+    sheet.append(["Line", "SKU", "Description", "Pack Size", "UOM"])
+    sheet.append([1, "CLD-GEL-500", "Reusable gel pack", "24 pcs / carton", "carton"])
+    sheet.append([2, "CLD-LIN-032", "Thermal box liner", "50 sets / bundle", "bundle"])
+    sheet.append([3, "CLD-TMP-IND", "Temperature indicator strip", "100 strips / pack", "pack"])
+    book.save(path)
+    register_file("file-line-substring", path)
+
+    source = ComparisonDataSource(
+        id="source-line-substring",
+        name="Line substring source",
+        file_id="file-line-substring",
+        sheet_name="Items",
+        header_row=1,
+        first_data_row=2,
+        selected_row_numbers=[],
+        ignored_row_numbers=[],
+        fields=[],
+    )
+
+    preview = preview_data_source(source)
+
+    assert preview.data_source.selected_row_numbers == [2, 3, 4]
+
+
+def test_auto_detected_preview_ignores_stale_selected_rows(tmp_path: Path) -> None:
+    path = tmp_path / "stale-selected.xlsx"
+    book = openpyxl.Workbook()
+    sheet = book.active
+    sheet.title = "Items"
+    sheet.append(["Line", "SKU", "Description", "Pack Size", "UOM"])
+    sheet.append(["ZONE A"] * 5)
+    sheet.append([1, "CLD-GEL-500", "Reusable gel pack", "24 pcs / carton", "carton"])
+    sheet.append([2, "CLD-LIN-032", "Thermal box liner", "50 sets / bundle", "bundle"])
+    sheet.append([3, "CLD-TMP-IND", "Temperature indicator strip", "100 strips / pack", "pack"])
+    book.save(path)
+    register_file("file-stale-selected", path)
+
+    source = ComparisonDataSource(
+        id="source-stale-selected",
+        name="Stale selected source",
+        file_id="file-stale-selected",
+        sheet_name="Items",
+        header_row=1,
+        first_data_row=3,
+        selected_row_numbers=[4, 5],
+        ignored_row_numbers=[],
+        row_selection_mode="auto_detected",
+        fields=[],
+    )
+
+    preview = preview_data_source(source)
+
+    assert preview.data_source.selected_row_numbers == [3, 4, 5]

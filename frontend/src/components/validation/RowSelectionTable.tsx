@@ -5,6 +5,8 @@ import type { PreviewRow } from "../../types/validation.types";
 interface RowSelectionTableProps {
   headers: string[];
   rows: PreviewRow[];
+  lockedRowNumbers?: number[];
+  headerRowNumber?: number;
   onToggleRow: (rowNumber: number) => void;
   onSelectRows: (rowNumbers: number[]) => void;
   onIgnoreRows: (rowNumbers: number[]) => void;
@@ -37,13 +39,14 @@ function rowText(row: PreviewRow) {
   return Object.values(row.cells).map((value) => String(value ?? "")).join(" ").trim();
 }
 
-function rowStatus(row: PreviewRow, headers: string[]) {
+function rowStatus(row: PreviewRow, headers: string[], headerRowNumber?: number) {
   const text = rowText(row);
+  if (row.row_number === headerRowNumber) return { label: "Header row", className: "bg-sky-100 text-sky-700" };
+  if (row.selected) return { label: "Included", className: "bg-emerald-50 text-emerald-700" };
   if (row.ignored) return { label: "Excluded", className: "bg-slate-100 text-slate-600" };
   if (!text) return { label: "Blank", className: "bg-zinc-100 text-zinc-600" };
   const headerHits = headers.filter((header) => header && text.toLowerCase().includes(header.toLowerCase())).length;
   if (headerHits >= Math.min(2, headers.length)) return { label: "Header-like", className: "bg-amber-50 text-amber-700" };
-  if (row.selected) return { label: "Included", className: "bg-emerald-50 text-emerald-700" };
   return { label: "Not included", className: "bg-slate-50 text-slate-500" };
 }
 
@@ -78,11 +81,13 @@ function elementContentBox(element: HTMLElement, container: HTMLDivElement) {
   };
 }
 
-export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, onIgnoreRows, onMarkDataRows }: RowSelectionTableProps) {
-  const visibleRows = rows.map((row) => row.row_number);
-  const selectedRows = rows.filter((row) => row.selected).map((row) => row.row_number);
-  const rowsContaining = (term: string) => rows.filter((row) => rowText(row).toLowerCase().includes(term)).map((row) => row.row_number);
-  const blankRows = rows.filter((row) => !rowText(row)).map((row) => row.row_number);
+export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], headerRowNumber, onToggleRow, onSelectRows, onIgnoreRows, onMarkDataRows }: RowSelectionTableProps) {
+  const lockedRows = new Set([...lockedRowNumbers, ...(headerRowNumber ? [headerRowNumber] : [])]);
+  const selectableRows = rows.filter((row) => !lockedRows.has(row.row_number));
+  const selectableRowNumbers = selectableRows.map((row) => row.row_number);
+  const selectedRows = selectableRows.filter((row) => row.selected).map((row) => row.row_number);
+  const rowsContaining = (term: string) => selectableRows.filter((row) => rowText(row).toLowerCase().includes(term)).map((row) => row.row_number);
+  const blankRows = selectableRows.filter((row) => !rowText(row)).map((row) => row.row_number);
   const [dragSelection, setDragSelection] = useState<DragSelectionState | null>(null);
   const [rangeStart, setRangeStart] = useState("");
   const [rangeEnd, setRangeEnd] = useState("");
@@ -103,11 +108,29 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
     const container = scrollContainerRef.current;
     if (!container) return [];
     const box = normalizedSelectionBox(selection);
-    return rows
+    return selectableRows
       .filter((row) => {
         const element = rowRefs.current.get(row.row_number);
         if (!element) return false;
         return boxesIntersect(elementContentBox(element, container), box);
+      })
+      .map((row) => row.row_number);
+  };
+
+  const rowsInScrollViewport = () => {
+    const container = scrollContainerRef.current;
+    if (!container) return selectableRowNumbers;
+    const containerBounds = container.getBoundingClientRect();
+    const stickyHeader = container.querySelector("thead");
+    const stickyHeaderBottom = stickyHeader?.getBoundingClientRect().bottom ?? containerBounds.top;
+    const viewportTop = Math.max(containerBounds.top, stickyHeaderBottom);
+    const viewportBottom = containerBounds.bottom;
+    return selectableRows
+      .filter((row) => {
+        const element = rowRefs.current.get(row.row_number);
+        if (!element) return false;
+        const rowBounds = element.getBoundingClientRect();
+        return rowBounds.bottom > viewportTop && rowBounds.top < viewportBottom;
       })
       .map((row) => row.row_number);
   };
@@ -251,6 +274,7 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
 
   const handleRowMouseDown = (event: MouseEvent<HTMLTableRowElement>, row: PreviewRow) => {
     if (event.button !== 0) return;
+    if (lockedRows.has(row.row_number)) return;
     const container = scrollContainerRef.current;
     if (!container) return;
     event.preventDefault();
@@ -277,6 +301,7 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
 
   const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, rowNumber: number) => {
     if (event.key !== "Enter" && event.key !== " ") return;
+    if (lockedRows.has(rowNumber)) return;
     event.preventDefault();
     onToggleRow(rowNumber);
   };
@@ -293,7 +318,7 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
 
     const lower = Math.min(start, end);
     const upper = Math.max(start, end);
-    const rowsInRange = rows.filter((row) => row.row_number >= lower && row.row_number <= upper).map((row) => row.row_number);
+    const rowsInRange = selectableRows.filter((row) => row.row_number >= lower && row.row_number <= upper).map((row) => row.row_number);
 
     if (!rowsInRange.length) {
       setRangeError(`No preview rows found from Excel row ${lower} to ${upper}.`);
@@ -323,13 +348,13 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="flex flex-wrap items-center gap-2 rounded-t-2xl border-b border-slate-200 bg-white p-3 text-xs font-semibold text-slate-700">
-        <button title="Include all rows in this preview" aria-label="Include all rows in this preview" onClick={() => onSelectRows(visibleRows)} className={toolbarButtonClass}>
+        <button title="Include all rows in this preview" aria-label="Include all rows in this preview" onClick={() => onSelectRows(selectableRowNumbers)} className={toolbarButtonClass}>
           <CheckSquare className="size-3.5" /> Select all
         </button>
         <button title="Clear the current row selection" aria-label="Clear the current row selection" onClick={() => onSelectRows([])} className={toolbarButtonClass}>
           <Square className="size-3.5" /> Select none
         </button>
-        <button title="Invert which preview rows are included" aria-label="Invert which preview rows are included" onClick={() => onSelectRows(rows.filter((row) => !row.selected).map((row) => row.row_number))} className={toolbarButtonClass}>
+        <button title="Invert which preview rows are included" aria-label="Invert which preview rows are included" onClick={() => onSelectRows(selectableRows.filter((row) => !row.selected).map((row) => row.row_number))} className={toolbarButtonClass}>
           <RotateCcw className="size-3.5" /> Invert
         </button>
         <form
@@ -402,8 +427,20 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
               className="absolute right-0 top-full z-30 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/70"
             >
               <p className={menuSectionClass}>Selection</p>
-              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onSelectRows(visibleRows))} className={menuItemClass} title="Include the rows currently shown in this preview table">
+              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onSelectRows(rowsInScrollViewport()))} className={menuItemClass} title="Include only the rows currently visible in the table viewport">
                 <Table2 className="size-3.5" /> Select visible
+              </button>
+              <button
+                role="menuitem"
+                type="button"
+                onClick={() => runMoreAction(() => {
+                  const visibleRowSet = new Set(rowsInScrollViewport());
+                  onSelectRows(selectedRows.filter((rowNumber) => !visibleRowSet.has(rowNumber)));
+                })}
+                className={menuItemClass}
+                title="Remove the rows currently visible in the table viewport from the selection"
+              >
+                <Square className="size-3.5" /> Unselect visible
               </button>
               <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(selectedRows))} className={menuItemClass} title="Move the currently selected rows to excluded rows so validation skips them">
                 <Ban className="size-3.5" /> Exclude selected
@@ -448,7 +485,9 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
           </thead>
           <tbody>
             {rows.map((row) => {
-              const status = rowStatus(row, headers);
+              const status = rowStatus(row, headers, headerRowNumber);
+              const locked = lockedRows.has(row.row_number);
+              const isHeaderRow = row.row_number === headerRowNumber;
               return (
                 <tr
                   key={row.row_number}
@@ -459,13 +498,14 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
                       rowRefs.current.delete(row.row_number);
                     }
                   }}
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`${row.selected ? "Unselect" : "Select"} Excel row ${row.row_number}`}
-                  title="Click to toggle one row, or drag to draw a selection box across rows"
+                  tabIndex={locked ? -1 : 0}
+                  role={locked ? undefined : "button"}
+                  aria-disabled={locked || undefined}
+                  aria-label={isHeaderRow ? `Excel row ${row.row_number} is the header row` : locked ? `Excel row ${row.row_number} is excluded by row setup` : `${row.selected ? "Unselect" : "Select"} Excel row ${row.row_number}`}
+                  title={isHeaderRow ? "This row is the header row and is not selectable." : locked ? "This row is excluded by the first data row setting." : "Click to toggle one row, or drag to draw a selection box across rows"}
                   onMouseDown={(event) => handleRowMouseDown(event, row)}
                   onKeyDown={(event) => handleRowKeyDown(event, row.row_number)}
-                  className={`group cursor-pointer border-t border-slate-100 align-middle transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${row.selected ? "bg-emerald-50/50" : ""} ${row.ignored ? "opacity-60" : ""}`}
+                  className={`group border-t border-slate-100 align-middle transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${locked ? "cursor-not-allowed" : "cursor-pointer hover:bg-slate-50"} ${isHeaderRow ? "bg-sky-50/80" : row.selected ? "bg-emerald-50/50" : ""} ${locked && !isHeaderRow ? "opacity-60" : ""} ${row.ignored && !row.selected && !locked ? "opacity-60" : ""}`}
                 >
                   <td className="border-b border-slate-100 p-0 align-middle">
                     <div className="flex min-h-11 items-center justify-center px-2.5 py-2">
@@ -473,10 +513,11 @@ export function RowSelectionTable({ headers, rows, onToggleRow, onSelectRows, on
                         type="checkbox"
                         aria-label={`${row.selected ? "Unselect" : "Select"} Excel row ${row.row_number}`}
                         checked={row.selected}
+                        disabled={locked}
                         onClick={(event) => event.stopPropagation()}
                         onMouseDown={(event) => event.stopPropagation()}
                         onChange={() => onToggleRow(row.row_number)}
-                        className="size-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600"
+                        className="size-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
                       />
                     </div>
                   </td>

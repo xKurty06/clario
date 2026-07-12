@@ -70,20 +70,14 @@ export function PresetAwareComparisonBuilderPage() {
   const [rowSetupComplete, setRowSetupComplete] = useState(false);
 
   const needsRowSetup = useMemo(
-    () => files.length > 0 && (!dataSources.length || dataSources.some((source) => !source.row_setup_confirmed) || !rowSetupComplete),
-    [dataSources, files.length, rowSetupComplete],
+    () => files.length > 0 && (!dataSources.length || !rowSetupComplete),
+    [dataSources.length, files.length, rowSetupComplete],
   );
 
   useEffect(() => {
     if (!files.length || dataSources.length) return;
     setDataSources(scaffoldSources(files, preset));
   }, [dataSources.length, files, preset, setDataSources]);
-
-  useEffect(() => {
-    if (dataSources.some((source) => !source.row_setup_confirmed)) {
-      setRowSetupComplete(false);
-    }
-  }, [dataSources]);
 
   useEffect(() => {
     if (rowSetupComplete) closePresetBanner();
@@ -93,5 +87,5 @@ export function PresetAwareComparisonBuilderPage() {
     return <RowSetupPage onContinue={() => setRowSetupComplete(true)} />;
   }
 
-  return <ComparisonBuilderPage />;
+  return <ComparisonBuilderPage onBackToRowSetup={() => setRowSetupComplete(false)} />;
 }
