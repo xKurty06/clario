@@ -1,5 +1,5 @@
 import { CircleHelp } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 
 interface HelpTipProps {
@@ -22,7 +22,6 @@ export function HelpTip({ text }: HelpTipProps) {
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState<TooltipPosition | null>(null);
   const triggerRef = useRef<HTMLSpanElement>(null);
-  const tooltipId = useId();
 
   const updatePosition = useCallback(() => {
     const rect = triggerRef.current?.getBoundingClientRect();
@@ -81,7 +80,6 @@ export function HelpTip({ text }: HelpTipProps) {
 
   const tooltip = visible && position && typeof document !== "undefined" ? createPortal(
     <span
-      id={tooltipId}
       role="tooltip"
       style={tooltipStyle}
       className="pointer-events-none fixed z-[130] rounded-xl bg-slate-900 px-3 py-2.5 text-left text-xs font-normal leading-5 text-white opacity-0 shadow-xl animate-[builder-dialog-in_120ms_cubic-bezier(0.16,1,0.3,1)_forwards]"
@@ -100,12 +98,11 @@ export function HelpTip({ text }: HelpTipProps) {
     <span
       ref={triggerRef}
       className="help-tip inline-flex align-middle"
-      title={text}
-      aria-describedby={visible ? tooltipId : undefined}
+      aria-hidden="true"
       onMouseEnter={() => setVisible(true)}
       onMouseLeave={() => setVisible(false)}
     >
-      <span className="grid size-5 place-items-center rounded-full text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-700" aria-hidden="true">
+      <span className="grid size-5 place-items-center rounded-full text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-700">
         <CircleHelp className="size-3.5" />
       </span>
       {tooltip}
