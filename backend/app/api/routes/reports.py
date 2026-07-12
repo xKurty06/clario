@@ -15,4 +15,9 @@ async def report_capabilities() -> dict[str, str]:
 @router.post("/pdf", response_class=FileResponse)
 async def export_pdf(result: ValidationResult) -> FileResponse:
     path = create_pdf(result)
-    return FileResponse(path, media_type="application/pdf", filename=path.name)
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        filename=path.name,
+        headers={"X-Report-Path": str(path.resolve())},
+    )
