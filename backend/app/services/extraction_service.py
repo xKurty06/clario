@@ -24,6 +24,7 @@ from app.services.file_service import get_file
 from app.services.sheet_service import composite_headers
 
 _INTERNAL_WORKING_FILE_PATTERN = re.compile(r"^[0-9a-f]{32}\.[A-Za-z0-9]+$", re.IGNORECASE)
+PREVIEW_CONTEXT_ROWS = 3
 
 
 def _load_frame(path: Path, sheet_name: str) -> pd.DataFrame:
@@ -108,6 +109,11 @@ def _auto_selected_rows(frame: pd.DataFrame, headers: list[str], data_source: Co
     return selected
 
 
+def _preview_start_row(data_source: ComparisonDataSource) -> int:
+    setup_anchor = min(data_source.header_row, data_source.first_data_row)
+    return max(setup_anchor - PREVIEW_CONTEXT_ROWS, 1)
+
+
 def preview_data_source(data_source: ComparisonDataSource) -> DataSourcePreview:
     recovered_file_name, path, _ = get_file(data_source.file_id)
     display_file_name = _display_file_name(data_source, recovered_file_name)
@@ -116,7 +122,8 @@ def preview_data_source(data_source: ComparisonDataSource) -> DataSourcePreview:
     selected_rows = set(data_source.selected_row_numbers or _auto_selected_rows(frame, headers, data_source))
     ignored_rows = set(data_source.ignored_row_numbers)
     rows: list[PreviewRow] = []
-    for row_index in range(max(data_source.first_data_row - 1, 0), len(frame)):
+    start_index = _preview_start_row(data_source) - 1
+    for row_index in range(start_index, len(frame)):
         row_number = row_index + 1
         row_values = frame.iloc[row_index].tolist()
         cells = {headers[index]: (None if pd.isna(value) else value) for index, value in enumerate(row_values)}
@@ -133,7 +140,7 @@ def preview_data_source(data_source: ComparisonDataSource) -> DataSourcePreview:
         data_source=source,
         columns=_columns(headers),
         rows=rows,
-        total_rows=len(rows),
+        total_rows=len(frame),
         detected_selected_rows=sorted(selected_rows),
     )
 
