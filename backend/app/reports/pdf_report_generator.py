@@ -11,6 +11,39 @@ from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, 
 from app.models.validation_models import ValidationResult
 from app.reports.base_report_generator import BaseReportGenerator
 
+_TEXT_REPLACEMENTS = str.maketrans({
+    "\u00a0": " ",
+    "\u20b1": "PHP ",
+    "\u2013": "-",
+    "\u2014": "-",
+    "\u2212": "-",
+    "\u00d7": "x",
+    "\u2022": "-",
+    "\u2018": "'",
+    "\u2019": "'",
+    "\u201c": '"',
+    "\u201d": '"',
+    "\u00b0": " deg",
+    "\u2264": "<=",
+    "\u2265": ">=",
+    "\u2248": "~",
+})
+
+
+def pdf_text(value: object) -> str:
+    """Return text that ReportLab's built-in PDF fonts can safely draw."""
+    text = "" if value is None else str(value)
+    text = text.translate(_TEXT_REPLACEMENTS)
+    return text.encode("latin-1", "replace").decode("latin-1")
+
+
+def pdf_paragraph(value: object, style: ParagraphStyle) -> Paragraph:
+    return Paragraph(escape(pdf_text(value)), style)
+
+
+def pdf_row(values: list[object]) -> list[str]:
+    return [pdf_text(value) for value in values]
+
 
 class PdfReportGenerator(BaseReportGenerator[ValidationResult]):
     def generate(self, data: ValidationResult, destination: Path) -> Path:
@@ -21,16 +54,16 @@ class PdfReportGenerator(BaseReportGenerator[ValidationResult]):
         story = [
             Paragraph("Comparison Builder Validation Report", title),
             Spacer(1, 7 * mm),
-            Paragraph(f"<b>Project:</b> {escape(data.project_name)}", styles["BodyText"]),
-            Paragraph(f"<b>Generated:</b> {escape(data.created_at)}", styles["BodyText"]),
-            Paragraph(f"<b>Preset:</b> {escape(data.preset.replace('_', ' ').title())}", styles["BodyText"]),
-            Paragraph(f"<b>Uploaded files:</b> {escape(', '.join(data.file_names) or 'None')}", styles["BodyText"]),
+            Paragraph(f"<b>Project:</b> {escape(pdf_text(data.project_name))}", styles["BodyText"]),
+            Paragraph(f"<b>Generated:</b> {escape(pdf_text(data.created_at))}", styles["BodyText"]),
+            Paragraph(f"<b>Preset:</b> {escape(pdf_text(data.preset.replace('_', ' ').title()))}", styles["BodyText"]),
+            Paragraph(f"<b>Uploaded files:</b> {escape(pdf_text(', '.join(data.file_names) or 'None'))}", styles["BodyText"]),
             Spacer(1, 6 * mm),
         ]
 
         summary = [
-            ["Selected rows", "Data sources", "Rules", "Discrepancies"],
-            [str(data.total_selected_rows), str(len(data.data_sources)), str(len(data.rule_summaries)), str(len(data.discrepancies))],
+            pdf_row(["Selected rows", "Data sources", "Rules", "Discrepancies"]),
+            pdf_row([data.total_selected_rows, len(data.data_sources), len(data.rule_summaries), len(data.discrepancies)]),
         ]
         table = Table(summary, colWidths=[55 * mm] * 4)
         table.setStyle(TableStyle([
@@ -43,16 +76,16 @@ class PdfReportGenerator(BaseReportGenerator[ValidationResult]):
         ]))
         story.extend([table, Spacer(1, 6 * mm), Paragraph("Data sources", styles["Heading2"])])
 
-        source_rows = [["Name", "File", "Sheet", "Header row", "First data row", "Selected rows"]]
+        source_rows = [pdf_row(["Name", "File", "Sheet", "Header row", "First data row", "Selected rows"])]
         for source in data.data_sources:
-            source_rows.append([
+            source_rows.append(pdf_row([
                 source.name,
                 source.file_name or "",
                 source.sheet_name,
-                str(source.header_row),
-                str(source.first_data_row),
-                str(len(source.selected_row_numbers)),
-            ])
+                source.header_row,
+                source.first_data_row,
+                len(source.selected_row_numbers),
+            ]))
         story.append(Table(source_rows, repeatRows=1, colWidths=[48 * mm, 50 * mm, 40 * mm, 22 * mm, 24 * mm, 24 * mm], style=[
             ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD5E1")),
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F8FAFC")),
@@ -61,11 +94,11 @@ class PdfReportGenerator(BaseReportGenerator[ValidationResult]):
         ]))
 
         story.extend([Spacer(1, 6 * mm), Paragraph("Comparison rules", styles["Heading2"])])
-        rule_rows = [["Rule", "Type", "Severity", "Discrepancies"]]
+        rule_rows = [pdf_row(["Rule", "Type", "Severity", "Discrepancies"])]
         for rule in data.rule_summaries:
-            rule_rows.append([rule.rule_name, rule.rule_type.replace("_", " "), rule.severity.title(), str(rule.discrepancy_count)])
+            rule_rows.append(pdf_row([rule.rule_name, rule.rule_type.replace("_", " "), rule.severity.title(), rule.discrepancy_count]))
         if len(rule_rows) == 1:
-            rule_rows.append(["No rules", "-", "-", "0"])
+            rule_rows.append(pdf_row(["No rules", "-", "-", "0"]))
         story.append(Table(rule_rows, repeatRows=1, colWidths=[95 * mm, 55 * mm, 28 * mm, 28 * mm], style=[
             ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD5E1")),
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F8FAFC")),
@@ -74,17 +107,19 @@ class PdfReportGenerator(BaseReportGenerator[ValidationResult]):
         ]))
 
         story.extend([Spacer(1, 6 * mm), Paragraph("Fields extracted", styles["Heading2"])])
-        field_rows = [["Data source", "Field", "Type", "Column", "Header", "Required"]]
+        field_rows = [pdf_row(["Data source", "Field", "Type", "Column", "Header", "Required"])]
         for source in data.data_sources:
             for field in source.fields:
-                field_rows.append([
+                field_rows.append(pdf_row([
                     source.name,
                     field.custom_display_name or field.field_name,
                     field.field_type,
                     field.column_letter,
                     field.original_header_label or "",
                     "Yes" if field.required else "No",
-                ])
+                ]))
+        if len(field_rows) == 1:
+            field_rows.append(pdf_row(["No mapped fields", "-", "-", "-", "-", "-"]))
         story.append(Table(field_rows, repeatRows=1, colWidths=[44 * mm, 44 * mm, 22 * mm, 18 * mm, 72 * mm, 16 * mm], style=[
             ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#CBD5E1")),
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F8FAFC")),
@@ -121,7 +156,7 @@ class PdfReportGenerator(BaseReportGenerator[ValidationResult]):
         if len(detail_rows) == 1:
             detail_rows.append(["No discrepancies", "-", "-", "-", "-", "-", "-", "No correction required.", ""])
 
-        detail = Table([[Paragraph(escape(str(cell)), styles["BodyText"]) for cell in row] for row in detail_rows], repeatRows=1, colWidths=[32 * mm, 16 * mm, 40 * mm, 40 * mm, 24 * mm, 28 * mm, 28 * mm, 44 * mm, 36 * mm])
+        detail = Table([[pdf_paragraph(cell, styles["BodyText"]) for cell in row] for row in detail_rows], repeatRows=1, colWidths=[30 * mm, 15 * mm, 36 * mm, 36 * mm, 22 * mm, 26 * mm, 26 * mm, 40 * mm, 30 * mm])
         detail.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#047857")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
