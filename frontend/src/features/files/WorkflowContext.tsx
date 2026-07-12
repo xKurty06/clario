@@ -1,5 +1,4 @@
 import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren } from "react";
-import { RowSetupConfirmationPanel } from "../../components/validation/RowSetupConfirmationPanel";
 import type { UploadedFile } from "../../types/file.types";
 import type {
   ComparisonDataSource,
@@ -103,22 +102,6 @@ export function WorkflowProvider({ children }: PropsWithChildren) {
     setDataSourcesState((current) => current.filter((item) => item.id !== id));
   }, []);
 
-  const confirmRowSetup = useCallback((sourceId: string) => {
-    setDataSourcesState((current) =>
-      current.map((item) =>
-        item.id === sourceId && sourcePreviews[item.id]
-          ? { ...item, row_setup_confirmed: true }
-          : item,
-      ),
-    );
-  }, [sourcePreviews]);
-
-  const confirmAllRowSetups = useCallback(() => {
-    setDataSourcesState((current) =>
-      current.map((item) => (sourcePreviews[item.id] ? { ...item, row_setup_confirmed: true } : item)),
-    );
-  }, [sourcePreviews]);
-
   const setResult = useCallback((value: ValidationResult | null) => {
     setResultState(value);
     writeStoredResult(value);
@@ -154,17 +137,7 @@ export function WorkflowProvider({ children }: PropsWithChildren) {
     [projectName, preset, files, dataSources, setDataSources, updateDataSource, removeDataSource, sourcePreviews, rules, result, setResult],
   );
 
-  return (
-    <Context.Provider value={value}>
-      {children}
-      <RowSetupConfirmationPanel
-        dataSources={dataSources}
-        sourcePreviews={sourcePreviews}
-        onConfirmSource={confirmRowSetup}
-        onConfirmAll={confirmAllRowSetups}
-      />
-    </Context.Provider>
-  );
+  return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 
 export function useWorkflow() {
