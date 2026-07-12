@@ -13,11 +13,11 @@ html { min-width: 0; overflow-x: hidden; }
 body { margin: 0; min-width: 0; min-height: 100dvh; overflow-x: hidden; }
 button, input, select, textarea { font: inherit; }
 
-main :where(p, h1, h2, h3, h4, h5, h6, dd, dt, li, label) {
+:where(p, h1, h2, h3, h4, h5, h6, dd, dt, li, label) {
   overflow-wrap: anywhere;
 }
 
-main :where(button, a, span) {
+:where(button, a, span) {
   min-width: 0;
 }
 
@@ -51,19 +51,20 @@ main :where(div:has(> button[aria-label="Include all rows in this preview"]) + d
   z-index: 0;
 }
 
-main :where([role="menu"]) {
+:where([role="menu"]) {
   z-index: 90;
 }
 
-main :where(.fixed.inset-0.z-\[70\]) {
+:where(.fixed.inset-0.z-\[70\]) {
   z-index: 120;
 }
 
-main :where(input + p.text-slate-500),
-main :where(.relative + p.text-slate-500),
-main :where(.relative + p.text-xs.leading-5.text-slate-500),
-main :where(label > span > span.block.text-sm.text-slate-500) {
-  display: none;
+:where(input + p.text-slate-500),
+:where(.relative + p.text-slate-500),
+:where(.relative + p.text-xs.leading-5.text-slate-500),
+:where(label:has(.help-tip) > span > span.block.text-sm.text-slate-500),
+:where(label:has([class~="help-tip"]) > span > span.block.text-sm.text-slate-500) {
+  display: none !important;
 }
 
 main :where(.truncate) {
