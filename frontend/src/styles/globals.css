@@ -130,6 +130,10 @@ main :where(div:has(> h2.truncate + span.inline-flex) > span.inline-flex) {
 }
 
 .app-route-fade {
+  isolation: auto;
+}
+
+.app-route-fade > :where(:not(.fixed)) {
   animation: app-route-fade-in 120ms ease-out both;
 }
 
