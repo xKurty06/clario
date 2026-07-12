@@ -13,6 +13,7 @@ interface RowSetupPageProps {
 
 const primaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:active:scale-100";
 const secondaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
+const rowActionButtonClass = "inline-flex items-center justify-center rounded-lg border bg-white px-2.5 py-1.5 text-[11px] font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 function sourceSignature(source: ComparisonDataSource) {
   return [source.file_id, source.sheet_name, source.header_row, source.first_data_row].join("|");
@@ -387,49 +388,48 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                           <div>
                             <h3 className="text-sm font-semibold text-slate-900">Spreadsheet row preview</h3>
-                            <p className="mt-1 text-xs leading-5 text-slate-500">Click a row action to set the header or first data row using the visible sheet content.</p>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">Use the row controls on the left side of each preview row so actions stay visible while scrolling.</p>
                           </div>
                           {preview ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Showing {preview.rows.length} rows</span> : null}
                         </div>
 
                         {preview ? (
-                          <div className="max-h-[42rem] overflow-auto rounded-2xl border border-slate-200 bg-white">
-                            <table className="min-w-full text-left text-xs">
-                              <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600 shadow-[0_1px_0_#e2e8f0]">
-                                <tr>
-                                  <th className="w-28 p-3 font-semibold">Row</th>
-                                  {columns.map((column) => (
-                                    <th key={column.letter} className="min-w-36 p-3 font-semibold">{column.letter} · {column.header_label || "Blank header"}</th>
-                                  ))}
-                                  {hasMoreColumns ? <th className="min-w-24 p-3 font-semibold">More</th> : null}
-                                  <th className="min-w-56 p-3 font-semibold">Actions</th>
-                                </tr>
-                              </thead>
+                          <div className="max-h-[36rem] overflow-auto rounded-2xl border border-slate-200 bg-white overscroll-contain">
+                            <table aria-label={`${source.name} row setup preview`} className="min-w-full border-separate border-spacing-0 text-left text-xs">
                               <tbody>
                                 {preview.rows.map((row) => (
-                                  <tr key={row.row_number} className={`border-t border-l-4 border-slate-100 align-top transition ${rowTone(row, source)}`}>
-                                    <td className="p-3">
-                                      <div className="space-y-1">
-                                        <p className="font-semibold text-slate-900">Row {row.row_number}</p>
-                                        {rowBadge(row, source)}
+                                  <tr key={row.row_number} className={`align-top transition ${rowTone(row, source)}`}>
+                                    <td className="sticky left-0 z-[1] min-w-48 border-b border-r border-slate-100 bg-inherit p-3 shadow-[1px_0_0_#e2e8f0]">
+                                      <div className="space-y-2">
+                                        <div className="space-y-1">
+                                          <p className="font-semibold text-slate-900">Row {row.row_number}</p>
+                                          {rowBadge(row, source)}
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => setHeaderFromRow(source, row.row_number)}
+                                            className={`${rowActionButtonClass} border-sky-200 text-sky-700 hover:bg-sky-50 focus-visible:outline-sky-500`}
+                                          >
+                                            Set header
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={row.row_number <= source.header_row}
+                                            onClick={() => setFirstDataFromRow(source, row.row_number)}
+                                            className={`${rowActionButtonClass} border-emerald-200 text-emerald-700 hover:bg-emerald-50 focus-visible:outline-emerald-500`}
+                                          >
+                                            Set data
+                                          </button>
+                                        </div>
                                       </div>
                                     </td>
                                     {columns.map((column) => (
-                                      <td key={`${row.row_number}-${column.letter}`} className="max-w-56 p-3 text-slate-700">
+                                      <td key={`${row.row_number}-${column.letter}`} className="min-w-40 max-w-64 border-b border-slate-100 p-3 text-slate-700">
                                         <span className="line-clamp-3">{displayCell(row.cells[column.header_label])}</span>
                                       </td>
                                     ))}
-                                    {hasMoreColumns ? <td className="p-3 text-slate-400">+{preview.columns.length - columns.length}</td> : null}
-                                    <td className="p-3">
-                                      <div className="flex flex-wrap gap-2">
-                                        <button type="button" onClick={() => setHeaderFromRow(source, row.row_number)} className="rounded-lg border border-sky-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500">
-                                          Set as header
-                                        </button>
-                                        <button type="button" disabled={row.row_number <= source.header_row} onClick={() => setFirstDataFromRow(source, row.row_number)} className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
-                                          Set first data
-                                        </button>
-                                      </div>
-                                    </td>
+                                    {hasMoreColumns ? <td className="min-w-24 border-b border-slate-100 p-3 text-slate-400">+{preview.columns.length - columns.length}</td> : null}
                                   </tr>
                                 ))}
                               </tbody>
