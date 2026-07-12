@@ -4,16 +4,15 @@ import { Link } from "react-router-dom";
 import { EmptyState } from "../components/common/EmptyState";
 import { PageHeader } from "../components/layout/PageHeader";
 import { useWorkflow } from "../features/files/WorkflowContext";
-import { exportPdf } from "../services/reportApi";
+import { exportPdf, openPdfExternally } from "../services/reportApi";
 
 interface ExportedReportState {
   filename: string;
   savedPath: string | null;
-  openUrl: string;
 }
 
 const primaryActionClass = "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none disabled:active:scale-100";
-const secondaryActionClass = "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600";
+const secondaryActionClass = "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100";
 
 function ExportMetric({ label, value }: { label: string; value: number }) {
   return (
@@ -27,7 +26,9 @@ function ExportMetric({ label, value }: { label: string; value: number }) {
 export function ReportExportPage() {
   const { result } = useWorkflow();
   const [busy, setBusy] = useState(false);
+  const [openBusy, setOpenBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
   const [exportedReport, setExportedReport] = useState<ExportedReportState | null>(null);
 
   if (!result) {
@@ -59,6 +60,7 @@ export function ReportExportPage() {
   const generateReport = async () => {
     setBusy(true);
     setErrorMessage("");
+    setStatusMessage("");
     try {
       const report = await exportPdf(result);
       if (!report.blob.size) {
@@ -68,8 +70,8 @@ export function ReportExportPage() {
       setExportedReport({
         filename: report.filename,
         savedPath: report.savedPath,
-        openUrl: report.openUrl,
       });
+      setStatusMessage("PDF generated locally. Use Open in PDF viewer to view it with your default PDF app.");
     } catch (cause) {
       setErrorMessage(cause instanceof Error ? cause.message : "Could not create report.");
     } finally {
@@ -77,9 +79,19 @@ export function ReportExportPage() {
     }
   };
 
-  const openReport = () => {
+  const openReport = async () => {
     if (!exportedReport) return;
-    window.location.assign(exportedReport.openUrl);
+    setOpenBusy(true);
+    setErrorMessage("");
+    setStatusMessage("");
+    try {
+      await openPdfExternally(result.id);
+      setStatusMessage("Opened the saved PDF using your default PDF viewer.");
+    } catch (cause) {
+      setErrorMessage(cause instanceof Error ? cause.message : "Could not open the PDF in an external viewer.");
+    } finally {
+      setOpenBusy(false);
+    }
   };
 
   return (
@@ -123,6 +135,12 @@ export function ReportExportPage() {
           </p>
         ) : null}
 
+        {statusMessage ? (
+          <p className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800" role="status">
+            {statusMessage}
+          </p>
+        ) : null}
+
         {exportedReport ? (
           <div className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50/60 p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -138,8 +156,8 @@ export function ReportExportPage() {
                   </p>
                 ) : null}
               </div>
-              <button type="button" onClick={openReport} className={secondaryActionClass}>
-                <ExternalLink className="size-4" /> Open PDF
+              <button type="button" onClick={openReport} disabled={openBusy} className={secondaryActionClass}>
+                <ExternalLink className="size-4" /> {openBusy ? "Opening..." : "Open in PDF viewer"}
               </button>
             </div>
           </div>
