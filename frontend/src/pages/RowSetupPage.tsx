@@ -13,6 +13,7 @@ interface RowSetupPageProps {
 
 const primaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:active:scale-100";
 const secondaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
+const setupActionButtonClass = "inline-flex items-center justify-center rounded-xl border bg-white px-3 py-2 text-xs font-semibold transition active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
 
 function sourceSignature(source: ComparisonDataSource) {
   return [source.file_id, source.sheet_name, source.header_row, source.first_data_row].join("|");
@@ -49,10 +50,10 @@ function displayCell(value: unknown) {
 }
 
 function rowTone(row: PreviewRow, source: ComparisonDataSource) {
-  if (row.row_number === source.header_row) return "border-l-sky-500 bg-sky-50/80";
-  if (row.row_number === source.first_data_row) return "border-l-emerald-500 bg-emerald-50/80";
-  if (row.selected) return "border-l-emerald-200 bg-emerald-50/30";
-  return "border-l-transparent bg-white";
+  if (row.row_number === source.header_row) return "border-sky-200 bg-sky-50/90";
+  if (row.row_number === source.first_data_row) return "border-emerald-200 bg-emerald-50/90";
+  if (row.selected) return "border-emerald-100 bg-emerald-50/40";
+  return "border-slate-200 bg-white";
 }
 
 function rowBadge(row: PreviewRow, source: ComparisonDataSource) {
@@ -99,7 +100,6 @@ function confirmedStatus(source: ComparisonDataSource, preview?: DataSourcePrevi
 export function RowSetupPage({ onContinue }: RowSetupPageProps) {
   const {
     files,
-    preset,
     dataSources,
     setDataSources,
     updateDataSource,
@@ -299,8 +299,8 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
             const stalePreview = Boolean(preview && sourceSignature(preview.data_source) !== sourceSignature(source));
             const collapsed = collapsedSourceIds.has(source.id);
             const selectedRowNumber = selectedRowsBySource[source.id] ?? (preview?.rows.some((row) => row.row_number === source.header_row) ? source.header_row : preview?.rows[0]?.row_number);
-            const selectedRow = preview?.rows.find((row) => row.row_number === selectedRowNumber);
-            const canUseSelectedRow = typeof selectedRowNumber === "number";
+            const selectedRowNumberValue = typeof selectedRowNumber === "number" ? selectedRowNumber : null;
+            const selectedRow = selectedRowNumberValue ? preview?.rows.find((row) => row.row_number === selectedRowNumberValue) : undefined;
 
             return (
               <section key={source.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" data-fade-section>
@@ -417,57 +417,58 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
                                 <span className="font-semibold text-slate-900">Selected row</span>
                                 <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-sm">
-                                  {selectedRowNumber ? `Row ${selectedRowNumber}` : "Choose a row"}
+                                  {selectedRowNumberValue ? `Row ${selectedRowNumberValue}` : "Choose a row"}
                                 </span>
                                 {selectedRow ? rowBadge(selectedRow, source) : null}
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 <button
                                   type="button"
-                                  disabled={!canUseSelectedRow}
-                                  onClick={() => canUseSelectedRow && setHeaderFromRow(source, selectedRowNumber)}
-                                  className="rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                  disabled={!selectedRowNumberValue}
+                                  onClick={() => selectedRowNumberValue && setHeaderFromRow(source, selectedRowNumberValue)}
+                                  className={`${setupActionButtonClass} border-sky-200 text-sky-700 hover:bg-sky-50 focus-visible:outline-sky-500`}
                                 >
                                   Set selected as header
                                 </button>
                                 <button
                                   type="button"
-                                  disabled={!canUseSelectedRow || selectedRowNumber <= source.header_row}
-                                  onClick={() => canUseSelectedRow && setFirstDataFromRow(source, selectedRowNumber)}
-                                  className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                  disabled={!selectedRowNumberValue || selectedRowNumberValue <= source.header_row}
+                                  onClick={() => selectedRowNumberValue && setFirstDataFromRow(source, selectedRowNumberValue)}
+                                  className={`${setupActionButtonClass} border-emerald-200 text-emerald-700 hover:bg-emerald-50 focus-visible:outline-emerald-500`}
                                 >
                                   Set selected as first data
                                 </button>
                               </div>
                             </div>
-                            <div className="max-h-[34rem] overflow-auto rounded-2xl border border-slate-200 bg-white">
-                              <table className="min-w-full border-separate border-spacing-0 text-left text-xs">
-                                <tbody>
-                                  {preview.rows.map((row) => {
-                                    const selected = selectedRowNumber === row.row_number;
-                                    return (
-                                      <tr
-                                        key={row.row_number}
-                                        onClick={() => selectPreviewRow(source.id, row.row_number)}
-                                        className={`cursor-pointer border-l-4 align-top transition hover:bg-emerald-50/60 ${rowTone(row, source)} ${selected ? "ring-2 ring-inset ring-emerald-300" : ""}`}
-                                      >
-                                        <td className="sticky left-0 z-10 w-32 min-w-32 border-r border-slate-200 bg-inherit p-2.5 shadow-[1px_0_0_#e2e8f0]">
-                                          <div className="space-y-1.5">
-                                            <p className="font-semibold text-slate-900">Row {row.row_number}</p>
-                                            {rowBadge(row, source)}
-                                          </div>
-                                        </td>
-                                        {columns.map((column) => (
-                                          <td key={`${row.row_number}-${column.letter}`} className="max-w-52 border-b border-slate-100 p-2.5 text-slate-700">
-                                            <span className="line-clamp-2">{displayCell(row.cells[column.header_label])}</span>
-                                          </td>
-                                        ))}
-                                        {hasMoreColumns ? <td className="border-b border-slate-100 p-2.5 text-slate-400">+{preview.columns.length - columns.length} columns</td> : null}
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
+                            <div className="max-h-[34rem] space-y-2 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                              {preview.rows.map((row) => {
+                                const selected = selectedRowNumberValue === row.row_number;
+                                return (
+                                  <button
+                                    key={row.row_number}
+                                    type="button"
+                                    onClick={() => selectPreviewRow(source.id, row.row_number)}
+                                    className={`block w-full rounded-2xl border p-3 text-left shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/60 ${rowTone(row, source)} ${selected ? "ring-2 ring-emerald-300" : ""}`}
+                                  >
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="text-sm font-semibold text-slate-950">Row {row.row_number}</span>
+                                        {rowBadge(row, source)}
+                                      </div>
+                                      {selected ? <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white">Selected</span> : null}
+                                    </div>
+                                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                                      {columns.map((column) => (
+                                        <span key={`${row.row_number}-${column.letter}`} className="min-w-36 max-w-44 rounded-xl border border-white/70 bg-white/75 px-2.5 py-2 shadow-sm">
+                                          <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">{column.letter}</span>
+                                          <span className="mt-1 block line-clamp-2 text-xs leading-5 text-slate-700">{displayCell(row.cells[column.header_label])}</span>
+                                        </span>
+                                      ))}
+                                      {hasMoreColumns ? <span className="min-w-32 rounded-xl border border-white/70 bg-white/75 px-2.5 py-2 text-xs font-medium text-slate-400 shadow-sm">+{preview.columns.length - columns.length} columns</span> : null}
+                                    </div>
+                                  </button>
+                                );
+                              })}
                             </div>
                           </>
                         ) : (
