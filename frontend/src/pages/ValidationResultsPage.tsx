@@ -1,4 +1,4 @@
-import { FileSearch, Search } from "lucide-react";
+import { FileDown, FileSearch, Search } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState } from "../components/common/EmptyState";
@@ -165,7 +165,15 @@ export function ValidationResultsPage() {
         eyebrow="Step 3 of 4"
         title="Review rule-based discrepancies"
         description={`${result.discrepancies.length} discrepancy(s) across ${result.total_selected_rows} selected rows. Every issue remains traceable to file, sheet, row, field, and rule.`}
-        action={<Link to="/reports" className="rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white">Export report</Link>}
+        action={(
+          <Link
+            to="/reports"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 active:scale-[0.99]"
+          >
+            <FileDown className="size-4" />
+            Export report
+          </Link>
+        )}
       />
 
       <div className="grid grid-cols-4 divide-x divide-slate-200 border-b border-slate-200 py-6">
