@@ -53,32 +53,36 @@ function rowTone(row: PreviewRow, source: ComparisonDataSource) {
   if (row.row_number === source.header_row) return "bg-sky-50/90";
   if (row.row_number === source.first_data_row) return "bg-emerald-50/90";
   if (row.selected) return "bg-emerald-50/40";
-  if (row.ignored || row.row_number < source.first_data_row) return "bg-white";
   return "bg-white";
 }
 
 function rowBadge(row: PreviewRow, source: ComparisonDataSource) {
+  const className = "inline-flex w-fit max-w-full shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px]";
   if (row.row_number === source.header_row) {
-    return <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">Header row</span>;
+    return <span className={`${className} bg-sky-100 font-semibold text-sky-700`}>Header row</span>;
   }
   if (row.row_number === source.first_data_row) {
-    return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">First data row</span>;
+    return <span className={`${className} bg-emerald-100 font-semibold text-emerald-700`}>First data row</span>;
   }
   if (row.ignored || row.row_number < source.first_data_row) {
-    return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">Excluded row</span>;
+    return <span className={`${className} bg-slate-100 font-medium text-slate-500`}>Excluded row</span>;
   }
   if (row.selected) {
-    return <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Selected data</span>;
+    return <span className={`${className} bg-emerald-50 font-semibold text-emerald-700`}>Selected data</span>;
   }
-  return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">Preview row</span>;
+  return <span className={`${className} bg-slate-100 font-medium text-slate-500`}>Preview row</span>;
 }
 
 function rowAccentClass(row: PreviewRow, source: ComparisonDataSource, selected: boolean) {
-  if (selected) return "border-l-emerald-500 ring-2 ring-inset ring-emerald-200";
+  if (selected) return "border-l-emerald-600";
   if (row.row_number === source.header_row) return "border-l-sky-500";
   if (row.row_number === source.first_data_row) return "border-l-emerald-500";
   if (row.selected) return "border-l-emerald-200";
   return "border-l-transparent";
+}
+
+function rowCellClass(selected: boolean) {
+  return selected ? "border-y border-emerald-300 bg-emerald-50/95" : "border-b border-slate-100";
 }
 
 function confirmedStatus(source: ComparisonDataSource, preview?: DataSourcePreview) {
@@ -454,24 +458,27 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                                 <tbody>
                                   {preview.rows.map((row) => {
                                     const selected = selectedRowNumberValue === row.row_number;
+                                    const cellClass = rowCellClass(selected);
                                     return (
                                       <tr
                                         key={row.row_number}
+                                        aria-selected={selected}
                                         onClick={() => selectPreviewRow(source.id, row.row_number)}
-                                        className={`cursor-pointer border-l-4 align-top transition hover:bg-emerald-50/70 ${rowTone(row, source)} ${rowAccentClass(row, source, selected)}`}
+                                        className={`cursor-pointer align-top transition hover:bg-emerald-50/70 ${rowTone(row, source)}`}
                                       >
-                                        <td className="sticky left-0 z-10 w-36 min-w-36 bg-inherit px-3 py-2.5 shadow-[8px_0_14px_-14px_rgba(15,23,42,0.45)]">
-                                          <div className="flex flex-col gap-1">
+                                        <td className={`w-40 min-w-40 border-l-4 px-3 py-2.5 ${cellClass} ${rowAccentClass(row, source, selected)}`}>
+                                          <div className="flex flex-wrap items-center gap-2">
                                             <span className="font-semibold text-slate-950">Row {row.row_number}</span>
+                                            {selected ? <span className="inline-flex w-fit whitespace-nowrap rounded-full bg-emerald-600 px-2 py-0.5 text-[11px] font-semibold text-white">Selected</span> : null}
                                             {rowBadge(row, source)}
                                           </div>
                                         </td>
                                         {columns.map((column) => (
-                                          <td key={`${row.row_number}-${column.letter}`} className="min-w-36 max-w-56 border-b border-slate-100 px-3 py-2.5 text-slate-700">
+                                          <td key={`${row.row_number}-${column.letter}`} className={`min-w-36 max-w-56 px-3 py-2.5 text-slate-700 ${cellClass}`}>
                                             <span className="line-clamp-2 leading-5">{displayCell(row.cells[column.header_label])}</span>
                                           </td>
                                         ))}
-                                        {hasMoreColumns ? <td className="min-w-32 border-b border-slate-100 px-3 py-2.5 text-xs font-medium text-slate-400">+{preview.columns.length - columns.length} columns</td> : null}
+                                        {hasMoreColumns ? <td className={`min-w-32 px-3 py-2.5 text-xs font-medium text-slate-400 ${cellClass}`}>+{preview.columns.length - columns.length} columns</td> : null}
                                       </tr>
                                     );
                                   })}
