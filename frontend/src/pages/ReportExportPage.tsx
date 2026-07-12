@@ -10,7 +10,6 @@ interface ExportedReportState {
   filename: string;
   savedPath: string | null;
   openUrl: string;
-  downloadUrl: string;
 }
 
 const primaryActionClass = "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none disabled:active:scale-100";
@@ -57,7 +56,7 @@ export function ReportExportPage() {
     );
   }
 
-  const download = async () => {
+  const generateReport = async () => {
     setBusy(true);
     setErrorMessage("");
     try {
@@ -70,24 +69,17 @@ export function ReportExportPage() {
         filename: report.filename,
         savedPath: report.savedPath,
         openUrl: report.openUrl,
-        downloadUrl: report.downloadUrl,
       });
-
-      const url = URL.createObjectURL(report.blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = report.filename;
-      anchor.rel = "noopener";
-      anchor.style.display = "none";
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (cause) {
       setErrorMessage(cause instanceof Error ? cause.message : "Could not create report.");
     } finally {
       setBusy(false);
     }
+  };
+
+  const openReport = () => {
+    if (!exportedReport) return;
+    window.location.assign(exportedReport.openUrl);
   };
 
   return (
@@ -108,13 +100,13 @@ export function ReportExportPage() {
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-emerald-700">Ready to export</p>
               <h2 className="mt-1 break-words text-xl font-semibold text-slate-950">{result.project_name}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                Review the summary below, then generate the local PDF report.
+                Review the summary below, then generate a local PDF copy of this validation result.
               </p>
             </div>
           </div>
-          <button disabled={busy} onClick={download} className={`${primaryActionClass} lg:mt-1`}>
+          <button disabled={busy} onClick={generateReport} className={`${primaryActionClass} lg:mt-1`}>
             <Download className="size-4" />
-            {busy ? "Creating report..." : exportedReport ? "Regenerate PDF" : "Export PDF report"}
+            {busy ? "Creating report..." : exportedReport ? "Regenerate PDF" : "Generate PDF report"}
           </button>
         </div>
 
@@ -146,19 +138,14 @@ export function ReportExportPage() {
                   </p>
                 ) : null}
               </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
-                <a href={exportedReport.openUrl} target="_blank" rel="noreferrer" className={secondaryActionClass}>
-                  <ExternalLink className="size-4" /> Open PDF
-                </a>
-                <a href={exportedReport.downloadUrl} className={primaryActionClass}>
-                  <Download className="size-4" /> Download PDF
-                </a>
-              </div>
+              <button type="button" onClick={openReport} className={secondaryActionClass}>
+                <ExternalLink className="size-4" /> Open PDF
+              </button>
             </div>
           </div>
         ) : (
           <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-500">
-            No PDF has been generated yet for this result. Click <span className="font-semibold text-slate-700">Export PDF report</span> to create one.
+            No PDF has been generated yet for this result. Click <span className="font-semibold text-slate-700">Generate PDF report</span> to create one.
           </div>
         )}
       </section>
