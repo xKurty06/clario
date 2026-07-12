@@ -62,7 +62,7 @@ export function ValidationResultsPage() {
       <div className="grid items-start gap-8 pt-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="h-fit self-start rounded-2xl border border-slate-200 bg-white p-5">
           <h2 className="text-base font-semibold">Rule breakdown</h2>
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 max-h-[calc(100dvh-18rem)] space-y-3 overflow-y-auto pr-1">
             {result.rule_summaries.map((rule) => (
               <div key={rule.rule_id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="flex items-center justify-between gap-3">
