@@ -67,6 +67,40 @@ main :where(div:has(> button[aria-label="Include all rows in this preview"]) + d
   z-index: 120;
 }
 
+main :where(.max-h-\[34rem\] table tbody tr > td:first-child) {
+  position: static !important;
+  z-index: auto !important;
+  width: 9rem;
+  min-width: 9rem;
+  border-bottom: 1px solid #f1f5f9;
+  box-shadow: none !important;
+  background: inherit;
+}
+
+main :where(.max-h-\[34rem\] table tbody tr > td:first-child > div) {
+  display: flex;
+  flex-flow: row wrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+}
+
+main :where(.max-h-\[34rem\] table tbody tr > td:first-child span.rounded-full) {
+  display: inline-flex !important;
+  width: max-content !important;
+  max-width: max-content !important;
+  flex: none;
+  align-items: center;
+  white-space: nowrap !important;
+}
+
+main :where(.max-h-\[34rem\] table tbody tr > td) {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+main :where(.max-h-\[34rem\] table tbody tr) {
+  border-left-width: 0 !important;
+}
+
 main :where(.truncate) {
   white-space: normal;
   overflow: visible;
