@@ -101,7 +101,7 @@ export function BuilderDrawer({
   if (!rendered) return null;
 
   const drawer = (
-    <div className="fixed inset-0 z-[90]">
+    <div className="fixed inset-0 z-[60]">
       <button
         className={`absolute inset-0 bg-slate-950/45 backdrop-blur-[3px] ${closing ? "animate-[builder-backdrop-out_220ms_cubic-bezier(0.16,1,0.3,1)_forwards]" : "animate-[builder-backdrop-in_220ms_cubic-bezier(0.16,1,0.3,1)_forwards]"}`}
         aria-label="Close drawer"
