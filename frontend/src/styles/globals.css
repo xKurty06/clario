@@ -59,14 +59,6 @@ main :where(div:has(> button[aria-label="Include all rows in this preview"]) + d
   z-index: 120;
 }
 
-:where(input + p.text-slate-500),
-:where(.relative + p.text-slate-500),
-:where(.relative + p.text-xs.leading-5.text-slate-500),
-:where(label:has(.help-tip) > span > span.block.text-sm.text-slate-500),
-:where(label:has([class~="help-tip"]) > span > span.block.text-sm.text-slate-500) {
-  display: none !important;
-}
-
 main :where(.truncate) {
   white-space: normal;
   overflow: visible;
