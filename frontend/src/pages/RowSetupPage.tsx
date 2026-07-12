@@ -196,6 +196,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
 
   const allConfirmed = dataSources.length > 0 && dataSources.every((source) => source.row_setup_confirmed);
   const confirmedCount = dataSources.filter((source) => source.row_setup_confirmed).length;
+  const hasPreviewedSource = dataSources.some((source) => sourcePreviews[source.id]);
 
   useEffect(() => {
     return () => {
@@ -441,9 +442,14 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
         title="Confirm row setup"
         description="Check the detected header row and first data row inside Clario before building rows, fields, and rules."
         action={
-          <button type="button" disabled={!allConfirmed} onClick={onContinue} className={primaryButtonClass}>
-            <Play className="size-4" /> Continue to comparison builder
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={!hasPreviewedSource} onClick={confirmAllPreviewed} className={secondaryButtonClass}>
+              <CheckCircle2 className="size-4" /> Confirm all previewed
+            </button>
+            <button type="button" disabled={!allConfirmed} onClick={onContinue} className={primaryButtonClass}>
+              <Play className="size-4" /> Continue to comparison builder
+            </button>
+          </div>
         }
       />
 
@@ -703,7 +709,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button type="button" disabled={!dataSources.some((source) => sourcePreviews[source.id])} onClick={confirmAllPreviewed} className={secondaryButtonClass}>
+            <button type="button" disabled={!hasPreviewedSource} onClick={confirmAllPreviewed} className={secondaryButtonClass}>
               <CheckCircle2 className="size-4" /> Confirm all previewed
             </button>
             <button type="button" disabled={!allConfirmed} onClick={onContinue} className={primaryButtonClass}>
