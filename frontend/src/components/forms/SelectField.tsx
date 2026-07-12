@@ -1,5 +1,6 @@
 import { Check, ChevronDown } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 
 export interface SelectOption {
   value: string;
@@ -17,16 +18,56 @@ interface SelectFieldProps {
   helpText?: string;
 }
 
+interface MenuPosition {
+  placement: "top" | "bottom";
+  left: number;
+  width: number;
+  maxHeight: number;
+  top?: number;
+  bottom?: number;
+}
+
+const MENU_GAP = 6;
+const MENU_MAX_HEIGHT = 256;
+const MENU_MIN_HEIGHT = 96;
+
 export function SelectField({ value, options, onChange, ariaLabel, className = "", compact = false, helpText }: SelectFieldProps) {
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
   const [activeIndex, setActiveIndex] = useState(() => Math.max(0, options.findIndex((option) => option.value === value)));
   const rootRef = useRef<HTMLDivElement>(null);
+  const listboxRef = useRef<HTMLDivElement>(null);
   const listboxId = useId();
   const selected = options.find((option) => option.value === value) ?? options[0];
 
+  const updateMenuPosition = useCallback(() => {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const belowSpace = viewportHeight - rect.bottom - MENU_GAP;
+    const aboveSpace = rect.top - MENU_GAP;
+    const shouldOpenAbove = belowSpace < MENU_MIN_HEIGHT && aboveSpace > belowSpace;
+    const availableSpace = shouldOpenAbove ? aboveSpace : belowSpace;
+    const maxHeight = Math.max(MENU_MIN_HEIGHT, Math.min(MENU_MAX_HEIGHT, availableSpace));
+    const left = Math.min(Math.max(MENU_GAP, rect.left), Math.max(MENU_GAP, viewportWidth - rect.width - MENU_GAP));
+
+    setMenuPosition({
+      placement: shouldOpenAbove ? "top" : "bottom",
+      left,
+      width: rect.width,
+      maxHeight,
+      top: shouldOpenAbove ? undefined : rect.bottom + MENU_GAP,
+      bottom: shouldOpenAbove ? viewportHeight - rect.top + MENU_GAP : undefined,
+    });
+  }, []);
+
   useEffect(() => {
     const close = (event: PointerEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target) || listboxRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
@@ -36,12 +77,68 @@ export function SelectField({ value, options, onChange, ariaLabel, className = "
     setActiveIndex(Math.max(0, options.findIndex((option) => option.value === value)));
   }, [options, value]);
 
+  useEffect(() => {
+    if (!open) {
+      setMenuPosition(null);
+      return undefined;
+    }
+
+    updateMenuPosition();
+    window.addEventListener("resize", updateMenuPosition);
+    window.addEventListener("scroll", updateMenuPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateMenuPosition);
+      window.removeEventListener("scroll", updateMenuPosition, true);
+    };
+  }, [open, updateMenuPosition]);
+
   const choose = (option: SelectOption) => {
     if (option.value !== value) {
       onChange(option.value);
     }
     setOpen(false);
   };
+
+  const menuStyle: CSSProperties | undefined = menuPosition
+    ? {
+        left: menuPosition.left,
+        width: menuPosition.width,
+        maxHeight: menuPosition.maxHeight,
+        ...(menuPosition.placement === "top" ? { bottom: menuPosition.bottom } : { top: menuPosition.top }),
+      }
+    : undefined;
+
+  const menu = open && menuPosition && typeof document !== "undefined" ? createPortal(
+    <div
+      ref={listboxRef}
+      id={listboxId}
+      role="listbox"
+      aria-label={ariaLabel}
+      style={menuStyle}
+      className="fixed z-[110] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_48px_rgba(15,23,42,0.18)] animate-[builder-dialog-in_120ms_cubic-bezier(0.16,1,0.3,1)_forwards]"
+    >
+      {options.map((option, index) => {
+        const isSelected = option.value === value;
+        const isActive = index === activeIndex;
+        return (
+          <button
+            type="button"
+            role="option"
+            aria-selected={isSelected}
+            title={option.description ?? `Choose ${option.label}`}
+            key={option.value}
+            onPointerEnter={() => setActiveIndex(index)}
+            onClick={() => choose(option)}
+            className={`flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left transition-colors duration-150 ${compact ? "text-xs" : "text-sm"} ${isSelected ? "bg-emerald-50 font-semibold text-emerald-800" : isActive ? "bg-slate-100 text-slate-950" : "text-slate-700 hover:bg-slate-100"}`}
+          >
+            <span className="min-w-0 flex-1 whitespace-normal break-words leading-5">{option.label}</span>
+            <Check aria-hidden="true" className={`mt-0.5 size-4 shrink-0 text-emerald-700 ${isSelected ? "opacity-100" : "opacity-0"}`} />
+          </button>
+        );
+      })}
+    </div>,
+    document.body,
+  ) : null;
 
   return (
     <div ref={rootRef} className={`relative ${className}`}>
@@ -73,29 +170,7 @@ export function SelectField({ value, options, onChange, ariaLabel, className = "
         <ChevronDown aria-hidden="true" className={`size-4 shrink-0 text-slate-500 transition-transform duration-200 ${open ? "rotate-180" : "rotate-0"}`} />
       </button>
 
-      {open && (
-        <div id={listboxId} role="listbox" aria-label={ariaLabel} className="absolute left-0 right-0 top-[calc(100%+6px)] z-50 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_16px_40px_rgba(15,23,42,0.14)]">
-          {options.map((option, index) => {
-            const isSelected = option.value === value;
-            const isActive = index === activeIndex;
-            return (
-              <button
-                type="button"
-                role="option"
-                aria-selected={isSelected}
-                title={option.description ?? `Choose ${option.label}`}
-                key={option.value}
-                onPointerEnter={() => setActiveIndex(index)}
-                onClick={() => choose(option)}
-                className={`flex w-full items-start gap-3 rounded-lg px-3 py-2 text-left transition-colors duration-150 ${compact ? "text-xs" : "text-sm"} ${isSelected ? "bg-emerald-50 font-semibold text-emerald-800" : isActive ? "bg-slate-100 text-slate-950" : "text-slate-700 hover:bg-slate-100"}`}
-              >
-                <span className="min-w-0 flex-1 whitespace-normal break-words leading-5">{option.label}</span>
-                <Check aria-hidden="true" className={`mt-0.5 size-4 shrink-0 text-emerald-700 ${isSelected ? "opacity-100" : "opacity-0"}`} />
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {menu}
     </div>
   );
 }
