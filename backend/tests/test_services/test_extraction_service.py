@@ -45,3 +45,41 @@ def test_preview_and_extraction_respect_selected_and_ignored_rows(tmp_path: Path
     assert [record.excel_row_number for record in records] == [2, 4]
     assert records[0].field_values["field-description"].raw_value == "Bond Paper"
     assert str(records[1].field_values["field-quantity"].normalized_value) == "7"
+
+
+def test_preview_excludes_rows_before_first_data_row(tmp_path: Path) -> None:
+    path = tmp_path / "offset-rows.xlsx"
+    book = openpyxl.Workbook()
+    sheet = book.active
+    sheet.title = "Items"
+    sheet.append(["Cycle: 2026-Q2"])
+    sheet.append(["Distribution Hub"])
+    sheet.append([])
+    sheet.append(["Planning Values"])
+    sheet.append(["Line", "SKU", "Description"])
+    sheet.append(["ZONE A", "ZONE A", "ZONE A"])
+    sheet.append([1, "CLD-GEL-500", "Reusable gel pack"])
+    sheet.append([2, "CLD-LIN-032", "Thermal box liner"])
+    book.save(path)
+    register_file("file-offset", path)
+
+    source = ComparisonDataSource(
+        id="source-offset",
+        name="Offset source",
+        file_id="file-offset",
+        sheet_name="Items",
+        header_row=5,
+        first_data_row=7,
+        selected_row_numbers=[2, 4, 6, 7, 8],
+        ignored_row_numbers=[],
+        fields=[],
+    )
+
+    preview = preview_data_source(source)
+    records = extract_records(source)
+
+    assert preview.data_source.selected_row_numbers == [7, 8]
+    assert preview.data_source.ignored_row_numbers == [1, 2, 3, 4, 6]
+    assert [row.row_number for row in preview.rows if row.selected] == [7, 8]
+    assert [row.row_number for row in preview.rows if row.ignored] == [2, 3, 4, 6]
+    assert [record.excel_row_number for record in records] == [7, 8]

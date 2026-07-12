@@ -52,6 +52,7 @@ else {
     $backend = Start-Process -FilePath $python `
         -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8765", "--reload" `
         -WorkingDirectory $backendDir `
+        -WindowStyle Hidden `
         -RedirectStandardOutput $logFile `
         -RedirectStandardError $errorLogFile `
         -PassThru

@@ -185,8 +185,8 @@ export function AppShell() {
         </div>
       </aside>
 
-      <main className={`min-w-0 px-4 py-6 pb-32 transition-[margin-left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] sm:px-6 lg:px-8 lg:py-8 lg:pb-32 ${collapsed ? "ml-[72px]" : "ml-[272px]"}`}>
-        <div className="mx-auto min-w-0 max-w-[1400px]">
+      <main className={`min-w-0 px-3 py-10 pb-8 transition-[margin-left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] sm:px-4 lg:px-6 lg:py-12 lg:pb-10 ${collapsed ? "ml-[72px]" : "ml-[272px]"}`}>
+        <div className="mx-auto min-w-0 max-w-[1500px]">
           <div key={location.pathname} className="app-route-fade">
             <Outlet />
           </div>

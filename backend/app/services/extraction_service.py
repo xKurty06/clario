@@ -109,6 +109,10 @@ def _auto_selected_rows(frame: pd.DataFrame, headers: list[str], data_source: Co
     return selected
 
 
+def _boundary_ignored_rows(data_source: ComparisonDataSource) -> set[int]:
+    return {row_number for row_number in range(1, data_source.first_data_row) if row_number != data_source.header_row}
+
+
 def _preview_start_row(data_source: ComparisonDataSource) -> int:
     setup_anchor = min(data_source.header_row, data_source.first_data_row)
     return max(setup_anchor - PREVIEW_CONTEXT_ROWS, 1)
@@ -119,8 +123,10 @@ def preview_data_source(data_source: ComparisonDataSource) -> DataSourcePreview:
     display_file_name = _display_file_name(data_source, recovered_file_name)
     frame = _load_frame(path, data_source.sheet_name)
     headers = composite_headers(path, data_source.sheet_name, frame, data_source.header_row)
-    selected_rows = set(data_source.selected_row_numbers or _auto_selected_rows(frame, headers, data_source))
-    ignored_rows = set(data_source.ignored_row_numbers)
+    boundary_ignored_rows = _boundary_ignored_rows(data_source)
+    candidate_selected_rows = set(data_source.selected_row_numbers or _auto_selected_rows(frame, headers, data_source))
+    selected_rows = {row_number for row_number in candidate_selected_rows if row_number >= data_source.first_data_row}
+    ignored_rows = set(data_source.ignored_row_numbers) | boundary_ignored_rows
     rows: list[PreviewRow] = []
     start_index = _preview_start_row(data_source) - 1
     for row_index in range(start_index, len(frame)):
@@ -135,7 +141,13 @@ def preview_data_source(data_source: ComparisonDataSource) -> DataSourcePreview:
                 cells=cells,
             )
         )
-    source = data_source.model_copy(update={"file_name": display_file_name, "selected_row_numbers": sorted(selected_rows)})
+    source = data_source.model_copy(
+        update={
+            "file_name": display_file_name,
+            "selected_row_numbers": sorted(selected_rows),
+            "ignored_row_numbers": sorted(ignored_rows),
+        }
+    )
     return DataSourcePreview(
         data_source=source,
         columns=_columns(headers),

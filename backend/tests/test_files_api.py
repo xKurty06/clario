@@ -50,9 +50,10 @@ def test_data_source_preview_route_returns_preview(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     body = response.json()
+    data_row = next(row for row in body["rows"] if row["row_number"] == 2)
     assert body["data_source"]["selected_row_numbers"] == [2]
     assert body["columns"][1]["letter"] == "B"
-    assert body["rows"][0]["cells"]["Description"] == "Bond Paper"
+    assert data_row["cells"]["Description"] == "Bond Paper"
 
 
 def test_data_source_preview_keeps_uploaded_display_name(tmp_path: Path) -> None:

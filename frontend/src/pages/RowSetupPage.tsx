@@ -26,6 +26,23 @@ function clampRow(value: number) {
   return Math.max(1, Number.isFinite(value) ? Math.trunc(value) : 1);
 }
 
+function setupBoundaryRows(headerRow: number, firstDataRow: number) {
+  return Array.from({ length: Math.max(firstDataRow - 1, 0) }, (_, index) => index + 1).filter((rowNumber) => rowNumber !== headerRow);
+}
+
+function applyRowBoundaries(source: ComparisonDataSource, headerRow: number, firstDataRow: number) {
+  const boundaryRows = setupBoundaryRows(headerRow, firstDataRow);
+  const boundarySet = new Set(boundaryRows);
+  return {
+    ...source,
+    header_row: headerRow,
+    first_data_row: firstDataRow,
+    selected_row_numbers: source.selected_row_numbers.filter((rowNumber) => rowNumber >= firstDataRow),
+    ignored_row_numbers: [...new Set([...source.ignored_row_numbers.filter((rowNumber) => rowNumber >= firstDataRow), ...boundaryRows])].sort((a, b) => a - b),
+    row_selection_mode: boundarySet.size ? "manual_include" : source.row_selection_mode,
+  };
+}
+
 function displayCell(value: unknown) {
   if (value === null || value === undefined || value === "") return "—";
   return String(value);
@@ -44,6 +61,9 @@ function rowBadge(row: PreviewRow, source: ComparisonDataSource) {
   }
   if (row.row_number === source.first_data_row) {
     return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">First data row</span>;
+  }
+  if (row.ignored || row.row_number < source.first_data_row) {
+    return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">Excluded row</span>;
   }
   if (row.selected) {
     return <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Selected data</span>;
@@ -165,23 +185,17 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
 
   const changeHeaderRow = (source: ComparisonDataSource, value: number) => {
     const headerRow = clampRow(value);
-    updateSourceSetup(source, {
-      ...source,
-      header_row: headerRow,
-      first_data_row: Math.max(source.first_data_row, headerRow + 1),
-    });
+    updateSourceSetup(source, applyRowBoundaries(source, headerRow, Math.max(source.first_data_row, headerRow + 1)));
   };
 
   const changeFirstDataRow = (source: ComparisonDataSource, value: number) => {
     const firstDataRow = Math.max(clampRow(value), source.header_row + 1);
-    updateSourceSetup(source, { ...source, first_data_row: firstDataRow });
+    updateSourceSetup(source, applyRowBoundaries(source, source.header_row, firstDataRow));
   };
 
   const setHeaderFromRow = (source: ComparisonDataSource, rowNumber: number) => {
     const next = {
-      ...source,
-      header_row: rowNumber,
-      first_data_row: Math.max(source.first_data_row, rowNumber + 1),
+      ...applyRowBoundaries(source, rowNumber, Math.max(source.first_data_row, rowNumber + 1)),
       row_setup_confirmed: false,
     };
     updateSourceSetup(source, next, false);
@@ -190,8 +204,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
 
   const setFirstDataFromRow = (source: ComparisonDataSource, rowNumber: number) => {
     const next = {
-      ...source,
-      first_data_row: Math.max(rowNumber, source.header_row + 1),
+      ...applyRowBoundaries(source, source.header_row, Math.max(rowNumber, source.header_row + 1)),
       row_setup_confirmed: false,
     };
     updateSourceSetup(source, next, false);
