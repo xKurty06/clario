@@ -12,6 +12,11 @@ export class ApiError extends Error {
   }
 }
 
+export interface ApiBlobResponse {
+  blob: Blob;
+  headers: Headers;
+}
+
 function backendRootUrl() {
   return appConfig.apiBaseUrl.replace(/\/api\/v\d+\/?$/, "");
 }
@@ -61,13 +66,17 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   return response.json() as Promise<T>;
 }
 
-export async function apiBlob(path: string, body: unknown): Promise<Blob> {
+export async function apiBlobWithHeaders(path: string, body: unknown): Promise<ApiBlobResponse> {
   const response = await fetchLocal(`${appConfig.apiBaseUrl}${path}`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/pdf" }, body: JSON.stringify(body) });
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { code?: string; detail?: string };
     throw new ApiError(response.status, body.code ?? "REPORT_ERROR", body.detail ?? "The local PDF service could not create the report.");
   }
-  return response.blob();
+  return { blob: await response.blob(), headers: response.headers };
+}
+
+export async function apiBlob(path: string, body: unknown): Promise<Blob> {
+  return (await apiBlobWithHeaders(path, body)).blob;
 }
 
 export async function checkBackendHealth(): Promise<void> {
