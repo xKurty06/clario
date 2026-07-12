@@ -5,7 +5,7 @@ import { EmptyState } from "../components/common/EmptyState";
 import { SelectField } from "../components/forms";
 import { PageHeader } from "../components/layout/PageHeader";
 import { useWorkflow } from "../features/files/WorkflowContext";
-import type { RuleType } from "../types/validation.types";
+import type { RuleDiscrepancy, RuleType } from "../types/validation.types";
 
 const ruleLabels: Record<RuleType, string> = {
   compare_values: "Compare two fields",
@@ -13,6 +13,128 @@ const ruleLabels: Record<RuleType, string> = {
   required_field_check: "Required field check",
   duplicate_check: "Duplicate check",
 };
+
+interface SmartNote {
+  title: string;
+  detail: string;
+}
+
+function valueText(value: unknown) {
+  return value === null || value === undefined ? "" : String(value).trim();
+}
+
+function numberValue(value: unknown) {
+  const text = valueText(value).replace(/,/g, "");
+  if (!text) return null;
+  const parsed = Number(text);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function alphaNumericSignature(value: unknown) {
+  return valueText(value).toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function compactWhitespace(value: unknown) {
+  return valueText(value).replace(/\s+/g, " ");
+}
+
+function fieldPair(item: RuleDiscrepancy) {
+  return {
+    expectedField: item.left_field_name || "expected field",
+    actualField: item.right_field_name || "actual field",
+  };
+}
+
+function ruleTypeNote(item: RuleDiscrepancy): SmartNote | null {
+  if (item.rule_type === "required_field_check") {
+    return {
+      title: "Required value is missing",
+      detail: `Fill in ${item.left_field_name || "the required field"}, or exclude the row if it is not a real data row.`,
+    };
+  }
+
+  if (item.rule_type === "duplicate_check") {
+    return {
+      title: "Duplicate selected row",
+      detail: "This value appears more than once in the selected rows. Keep one valid row or merge duplicate entries.",
+    };
+  }
+
+  if (item.rule_type === "formula_check") {
+    return {
+      title: "Formula result does not match",
+      detail: item.notes || `Recheck the source numbers used to calculate ${item.left_field_name || "the result field"}.`,
+    };
+  }
+
+  return null;
+}
+
+function compareValueNote(item: RuleDiscrepancy): SmartNote {
+  const expected = valueText(item.expected_value);
+  const actual = valueText(item.actual_value);
+  const { expectedField, actualField } = fieldPair(item);
+  const expectedNumber = numberValue(expected);
+  const actualNumber = numberValue(actual);
+
+  if (!expected && actual) {
+    return {
+      title: "Unexpected value found",
+      detail: `${actualField} has a value, but the trusted ${expectedField} is blank. Confirm the row pairing and selected rows.`,
+    };
+  }
+
+  if (expected && !actual) {
+    return {
+      title: "Actual value is blank",
+      detail: `${actualField} is missing. Copy or encode the trusted ${expectedField} value if the row should match.`,
+    };
+  }
+
+  if (expectedNumber !== null && actualNumber !== null && expectedNumber !== actualNumber) {
+    const difference = actualNumber - expectedNumber;
+    const direction = difference > 0 ? "higher" : "lower";
+    return {
+      title: `Actual value is ${direction}`,
+      detail: `${actualField} differs from ${expectedField} by ${Math.abs(difference).toLocaleString()}. Expected ${expected}, found ${actual}.`,
+    };
+  }
+
+  if (expected && actual) {
+    const expectedCase = compactWhitespace(expected).toLowerCase();
+    const actualCase = compactWhitespace(actual).toLowerCase();
+    const expectedSignature = alphaNumericSignature(expected);
+    const actualSignature = alphaNumericSignature(actual);
+
+    if (expectedCase === actualCase && compactWhitespace(expected) !== compactWhitespace(actual)) {
+      return {
+        title: "Capitalization or spacing only",
+        detail: "The words appear the same after ignoring capitalization or extra spaces. Adjust the rule if this should be accepted.",
+      };
+    }
+
+    if (expectedSignature && expectedSignature === actualSignature) {
+      return {
+        title: "Formatting difference only",
+        detail: "The letters and numbers match, but punctuation, symbols, spacing, or unit formatting differ. Review whether formatting must match exactly.",
+      };
+    }
+
+    return {
+      title: "Text content does not match",
+      detail: `Review wording, units, model details, or spelling in ${actualField}. Use the trusted ${expectedField} value if this row should match exactly.`,
+    };
+  }
+
+  return {
+    title: "Review this row pairing",
+    detail: item.notes || item.suggested_correction || "The rule found a mismatch. Check the selected rows, fields, and match strategy.",
+  };
+}
+
+function smartNoteFor(item: RuleDiscrepancy): SmartNote {
+  return ruleTypeNote(item) ?? compareValueNote(item);
+}
 
 export function ValidationResultsPage() {
   const { result } = useWorkflow();
@@ -30,9 +152,10 @@ export function ValidationResultsPage() {
     );
   }
 
-  const filtered = result.discrepancies.filter((item) => {
+  const enriched = result.discrepancies.map((item) => ({ item, note: smartNoteFor(item) }));
+  const filtered = enriched.filter(({ item, note }) => {
     const matchesSeverity = severity === "all" || item.severity === severity;
-    const haystack = `${item.rule_name} ${item.expected_value ?? ""} ${item.actual_value ?? ""} ${item.notes ?? ""}`.toLowerCase();
+    const haystack = `${item.rule_name} ${item.expected_value ?? ""} ${item.actual_value ?? ""} ${item.notes ?? ""} ${item.suggested_correction ?? ""} ${note.title} ${note.detail}`.toLowerCase();
     return matchesSeverity && haystack.includes(query.toLowerCase());
   });
 
@@ -114,7 +237,7 @@ export function ValidationResultsPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((item, index) => (
+                {filtered.map(({ item, note }, index) => (
                   <tr key={`${item.rule_id}-${index}`} className="border-t border-slate-100 align-top">
                     <td className="p-3">
                       <p className="font-semibold">{item.rule_name}</p>
@@ -127,7 +250,10 @@ export function ValidationResultsPage() {
                     <td className="p-3 text-xs text-slate-600">{item.right_file_name ?? "-"}<br />{item.right_sheet_name ?? "-"} - row {item.right_row_number ?? "-"}</td>
                     <td className="max-w-xs p-3">{item.expected_value ?? "-"}</td>
                     <td className="max-w-xs p-3">{item.actual_value ?? "-"}</td>
-                    <td className="max-w-sm p-3 text-slate-600">{item.suggested_correction ?? item.notes ?? "Review item."}</td>
+                    <td className="max-w-sm p-3 text-slate-600">
+                      <p className="font-semibold text-slate-900">{note.title}</p>
+                      <p className="mt-1 text-xs leading-5 text-slate-500">{note.detail}</p>
+                    </td>
                   </tr>
                 ))}
               </tbody>
