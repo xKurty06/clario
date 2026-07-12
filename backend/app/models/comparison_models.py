@@ -43,6 +43,7 @@ class ComparisonDataSource(BaseModel):
     sheet_name: str
     header_row: int = Field(ge=1, le=1000)
     first_data_row: int = Field(ge=1, le=1_000_000)
+    row_setup_confirmed: bool = False
     selected_row_numbers: list[int] = Field(default_factory=list)
     ignored_row_numbers: list[int] = Field(default_factory=list)
     row_selection_mode: RowSelectionMode = "auto_detected"
