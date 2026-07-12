@@ -1,5 +1,6 @@
 import { Download, FileOutput } from "lucide-react";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { EmptyState } from "../components/common/EmptyState";
 import { PageHeader } from "../components/layout/PageHeader";
 import { useWorkflow } from "../features/files/WorkflowContext";
@@ -13,9 +14,24 @@ export function ReportExportPage() {
   if (!result) {
     return (
       <div>
-        <PageHeader eyebrow="Step 4 of 4" title="Export local report" description="Complete validation first." />
+        <PageHeader eyebrow="Step 4 of 4" title="Export local report" description="Run validation first, then return here to export the completed result." />
         <div className="pt-8">
-          <EmptyState icon={FileOutput} title="No report data" description="A completed validation result is required for PDF export." />
+          <EmptyState
+            icon={FileOutput}
+            title="No report data"
+            description="A completed validation result is required for PDF export. If you already ran validation in this browser session, return to Results. Otherwise, go back to Review & Run and run validation again."
+          />
+          <div className="mt-5 flex flex-wrap justify-center gap-3">
+            <Link to="/results" className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              Back to Results
+            </Link>
+            <Link to="/mapping" className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              Return to Review & Run
+            </Link>
+            <Link to="/upload" className="inline-flex items-center justify-center rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">
+              Start new validation
+            </Link>
+          </div>
         </div>
       </div>
     );
