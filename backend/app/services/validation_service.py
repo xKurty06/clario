@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from uuid import uuid4
 
 from app.models.comparison_models import (
     ComparisonDataSource,
     ComparisonRule,
+    ExtractedFieldValue,
     ExtractedRecord,
     FieldType,
     RuleDiscrepancy,
@@ -19,10 +21,124 @@ from app.services.extraction_service import extract_records, get_field, get_fiel
 from app.normalizers.text_normalizer import normalize_text
 
 
+_MATCH_STRATEGY_LABELS = {
+    "by_row_order": "row order",
+    "by_item_number_field": "item number",
+    "by_exact_text_field": "exact text",
+    "by_multiple_fields": "multiple match fields",
+    "manual_placeholder": "manual placeholder",
+}
+
+_STRICTNESS_LABELS = {
+    "exact": "exact matching",
+    "normalized_exact": "normalized exact matching",
+    "numeric_tolerance": "numeric tolerance matching",
+    "currency_tolerance": "currency tolerance matching",
+}
+
+
 def _stringify(value: object) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _value_text(value: object) -> str:
+    return "" if value is None else str(value).strip()
+
+
+def _decimal_or_none(value: object) -> Decimal | None:
+    text = _value_text(value)
+    if not text:
+        return None
+    cleaned = text.replace(",", "").replace("₱", "").replace("PHP", "").strip()
+    try:
+        return Decimal(cleaned)
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def _alpha_numeric_signature(value: object) -> str:
+    return re.sub(r"[^a-z0-9]+", "", _value_text(value).lower())
+
+
+def _compact_text(value: object) -> str:
+    return re.sub(r"\s+", " ", _value_text(value)).strip()
+
+
+def _friendly_match_strategy(rule: ComparisonRule) -> str:
+    return _MATCH_STRATEGY_LABELS.get(rule.match_strategy, rule.match_strategy.replace("_", " "))
+
+
+def _friendly_strictness(rule: ComparisonRule) -> str:
+    return _STRICTNESS_LABELS.get(rule.strictness, rule.strictness.replace("_", " "))
+
+
+def _comparison_guidance(
+    left_value: ExtractedFieldValue,
+    right_value: ExtractedFieldValue,
+    rule: ComparisonRule,
+    field_type: FieldType,
+) -> tuple[str, str]:
+    expected = left_value.raw_value
+    actual = right_value.raw_value
+    expected_text = _value_text(expected)
+    actual_text = _value_text(actual)
+    expected_field = left_value.display_name
+    actual_field = right_value.display_name
+    match_note = f"Rows were paired by {_friendly_match_strategy(rule)} using {_friendly_strictness(rule)}."
+
+    if not expected_text and actual_text:
+        return (
+            f"Review {actual_field}; the trusted {expected_field} is blank while the actual side has a value.",
+            f"Unexpected actual value. {match_note}",
+        )
+
+    if expected_text and not actual_text:
+        return (
+            f"Fill in {actual_field} or verify that this row should be included.",
+            f"Actual value is blank while trusted {expected_field} has data. {match_note}",
+        )
+
+    expected_number = _decimal_or_none(expected)
+    actual_number = _decimal_or_none(actual)
+    if expected_number is not None and actual_number is not None and expected_number != actual_number:
+        difference = actual_number - expected_number
+        direction = "higher" if difference > 0 else "lower"
+        return (
+            f"Review {actual_field}; expected {expected_text}, found {actual_text}.",
+            f"Actual value is {direction} by {abs(difference)}. {match_note}",
+        )
+
+    if field_type == "text" or expected_text or actual_text:
+        expected_compact = _compact_text(expected)
+        actual_compact = _compact_text(actual)
+        expected_case = expected_compact.lower()
+        actual_case = actual_compact.lower()
+        expected_signature = _alpha_numeric_signature(expected)
+        actual_signature = _alpha_numeric_signature(actual)
+
+        if expected_case == actual_case and expected_compact != actual_compact:
+            return (
+                f"Review capitalization or extra spacing in {actual_field}.",
+                f"The wording appears the same after ignoring capitalization or extra spaces. {match_note}",
+            )
+
+        if expected_signature and expected_signature == actual_signature:
+            return (
+                f"Review punctuation, spacing, symbols, or unit formatting in {actual_field}.",
+                f"Formatting-only difference: the letters and numbers match, but the written format differs. {match_note}",
+            )
+
+        return (
+            f"Review {actual_field} against the trusted {expected_field}.",
+            f"Text content differs. Check wording, units, item variant, model details, or spelling. {match_note}",
+        )
+
+    return (
+        f"Review {actual_field} against {expected_field}.",
+        f"Values do not match. {match_note}",
+    )
 
 
 def _compare_values(left: object, right: object, rule: ComparisonRule, field_type: FieldType) -> bool:
@@ -127,8 +243,8 @@ def _compare_rule(
                     right_row_number=right_record.excel_row_number if right_record else None,
                     expected_value="Matching row",
                     actual_value=f"Missing {missing_side} match",
-                    suggested_correction="Confirm the selected rows and match fields.",
-                    notes=f"No matching row was found using {rule.match_strategy}.",
+                    suggested_correction="Check selected rows and match fields; one side may be missing this item.",
+                    notes=f"No matching row was found using {_friendly_match_strategy(rule)}.",
                 )
             )
             continue
@@ -139,6 +255,12 @@ def _compare_rule(
             continue
         if _compare_values(left_value.normalized_value, right_value.normalized_value, rule, left_field.field_type if left_field else "text"):
             continue
+        suggested_correction, notes = _comparison_guidance(
+            left_value,
+            right_value,
+            rule,
+            left_field.field_type if left_field else "text",
+        )
         discrepancies.append(
             RuleDiscrepancy(
                 rule_id=rule.id,
@@ -155,8 +277,8 @@ def _compare_rule(
                 right_field_name=right_value.display_name,
                 expected_value=_stringify(left_value.raw_value),
                 actual_value=_stringify(right_value.raw_value),
-                suggested_correction=f"Align {right_value.display_name} with {left_value.display_name}.",
-                notes=f"Compared using {rule.strictness}.",
+                suggested_correction=suggested_correction,
+                notes=notes,
             )
         )
     return discrepancies
@@ -207,8 +329,8 @@ def _formula_rule(
                 left_field_name=result_field.display_name,
                 expected_value=_stringify(expected),
                 actual_value=_stringify(result_value.raw_value if result_value else None),
-                suggested_correction=f"Review the formula for {result_field.display_name}.",
-                notes=f"Expected {operand_fields[0].display_name} {rule.formula_settings.operator} {operand_fields[1].display_name}.",
+                suggested_correction=f"Recalculate or review {result_field.display_name} for this row.",
+                notes=f"Expected {operand_fields[0].display_name} {rule.formula_settings.operator} {operand_fields[1].display_name}; found a different result.",
             )
         )
     return discrepancies
@@ -221,6 +343,7 @@ def _required_field_rule(rule: ComparisonRule, records: list[ExtractedRecord]) -
         field_value = get_field_value(record, rule.left_field_id) if rule.left_field_id else None
         if field_value and field_value.normalized_value not in (None, ""):
             continue
+        field_name = field_value.display_name if field_value else "required field"
         discrepancies.append(
             RuleDiscrepancy(
                 rule_id=rule.id,
@@ -233,8 +356,8 @@ def _required_field_rule(rule: ComparisonRule, records: list[ExtractedRecord]) -
                 left_field_name=field_value.display_name if field_value else None,
                 expected_value="Required value",
                 actual_value="Blank",
-                suggested_correction="Fill in the required field or exclude the row.",
-                notes="Required field check.",
+                suggested_correction=f"Fill in {field_name} or exclude the row if it is not valid data.",
+                notes="A required mapped field is blank in a selected row.",
             )
         )
     return discrepancies
@@ -261,8 +384,8 @@ def _duplicate_rule(rule: ComparisonRule, records: list[ExtractedRecord]) -> lis
                 left_row_number=record.excel_row_number,
                 expected_value="Unique value",
                 actual_value=", ".join(key),
-                suggested_correction="Remove or merge duplicate rows.",
-                notes="Duplicate check matched another selected row.",
+                suggested_correction="Keep one valid row, merge duplicates, or exclude duplicate rows from validation.",
+                notes="The same match value appears more than once in the selected rows.",
             )
         )
     return discrepancies
@@ -300,8 +423,8 @@ def run_validation(request: ValidationRequest) -> ValidationResult:
                     left_row_number=record.excel_row_number,
                     expected_value="Valid extracted row",
                     actual_value=issue,
-                    suggested_correction="Review the field mapping and source row selection.",
-                    notes="Raised during extraction before rule comparison.",
+                    suggested_correction="Review field mapping and source row selection before trusting this row.",
+                    notes="This issue was raised during extraction before rule comparison.",
                 )
             )
 
