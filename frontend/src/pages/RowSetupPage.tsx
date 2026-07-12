@@ -1,0 +1,421 @@
+import { AlertTriangle, CheckCircle2, FileSpreadsheet, LoaderCircle, Play, RefreshCw, Rows3, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SelectField } from "../components/forms/SelectField";
+import { PageHeader } from "../components/layout/PageHeader";
+import { useWorkflow } from "../features/files/WorkflowContext";
+import { previewDataSource } from "../services/fileApi";
+import type { UploadedFile } from "../types/file.types";
+import type { ComparisonDataSource, DataSourcePreview, PreviewRow } from "../types/validation.types";
+
+interface RowSetupPageProps {
+  onContinue: () => void;
+}
+
+const primaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:active:scale-100";
+const secondaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
+
+function sourceSignature(source: ComparisonDataSource) {
+  return [source.file_id, source.sheet_name, source.header_row, source.first_data_row].join("|");
+}
+
+function sourceFile(source: ComparisonDataSource, files: UploadedFile[]) {
+  return files.find((file) => file.id === source.file_id) ?? files[0] ?? null;
+}
+
+function clampRow(value: number) {
+  return Math.max(1, Number.isFinite(value) ? Math.trunc(value) : 1);
+}
+
+function displayCell(value: unknown) {
+  if (value === null || value === undefined || value === "") return "—";
+  return String(value);
+}
+
+function rowTone(row: PreviewRow, source: ComparisonDataSource) {
+  if (row.row_number === source.header_row) return "border-l-sky-500 bg-sky-50/80";
+  if (row.row_number === source.first_data_row) return "border-l-emerald-500 bg-emerald-50/80";
+  if (row.selected) return "border-l-emerald-200 bg-emerald-50/30";
+  return "border-l-transparent bg-white";
+}
+
+function rowBadge(row: PreviewRow, source: ComparisonDataSource) {
+  if (row.row_number === source.header_row) {
+    return <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">Header row</span>;
+  }
+  if (row.row_number === source.first_data_row) {
+    return <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">First data row</span>;
+  }
+  if (row.selected) {
+    return <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Selected data</span>;
+  }
+  return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">Preview row</span>;
+}
+
+function confirmedStatus(source: ComparisonDataSource, preview?: DataSourcePreview) {
+  if (source.row_setup_confirmed) {
+    return {
+      label: "Confirmed",
+      className: "bg-emerald-50 text-emerald-700",
+      icon: CheckCircle2,
+      detail: "This source is ready for rows, fields, and rules.",
+    };
+  }
+  if (preview) {
+    return {
+      label: "Needs confirmation",
+      className: "bg-amber-50 text-amber-700",
+      icon: AlertTriangle,
+      detail: "Review the highlighted rows, then confirm this source.",
+    };
+  }
+  return {
+    label: "Preview needed",
+    className: "bg-slate-100 text-slate-700",
+    icon: Rows3,
+    detail: "Load the spreadsheet preview to see the actual rows.",
+  };
+}
+
+export function RowSetupPage({ onContinue }: RowSetupPageProps) {
+  const {
+    files,
+    preset,
+    dataSources,
+    setDataSources,
+    updateDataSource,
+    sourcePreviews,
+    setSourcePreview,
+    removeSourcePreview,
+  } = useWorkflow();
+  const [busySourceId, setBusySourceId] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const autoPreviewed = useRef<Set<string>>(new Set());
+
+  const allConfirmed = dataSources.length > 0 && dataSources.every((source) => source.row_setup_confirmed);
+  const confirmedCount = dataSources.filter((source) => source.row_setup_confirmed).length;
+
+  const loadPreview = useCallback(async (source: ComparisonDataSource) => {
+    if (!source.file_id || !source.sheet_name) return;
+    setBusySourceId(source.id);
+    setErrors((current) => ({ ...current, [source.id]: "" }));
+    try {
+      const preview = await previewDataSource(source);
+      updateDataSource(source.id, preview.data_source);
+      setSourcePreview(source.id, preview);
+    } catch (cause) {
+      setErrors((current) => ({
+        ...current,
+        [source.id]: cause instanceof Error ? cause.message : "Could not load the row preview.",
+      }));
+    } finally {
+      setBusySourceId(null);
+    }
+  }, [setSourcePreview, updateDataSource]);
+
+  useEffect(() => {
+    dataSources.forEach((source) => {
+      const signature = `${source.id}:${sourceSignature(source)}`;
+      if (sourcePreviews[source.id] || autoPreviewed.current.has(signature) || busySourceId) return;
+      autoPreviewed.current.add(signature);
+      void loadPreview(source);
+    });
+  }, [busySourceId, dataSources, loadPreview, sourcePreviews]);
+
+  const fileOptions = useMemo(
+    () => files.map((file) => ({ value: file.id, label: file.name, description: `${file.extension.toUpperCase()} • ${file.sheets.length} sheet${file.sheets.length === 1 ? "" : "s"}` })),
+    [files],
+  );
+
+  const updateSourceSetup = (source: ComparisonDataSource, next: ComparisonDataSource, clearPreview = true) => {
+    updateDataSource(source.id, { ...next, row_setup_confirmed: false });
+    if (clearPreview) removeSourcePreview(source.id);
+  };
+
+  const changeFile = (source: ComparisonDataSource, fileId: string) => {
+    const file = files.find((item) => item.id === fileId);
+    const sheet = file?.sheets[0];
+    const headerRow = sheet?.detected_header_row ?? 1;
+    updateSourceSetup(source, {
+      ...source,
+      file_id: file?.id ?? "",
+      file_name: file?.name ?? null,
+      sheet_name: sheet?.name ?? "",
+      header_row: headerRow,
+      first_data_row: headerRow + 1,
+      selected_row_numbers: [],
+      ignored_row_numbers: [],
+      row_selection_mode: "auto_detected",
+    });
+  };
+
+  const changeSheet = (source: ComparisonDataSource, sheetName: string) => {
+    const file = sourceFile(source, files);
+    const sheet = file?.sheets.find((item) => item.name === sheetName);
+    const headerRow = sheet?.detected_header_row ?? 1;
+    updateSourceSetup(source, {
+      ...source,
+      sheet_name: sheetName,
+      header_row: headerRow,
+      first_data_row: headerRow + 1,
+      selected_row_numbers: [],
+      ignored_row_numbers: [],
+      row_selection_mode: "auto_detected",
+    });
+  };
+
+  const changeHeaderRow = (source: ComparisonDataSource, value: number) => {
+    const headerRow = clampRow(value);
+    updateSourceSetup(source, {
+      ...source,
+      header_row: headerRow,
+      first_data_row: Math.max(source.first_data_row, headerRow + 1),
+    });
+  };
+
+  const changeFirstDataRow = (source: ComparisonDataSource, value: number) => {
+    const firstDataRow = Math.max(clampRow(value), source.header_row + 1);
+    updateSourceSetup(source, { ...source, first_data_row: firstDataRow });
+  };
+
+  const setHeaderFromRow = (source: ComparisonDataSource, rowNumber: number) => {
+    const next = {
+      ...source,
+      header_row: rowNumber,
+      first_data_row: Math.max(source.first_data_row, rowNumber + 1),
+      row_setup_confirmed: false,
+    };
+    updateSourceSetup(source, next, false);
+    void loadPreview(next);
+  };
+
+  const setFirstDataFromRow = (source: ComparisonDataSource, rowNumber: number) => {
+    const next = {
+      ...source,
+      first_data_row: Math.max(rowNumber, source.header_row + 1),
+      row_setup_confirmed: false,
+    };
+    updateSourceSetup(source, next, false);
+    void loadPreview(next);
+  };
+
+  const confirmSource = (source: ComparisonDataSource) => {
+    if (!sourcePreviews[source.id]) return;
+    updateDataSource(source.id, { ...source, row_setup_confirmed: true });
+  };
+
+  const confirmAllPreviewed = () => {
+    setDataSources(dataSources.map((source) => ({ ...source, row_setup_confirmed: Boolean(sourcePreviews[source.id]) })));
+  };
+
+  return (
+    <div>
+      <PageHeader
+        eyebrow="Step 2 of 4"
+        title="Confirm row setup"
+        description="Check the detected header row and first data row inside Clario before building rows, fields, and rules."
+        action={
+          <button type="button" disabled={!allConfirmed} onClick={onContinue} className={primaryButtonClass}>
+            <Play className="size-4" /> Continue to comparison builder
+          </button>
+        }
+      />
+
+      <div className="space-y-6 pt-6">
+        <section className="rounded-3xl border border-emerald-100 bg-[linear-gradient(135deg,_rgba(16,185,129,0.12),_rgba(255,255,255,0.96))] p-5 shadow-sm" data-fade-section>
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-700 text-white shadow-sm">
+                <ShieldCheck className="size-5" />
+              </span>
+              <div>
+                <h2 className="text-base font-semibold text-slate-950">Visual row setup review</h2>
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                  The preview below shows the actual spreadsheet rows around the detected setup. Use the highlighted rows to confirm or adjust without opening Excel.
+                </p>
+              </div>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm">
+              {confirmedCount} of {dataSources.length} confirmed
+            </span>
+          </div>
+        </section>
+
+        <div className="space-y-5">
+          {dataSources.map((source, index) => {
+            const file = sourceFile(source, files);
+            const preview = sourcePreviews[source.id];
+            const status = confirmedStatus(source, preview);
+            const StatusIcon = status.icon;
+            const sheetOptions = (file?.sheets ?? []).map((sheet) => ({ value: sheet.name, label: sheet.name, description: `${sheet.row_count} rows • ${sheet.column_count} columns` }));
+            const columns = preview?.columns.slice(0, 8) ?? [];
+            const hasMoreColumns = Boolean(preview && preview.columns.length > columns.length);
+            const stalePreview = Boolean(preview && sourceSignature(preview.data_source) !== sourceSignature(source));
+
+            return (
+              <section key={source.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" data-fade-section>
+                <div className="border-b border-slate-200 bg-[linear-gradient(180deg,_#ffffff_0%,_#f8fafc_100%)] p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
+                        <FileSpreadsheet className="size-5" />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h2 className="text-base font-semibold text-slate-950">{source.name}</h2>
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${status.className}`}>
+                            <StatusIcon className="size-3.5" /> {status.label}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm leading-6 text-slate-500">{status.detail}</p>
+                      </div>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">Source {index + 1}</span>
+                  </div>
+                </div>
+
+                <div className="grid gap-5 p-5 xl:grid-cols-[340px_minmax(0,1fr)]">
+                  <div className="space-y-4">
+                    <SelectField
+                      ariaLabel={`${source.name} file`}
+                      helpText="Choose which uploaded workbook this source should use."
+                      value={source.file_id}
+                      options={fileOptions}
+                      onChange={(value) => changeFile(source, value)}
+                    />
+                    <SelectField
+                      ariaLabel={`${source.name} sheet`}
+                      helpText="Choose the worksheet to inspect for this source."
+                      value={source.sheet_name}
+                      options={sheetOptions}
+                      onChange={(value) => changeSheet(source, value)}
+                    />
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="block">
+                        <span className="text-xs font-semibold text-slate-600">Header row</span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={source.header_row}
+                          onChange={(event) => changeHeaderRow(source, Number(event.target.value))}
+                          className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="text-xs font-semibold text-slate-600">First data row</span>
+                        <input
+                          type="number"
+                          min={source.header_row + 1}
+                          value={source.first_data_row}
+                          onChange={(event) => changeFirstDataRow(source, Number(event.target.value))}
+                          className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                      Header row should contain column names. First data row should be the first real item row, not a title, lot header, blank row, or total row.
+                    </div>
+
+                    {errors[source.id] ? <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errors[source.id]}</p> : null}
+
+                    <div className="flex flex-wrap gap-2">
+                      <button type="button" onClick={() => loadPreview(source)} disabled={busySourceId === source.id} className={secondaryButtonClass}>
+                        {busySourceId === source.id ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                        {preview ? "Refresh preview" : "Load preview"}
+                      </button>
+                      <button type="button" onClick={() => confirmSource(source)} disabled={!preview || stalePreview} className={primaryButtonClass}>
+                        <CheckCircle2 className="size-4" /> Confirm setup
+                      </button>
+                    </div>
+                    {stalePreview ? <p className="text-xs leading-5 text-amber-700">Preview is stale. Refresh it before confirming this source.</p> : null}
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <h3 className="text-sm font-semibold text-slate-900">Spreadsheet row preview</h3>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">Click a row action to set the header or first data row using the visible sheet content.</p>
+                      </div>
+                      {preview ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Showing {preview.rows.length} rows</span> : null}
+                    </div>
+
+                    {preview ? (
+                      <div className="overflow-auto rounded-2xl border border-slate-200 bg-white">
+                        <table className="min-w-full text-left text-xs">
+                          <thead className="sticky top-0 z-10 bg-slate-100 text-slate-600">
+                            <tr>
+                              <th className="w-28 p-3 font-semibold">Row</th>
+                              {columns.map((column) => (
+                                <th key={column.letter} className="min-w-36 p-3 font-semibold">{column.letter} · {column.header_label || "Blank header"}</th>
+                              ))}
+                              {hasMoreColumns ? <th className="min-w-24 p-3 font-semibold">More</th> : null}
+                              <th className="min-w-56 p-3 font-semibold">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {preview.rows.map((row) => (
+                              <tr key={row.row_number} className={`border-t border-l-4 border-slate-100 align-top transition ${rowTone(row, source)}`}>
+                                <td className="p-3">
+                                  <div className="space-y-1">
+                                    <p className="font-semibold text-slate-900">Row {row.row_number}</p>
+                                    {rowBadge(row, source)}
+                                  </div>
+                                </td>
+                                {columns.map((column) => (
+                                  <td key={`${row.row_number}-${column.letter}`} className="max-w-56 p-3 text-slate-700">
+                                    <span className="line-clamp-3">{displayCell(row.cells[column.header_label])}</span>
+                                  </td>
+                                ))}
+                                {hasMoreColumns ? <td className="p-3 text-slate-400">+{preview.columns.length - columns.length}</td> : null}
+                                <td className="p-3">
+                                  <div className="flex flex-wrap gap-2">
+                                    <button type="button" onClick={() => setHeaderFromRow(source, row.row_number)} className="rounded-lg border border-sky-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500">
+                                      Set as header
+                                    </button>
+                                    <button type="button" disabled={row.row_number <= source.header_row} onClick={() => setFirstDataFromRow(source, row.row_number)} className="rounded-lg border border-emerald-200 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-emerald-700 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-50">
+                                      Set first data
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                        <span>
+                          <Rows3 className="mx-auto size-7 text-slate-400" />
+                          <span className="mt-3 block text-sm font-semibold text-slate-800">Preview not loaded yet</span>
+                          <span className="mt-1 block text-sm text-slate-500">Load the preview to see the actual header and data rows.</span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </section>
+            );
+          })}
+        </div>
+
+        <section className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm" data-fade-section>
+          <div>
+            <h2 className="text-sm font-semibold text-slate-950">Ready for the comparison builder?</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              Confirm every source first so fields and rules are built from the correct rows.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={!dataSources.some((source) => sourcePreviews[source.id])} onClick={confirmAllPreviewed} className={secondaryButtonClass}>
+              <CheckCircle2 className="size-4" /> Confirm all previewed
+            </button>
+            <button type="button" disabled={!allConfirmed} onClick={onContinue} className={primaryButtonClass}>
+              <Play className="size-4" /> Continue to comparison builder
+            </button>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
