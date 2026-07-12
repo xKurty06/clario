@@ -21,11 +21,11 @@ const VIEWPORT_MARGIN = 12;
 export function HelpTip({ text }: HelpTipProps) {
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState<TooltipPosition | null>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
   const tooltipId = useId();
 
   const updatePosition = useCallback(() => {
-    const rect = buttonRef.current?.getBoundingClientRect();
+    const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
 
     const viewportWidth = window.innerWidth;
@@ -97,23 +97,17 @@ export function HelpTip({ text }: HelpTipProps) {
   ) : null;
 
   return (
-    <span className="inline-flex align-middle">
-      <button
-        ref={buttonRef}
-        type="button"
-        aria-label={`Help: ${text}`}
-        aria-describedby={visible ? tooltipId : undefined}
-        onMouseEnter={() => setVisible(true)}
-        onMouseLeave={() => setVisible(false)}
-        onFocus={() => setVisible(true)}
-        onBlur={() => setVisible(false)}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") setVisible(false);
-        }}
-        className="grid size-5 place-items-center rounded-full text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-700 focus-visible:bg-emerald-50 focus-visible:text-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600"
-      >
-        <CircleHelp aria-hidden="true" className="size-3.5" />
-      </button>
+    <span
+      ref={triggerRef}
+      className="help-tip inline-flex align-middle"
+      title={text}
+      aria-describedby={visible ? tooltipId : undefined}
+      onMouseEnter={() => setVisible(true)}
+      onMouseLeave={() => setVisible(false)}
+    >
+      <span className="grid size-5 place-items-center rounded-full text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-700" aria-hidden="true">
+        <CircleHelp className="size-3.5" />
+      </span>
       {tooltip}
     </span>
   );
