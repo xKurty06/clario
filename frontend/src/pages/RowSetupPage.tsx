@@ -13,7 +13,6 @@ interface RowSetupPageProps {
 
 const primaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:active:scale-100";
 const secondaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
-const rowActionButtonClass = "inline-flex items-center justify-center rounded-lg border bg-white px-2.5 py-1.5 text-[11px] font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50";
 
 function sourceSignature(source: ComparisonDataSource) {
   return [source.file_id, source.sheet_name, source.header_row, source.first_data_row].join("|");
@@ -111,6 +110,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
   const [busySourceId, setBusySourceId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [collapsedSourceIds, setCollapsedSourceIds] = useState<Set<string>>(() => new Set());
+  const [selectedRowsBySource, setSelectedRowsBySource] = useState<Record<string, number>>({});
   const autoPreviewed = useRef<Set<string>>(new Set());
 
   const allConfirmed = dataSources.length > 0 && dataSources.every((source) => source.row_setup_confirmed);
@@ -124,6 +124,10 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
       const preview = await previewDataSource(source);
       updateDataSource(source.id, preview.data_source);
       setSourcePreview(source.id, preview);
+      setSelectedRowsBySource((current) => ({
+        ...current,
+        [source.id]: current[source.id] ?? preview.data_source.header_row ?? preview.rows[0]?.row_number ?? source.header_row,
+      }));
     } catch (cause) {
       setErrors((current) => ({
         ...current,
@@ -151,11 +155,20 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
   const updateSourceSetup = (source: ComparisonDataSource, next: ComparisonDataSource, clearPreview = true) => {
     updateDataSource(source.id, { ...next, row_setup_confirmed: false });
     if (clearPreview) removeSourcePreview(source.id);
+    setSelectedRowsBySource((current) => {
+      const nextRows = { ...current };
+      delete nextRows[source.id];
+      return nextRows;
+    });
     setCollapsedSourceIds((current) => {
       const nextSet = new Set(current);
       nextSet.delete(source.id);
       return nextSet;
     });
+  };
+
+  const selectPreviewRow = (sourceId: string, rowNumber: number) => {
+    setSelectedRowsBySource((current) => ({ ...current, [sourceId]: rowNumber }));
   };
 
   const toggleSource = (sourceId: string) => {
@@ -218,6 +231,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
       row_setup_confirmed: false,
     };
     updateSourceSetup(source, next, false);
+    setSelectedRowsBySource((current) => ({ ...current, [source.id]: rowNumber }));
     void loadPreview(next);
   };
 
@@ -227,6 +241,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
       row_setup_confirmed: false,
     };
     updateSourceSetup(source, next, false);
+    setSelectedRowsBySource((current) => ({ ...current, [source.id]: rowNumber }));
     void loadPreview(next);
   };
 
@@ -262,7 +277,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
               <div>
                 <h2 className="text-base font-semibold text-slate-950">Visual row setup review</h2>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-                  The preview below shows the actual spreadsheet rows around the detected setup. Use the highlighted rows to confirm or adjust without opening Excel.
+                  The preview below shows the actual spreadsheet rows around the detected setup. Select any visible row, then set it as the header or first data row without opening Excel.
                 </p>
               </div>
             </div>
@@ -283,6 +298,9 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
             const hasMoreColumns = Boolean(preview && preview.columns.length > columns.length);
             const stalePreview = Boolean(preview && sourceSignature(preview.data_source) !== sourceSignature(source));
             const collapsed = collapsedSourceIds.has(source.id);
+            const selectedRowNumber = selectedRowsBySource[source.id] ?? (preview?.rows.some((row) => row.row_number === source.header_row) ? source.header_row : preview?.rows[0]?.row_number);
+            const selectedRow = preview?.rows.find((row) => row.row_number === selectedRowNumber);
+            const canUseSelectedRow = typeof selectedRowNumber === "number";
 
             return (
               <section key={source.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" data-fade-section>
@@ -388,53 +406,70 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                           <div>
                             <h3 className="text-sm font-semibold text-slate-900">Spreadsheet row preview</h3>
-                            <p className="mt-1 text-xs leading-5 text-slate-500">Use the row controls on the left side of each preview row so actions stay visible while scrolling.</p>
+                            <p className="mt-1 text-xs leading-5 text-slate-500">Click a row to select it. Use the action bar below to set the selected row.</p>
                           </div>
-                          {preview ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Showing {preview.rows.length} rows</span> : null}
+                          {preview ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Showing all {preview.rows.length} preview rows</span> : null}
                         </div>
 
                         {preview ? (
-                          <div className="max-h-[36rem] overflow-auto rounded-2xl border border-slate-200 bg-white overscroll-contain">
-                            <table aria-label={`${source.name} row setup preview`} className="min-w-full border-separate border-spacing-0 text-left text-xs">
-                              <tbody>
-                                {preview.rows.map((row) => (
-                                  <tr key={row.row_number} className={`align-top transition ${rowTone(row, source)}`}>
-                                    <td className="sticky left-0 z-[1] min-w-48 border-b border-r border-slate-100 bg-inherit p-3 shadow-[1px_0_0_#e2e8f0]">
-                                      <div className="space-y-2">
-                                        <div className="space-y-1">
-                                          <p className="font-semibold text-slate-900">Row {row.row_number}</p>
-                                          {rowBadge(row, source)}
-                                        </div>
-                                        <div className="flex flex-wrap gap-1.5">
-                                          <button
-                                            type="button"
-                                            onClick={() => setHeaderFromRow(source, row.row_number)}
-                                            className={`${rowActionButtonClass} border-sky-200 text-sky-700 hover:bg-sky-50 focus-visible:outline-sky-500`}
-                                          >
-                                            Set header
-                                          </button>
-                                          <button
-                                            type="button"
-                                            disabled={row.row_number <= source.header_row}
-                                            onClick={() => setFirstDataFromRow(source, row.row_number)}
-                                            className={`${rowActionButtonClass} border-emerald-200 text-emerald-700 hover:bg-emerald-50 focus-visible:outline-emerald-500`}
-                                          >
-                                            Set data
-                                          </button>
-                                        </div>
-                                      </div>
-                                    </td>
-                                    {columns.map((column) => (
-                                      <td key={`${row.row_number}-${column.letter}`} className="min-w-40 max-w-64 border-b border-slate-100 p-3 text-slate-700">
-                                        <span className="line-clamp-3">{displayCell(row.cells[column.header_label])}</span>
-                                      </td>
-                                    ))}
-                                    {hasMoreColumns ? <td className="min-w-24 border-b border-slate-100 p-3 text-slate-400">+{preview.columns.length - columns.length}</td> : null}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
+                          <>
+                            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                                <span className="font-semibold text-slate-900">Selected row</span>
+                                <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-sm">
+                                  {selectedRowNumber ? `Row ${selectedRowNumber}` : "Choose a row"}
+                                </span>
+                                {selectedRow ? rowBadge(selectedRow, source) : null}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  disabled={!canUseSelectedRow}
+                                  onClick={() => canUseSelectedRow && setHeaderFromRow(source, selectedRowNumber)}
+                                  className="rounded-lg border border-sky-200 bg-white px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  Set selected as header
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!canUseSelectedRow || selectedRowNumber <= source.header_row}
+                                  onClick={() => canUseSelectedRow && setFirstDataFromRow(source, selectedRowNumber)}
+                                  className="rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  Set selected as first data
+                                </button>
+                              </div>
+                            </div>
+                            <div className="max-h-[34rem] overflow-auto rounded-2xl border border-slate-200 bg-white">
+                              <table className="min-w-full border-separate border-spacing-0 text-left text-xs">
+                                <tbody>
+                                  {preview.rows.map((row) => {
+                                    const selected = selectedRowNumber === row.row_number;
+                                    return (
+                                      <tr
+                                        key={row.row_number}
+                                        onClick={() => selectPreviewRow(source.id, row.row_number)}
+                                        className={`cursor-pointer border-l-4 align-top transition hover:bg-emerald-50/60 ${rowTone(row, source)} ${selected ? "ring-2 ring-inset ring-emerald-300" : ""}`}
+                                      >
+                                        <td className="sticky left-0 z-10 w-32 min-w-32 border-r border-slate-200 bg-inherit p-2.5 shadow-[1px_0_0_#e2e8f0]">
+                                          <div className="space-y-1.5">
+                                            <p className="font-semibold text-slate-900">Row {row.row_number}</p>
+                                            {rowBadge(row, source)}
+                                          </div>
+                                        </td>
+                                        {columns.map((column) => (
+                                          <td key={`${row.row_number}-${column.letter}`} className="max-w-52 border-b border-slate-100 p-2.5 text-slate-700">
+                                            <span className="line-clamp-2">{displayCell(row.cells[column.header_label])}</span>
+                                          </td>
+                                        ))}
+                                        {hasMoreColumns ? <td className="border-b border-slate-100 p-2.5 text-slate-400">+{preview.columns.length - columns.length} columns</td> : null}
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </>
                         ) : (
                           <div className="grid min-h-64 place-items-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
                             <span>
