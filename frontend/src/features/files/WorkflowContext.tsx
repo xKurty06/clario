@@ -8,12 +8,17 @@ import type {
   ValidationResult,
 } from "../../types/validation.types";
 
-const STORED_RESULT_KEY = "procurement-validator:last-validation-result";
+const STORED_RESULT_KEY = "clario:last-validation-result";
+const LEGACY_STORED_RESULT_KEY = "procurement-validator:last-validation-result";
 
 function readStoredResult() {
   if (typeof window === "undefined") return null;
   try {
-    const value = window.sessionStorage.getItem(STORED_RESULT_KEY);
+    const value = window.sessionStorage.getItem(STORED_RESULT_KEY) ?? window.sessionStorage.getItem(LEGACY_STORED_RESULT_KEY);
+    if (value && !window.sessionStorage.getItem(STORED_RESULT_KEY)) {
+      window.sessionStorage.setItem(STORED_RESULT_KEY, value);
+      window.sessionStorage.removeItem(LEGACY_STORED_RESULT_KEY);
+    }
     return value ? (JSON.parse(value) as ValidationResult) : null;
   } catch {
     return null;
@@ -25,8 +30,10 @@ function writeStoredResult(value: ValidationResult | null) {
   try {
     if (value) {
       window.sessionStorage.setItem(STORED_RESULT_KEY, JSON.stringify(value));
+      window.sessionStorage.removeItem(LEGACY_STORED_RESULT_KEY);
     } else {
       window.sessionStorage.removeItem(STORED_RESULT_KEY);
+      window.sessionStorage.removeItem(LEGACY_STORED_RESULT_KEY);
     }
   } catch {
     // Ignore storage failures so local validation still works in restricted browsers.

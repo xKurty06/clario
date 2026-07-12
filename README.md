@@ -1,6 +1,6 @@
-# Procurement Validator
+# Clario
 
-Temporary project name for a working local-first Windows application that compares flexible procurement spreadsheets.
+Clario is a local-first Windows application that compares flexible procurement spreadsheets.
 
 ## Version 1 status
 
@@ -31,6 +31,8 @@ The current machine may run newer tool versions, but the project targets the ver
 ## Install dependencies
 
 ```powershell
+cd clario
+
 cd frontend
 npm install
 
@@ -136,9 +138,8 @@ AI will never be the source of truth. The reserved provider interface is advisor
 - [Comparison Builder UI](docs/comparison-builder-ui.md)
 - [Development troubleshooting](docs/dev-troubleshooting.md)
 - [Template design](docs/templates.md)
-- [Rename guide](docs/renaming.md)
 - [Phase roadmap](docs/roadmap.md)
 
-## Temporary app name
+## App identity
 
-The primary naming constants are in `frontend/src/app/config.ts` and `backend/app/config/constants.py`. Tauri metadata must also contain the user-visible name because Windows packaging consumes static configuration; follow the rename guide to update these few controlled locations.
+The primary naming constants are in `frontend/src/app/config.ts` and `backend/app/config/constants.py`. Tauri metadata also contains the user-visible name because Windows packaging consumes static configuration.

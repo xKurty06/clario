@@ -1,8 +1,17 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+CLARIO_DATA_DIRECTORY = Path.home() / ".clario"
+LEGACY_DATA_DIRECTORY = Path.home() / ".procurement-validator"
+
+
+def default_data_directory() -> Path:
+    if LEGACY_DATA_DIRECTORY.exists() and not CLARIO_DATA_DIRECTORY.exists():
+        return LEGACY_DATA_DIRECTORY
+    return CLARIO_DATA_DIRECTORY
 
 
 class Settings(BaseSettings):
@@ -10,18 +19,37 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=".env",
-        env_prefix="PROCUREMENT_VALIDATOR_",
         extra="ignore",
     )
 
-    host: str = Field(default="127.0.0.1", pattern=r"^(127\.0\.0\.1|localhost)$")
-    port: int = Field(default=8765, ge=1024, le=65535)
-    log_level: str = "INFO"
-    data_directory: Path = Path.home() / ".procurement-validator"
+    host: str = Field(
+        default="127.0.0.1",
+        pattern=r"^(127\.0\.0\.1|localhost)$",
+        validation_alias=AliasChoices("CLARIO_HOST", "PROCUREMENT_VALIDATOR_HOST"),
+    )
+    port: int = Field(
+        default=8765,
+        ge=1024,
+        le=65535,
+        validation_alias=AliasChoices("CLARIO_PORT", "PROCUREMENT_VALIDATOR_PORT"),
+    )
+    log_level: str = Field(
+        default="INFO",
+        validation_alias=AliasChoices("CLARIO_LOG_LEVEL", "PROCUREMENT_VALIDATOR_LOG_LEVEL"),
+    )
+    data_directory: Path = Field(
+        default_factory=default_data_directory,
+        validation_alias=AliasChoices("CLARIO_DATA_DIRECTORY", "PROCUREMENT_VALIDATOR_DATA_DIRECTORY"),
+    )
 
     @property
     def database_path(self) -> Path:
-        return self.data_directory / "procurement-validator.sqlite3"
+        database_name = (
+            "procurement-validator.sqlite3"
+            if self.data_directory == LEGACY_DATA_DIRECTORY
+            else "clario.sqlite3"
+        )
+        return self.data_directory / database_name
 
     @property
     def upload_directory(self) -> Path:

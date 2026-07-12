@@ -1,12 +1,12 @@
 [package]
-name = "procurement-validator"
+name = "clario"
 version = "0.1.0"
 description = "Local-first procurement spreadsheet validation desktop shell"
-authors = ["Procurement Validator contributors"]
+authors = ["Clario contributors"]
 edition = "2021"
 
 [lib]
-name = "procurement_validator_lib"
+name = "clario_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
@@ -16,4 +16,3 @@ tauri-build = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = [] }
-

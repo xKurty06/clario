@@ -1,5 +1,5 @@
-APP_DISPLAY_NAME = "Procurement Validator"
-APP_PACKAGE_NAME = "procurement-validator"
+APP_DISPLAY_NAME = "Clario"
+APP_PACKAGE_NAME = "clario"
 APP_VERSION = "0.1.0"
 API_PREFIX = "/api/v1"
 SUPPORTED_FILE_EXTENSIONS = frozenset({".xlsx", ".xls", ".csv"})
