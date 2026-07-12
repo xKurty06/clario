@@ -1,3 +1,4 @@
+import { appConfig } from "../app/config";
 import type { ValidationResult } from "../types/validation.types";
 import { apiBlobWithHeaders } from "./apiClient";
 
@@ -5,6 +6,8 @@ export interface ExportedPdfReport {
   blob: Blob;
   filename: string;
   savedPath: string | null;
+  openUrl: string;
+  downloadUrl: string;
 }
 
 function filenameFromDisposition(disposition: string | null) {
@@ -20,11 +23,19 @@ function fallbackReportFileName(projectName: string) {
   return `${safeName || "validation"}-comparison-report.pdf`;
 }
 
+function reportUrl(resultId: string, download = false) {
+  const encodedId = encodeURIComponent(resultId);
+  const suffix = download ? "?download=true" : "";
+  return `${appConfig.apiBaseUrl}/reports/${encodedId}/pdf${suffix}`;
+}
+
 export async function exportPdf(result: ValidationResult): Promise<ExportedPdfReport> {
   const response = await apiBlobWithHeaders("/reports/pdf", result);
   return {
     blob: response.blob,
     filename: filenameFromDisposition(response.headers.get("Content-Disposition")) ?? fallbackReportFileName(result.project_name),
     savedPath: response.headers.get("X-Report-Path"),
+    openUrl: reportUrl(result.id),
+    downloadUrl: reportUrl(result.id, true),
   };
 }
