@@ -50,10 +50,11 @@ function displayCell(value: unknown) {
 }
 
 function rowTone(row: PreviewRow, source: ComparisonDataSource) {
-  if (row.row_number === source.header_row) return "border-sky-200 bg-sky-50/90";
-  if (row.row_number === source.first_data_row) return "border-emerald-200 bg-emerald-50/90";
-  if (row.selected) return "border-emerald-100 bg-emerald-50/40";
-  return "border-slate-200 bg-white";
+  if (row.row_number === source.header_row) return "bg-sky-50/90";
+  if (row.row_number === source.first_data_row) return "bg-emerald-50/90";
+  if (row.selected) return "bg-emerald-50/40";
+  if (row.ignored || row.row_number < source.first_data_row) return "bg-white";
+  return "bg-white";
 }
 
 function rowBadge(row: PreviewRow, source: ComparisonDataSource) {
@@ -70,6 +71,14 @@ function rowBadge(row: PreviewRow, source: ComparisonDataSource) {
     return <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">Selected data</span>;
   }
   return <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500">Preview row</span>;
+}
+
+function rowAccentClass(row: PreviewRow, source: ComparisonDataSource, selected: boolean) {
+  if (selected) return "border-l-emerald-500 ring-2 ring-inset ring-emerald-200";
+  if (row.row_number === source.header_row) return "border-l-sky-500";
+  if (row.row_number === source.first_data_row) return "border-l-emerald-500";
+  if (row.selected) return "border-l-emerald-200";
+  return "border-l-transparent";
 }
 
 function confirmedStatus(source: ComparisonDataSource, preview?: DataSourcePreview) {
@@ -277,7 +286,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
               <div>
                 <h2 className="text-base font-semibold text-slate-950">Visual row setup review</h2>
                 <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-                  The preview below shows the actual spreadsheet rows around the detected setup. Select any visible row, then set it as the header or first data row without opening Excel.
+                  The preview below shows the spreadsheet in a file-explorer style list. Select a row, then set it as the header or first data row without opening Excel.
                 </p>
               </div>
             </div>
@@ -440,35 +449,34 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                                 </button>
                               </div>
                             </div>
-                            <div className="max-h-[34rem] space-y-2 overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 p-2">
-                              {preview.rows.map((row) => {
-                                const selected = selectedRowNumberValue === row.row_number;
-                                return (
-                                  <button
-                                    key={row.row_number}
-                                    type="button"
-                                    onClick={() => selectPreviewRow(source.id, row.row_number)}
-                                    className={`block w-full rounded-2xl border p-3 text-left shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50/60 ${rowTone(row, source)} ${selected ? "ring-2 ring-emerald-300" : ""}`}
-                                  >
-                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <span className="text-sm font-semibold text-slate-950">Row {row.row_number}</span>
-                                        {rowBadge(row, source)}
-                                      </div>
-                                      {selected ? <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-semibold text-white">Selected</span> : null}
-                                    </div>
-                                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-                                      {columns.map((column) => (
-                                        <span key={`${row.row_number}-${column.letter}`} className="min-w-36 max-w-44 rounded-xl border border-white/70 bg-white/75 px-2.5 py-2 shadow-sm">
-                                          <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">{column.letter}</span>
-                                          <span className="mt-1 block line-clamp-2 text-xs leading-5 text-slate-700">{displayCell(row.cells[column.header_label])}</span>
-                                        </span>
-                                      ))}
-                                      {hasMoreColumns ? <span className="min-w-32 rounded-xl border border-white/70 bg-white/75 px-2.5 py-2 text-xs font-medium text-slate-400 shadow-sm">+{preview.columns.length - columns.length} columns</span> : null}
-                                    </div>
-                                  </button>
-                                );
-                              })}
+                            <div className="max-h-[34rem] overflow-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+                              <table className="min-w-full border-separate border-spacing-0 text-left text-xs">
+                                <tbody>
+                                  {preview.rows.map((row) => {
+                                    const selected = selectedRowNumberValue === row.row_number;
+                                    return (
+                                      <tr
+                                        key={row.row_number}
+                                        onClick={() => selectPreviewRow(source.id, row.row_number)}
+                                        className={`cursor-pointer border-l-4 align-top transition hover:bg-emerald-50/70 ${rowTone(row, source)} ${rowAccentClass(row, source, selected)}`}
+                                      >
+                                        <td className="sticky left-0 z-10 w-36 min-w-36 bg-inherit px-3 py-2.5 shadow-[8px_0_14px_-14px_rgba(15,23,42,0.45)]">
+                                          <div className="flex flex-col gap-1">
+                                            <span className="font-semibold text-slate-950">Row {row.row_number}</span>
+                                            {rowBadge(row, source)}
+                                          </div>
+                                        </td>
+                                        {columns.map((column) => (
+                                          <td key={`${row.row_number}-${column.letter}`} className="min-w-36 max-w-56 border-b border-slate-100 px-3 py-2.5 text-slate-700">
+                                            <span className="line-clamp-2 leading-5">{displayCell(row.cells[column.header_label])}</span>
+                                          </td>
+                                        ))}
+                                        {hasMoreColumns ? <td className="min-w-32 border-b border-slate-100 px-3 py-2.5 text-xs font-medium text-slate-400">+{preview.columns.length - columns.length} columns</td> : null}
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
                             </div>
                           </>
                         ) : (
