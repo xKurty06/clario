@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo, useState, type PropsWithChildren } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren } from "react";
 import type { UploadedFile } from "../../types/file.types";
 import type {
   ComparisonDataSource,
@@ -7,6 +7,31 @@ import type {
   PresetSelection,
   ValidationResult,
 } from "../../types/validation.types";
+
+const STORED_RESULT_KEY = "procurement-validator:last-validation-result";
+
+function readStoredResult() {
+  if (typeof window === "undefined") return null;
+  try {
+    const value = window.sessionStorage.getItem(STORED_RESULT_KEY);
+    return value ? (JSON.parse(value) as ValidationResult) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredResult(value: ValidationResult | null) {
+  if (typeof window === "undefined") return;
+  try {
+    if (value) {
+      window.sessionStorage.setItem(STORED_RESULT_KEY, JSON.stringify(value));
+    } else {
+      window.sessionStorage.removeItem(STORED_RESULT_KEY);
+    }
+  } catch {
+    // Ignore storage failures so local validation still works in restricted browsers.
+  }
+}
 
 interface WorkflowState {
   projectName: string;
@@ -39,7 +64,12 @@ export function WorkflowProvider({ children }: PropsWithChildren) {
   const [dataSources, setDataSources] = useState<ComparisonDataSource[]>([]);
   const [sourcePreviews, setSourcePreviews] = useState<Record<string, DataSourcePreview>>({});
   const [rules, setRules] = useState<ComparisonRule[]>([]);
-  const [result, setResult] = useState<ValidationResult | null>(null);
+  const [result, setResultState] = useState<ValidationResult | null>(() => readStoredResult());
+
+  const setResult = useCallback((value: ValidationResult | null) => {
+    setResultState(value);
+    writeStoredResult(value);
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -68,7 +98,7 @@ export function WorkflowProvider({ children }: PropsWithChildren) {
       result,
       setResult,
     }),
-    [projectName, preset, files, dataSources, sourcePreviews, rules, result],
+    [projectName, preset, files, dataSources, sourcePreviews, rules, result, setResult],
   );
 
   return <Context.Provider value={value}>{children}</Context.Provider>;
