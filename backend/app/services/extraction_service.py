@@ -24,7 +24,6 @@ from app.services.file_service import get_file
 from app.services.sheet_service import composite_headers
 
 _INTERNAL_WORKING_FILE_PATTERN = re.compile(r"^[0-9a-f]{32}\.[A-Za-z0-9]+$", re.IGNORECASE)
-PREVIEW_CONTEXT_ROWS = 3
 
 
 def _load_frame(path: Path, sheet_name: str) -> pd.DataFrame:
@@ -114,8 +113,9 @@ def _boundary_ignored_rows(data_source: ComparisonDataSource) -> set[int]:
 
 
 def _preview_start_row(data_source: ComparisonDataSource) -> int:
-    setup_anchor = min(data_source.header_row, data_source.first_data_row)
-    return max(setup_anchor - PREVIEW_CONTEXT_ROWS, 1)
+    # Row setup is a visual review step, so always include the top of the sheet.
+    # This lets users see titles, blank rows, merged-header text, and row 1 without opening Excel.
+    return 1
 
 
 def preview_data_source(data_source: ComparisonDataSource) -> DataSourcePreview:
