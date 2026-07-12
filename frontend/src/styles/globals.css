@@ -56,9 +56,6 @@ main :where([role="menu"]) {
 }
 
 main :where(.fixed.inset-0.z-\[70\]) {
-  left: calc(var(--app-sidebar-offset, 272px) * -1);
-  right: auto;
-  width: 100vw;
   z-index: 120;
 }
 
