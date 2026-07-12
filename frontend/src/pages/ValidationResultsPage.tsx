@@ -59,8 +59,8 @@ export function ValidationResultsPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-[320px_minmax(0,1fr)] gap-8 pt-6">
-        <aside className="rounded-2xl border border-slate-200 bg-white p-5">
+      <div className="grid items-start gap-8 pt-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <aside className="h-fit self-start rounded-2xl border border-slate-200 bg-white p-5">
           <h2 className="text-base font-semibold">Rule breakdown</h2>
           <div className="mt-4 space-y-3">
             {result.rule_summaries.map((rule) => (
@@ -75,7 +75,7 @@ export function ValidationResultsPage() {
           </div>
         </aside>
 
-        <section>
+        <section className="min-w-0">
           <div className="mb-5 flex gap-3">
             <label className="relative flex-1">
               <Search className="absolute left-3 top-3 size-4 text-slate-400" />
