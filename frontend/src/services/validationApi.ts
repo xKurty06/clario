@@ -8,12 +8,24 @@ export interface ValidationPayload {
   rules: ComparisonRule[];
 }
 
-export const runValidation = (payload: ValidationPayload) =>
-  apiRequest<ValidationResult>("/validation/run", {
+function unconfirmedSourceNames(dataSources: ComparisonDataSource[]) {
+  return dataSources.filter((source) => !source.row_setup_confirmed).map((source) => source.name);
+}
+
+export const runValidation = (payload: ValidationPayload) => {
+  const unconfirmed = unconfirmedSourceNames(payload.data_sources);
+  if (unconfirmed.length) {
+    const names = unconfirmed.slice(0, 3).join(", ");
+    const suffix = unconfirmed.length > 3 ? ` and ${unconfirmed.length - 3} more` : "";
+    throw new Error(`Confirm the header row and first data row for ${names}${suffix} before running validation.`);
+  }
+
+  return apiRequest<ValidationResult>("/validation/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+};
 
 export interface RecentSession {
   id: string;
