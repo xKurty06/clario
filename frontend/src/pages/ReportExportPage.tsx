@@ -6,10 +6,16 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { useWorkflow } from "../features/files/WorkflowContext";
 import { exportPdf } from "../services/reportApi";
 
+function reportFileName(projectName: string) {
+  const safeName = projectName.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "");
+  return `${safeName || "validation"}-comparison-report.pdf`;
+}
+
 export function ReportExportPage() {
   const { result } = useWorkflow();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageTone, setMessageTone] = useState<"success" | "error" | "neutral">("neutral");
 
   if (!result) {
     return (
@@ -40,21 +46,40 @@ export function ReportExportPage() {
   const download = async () => {
     setBusy(true);
     setMessage("");
+    setMessageTone("neutral");
+    let url: string | null = null;
     try {
       const blob = await exportPdf(result);
-      const url = URL.createObjectURL(blob);
+      if (!blob.size) {
+        throw new Error("The PDF service returned an empty report. Please run validation again and retry export.");
+      }
+
+      url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `${result.project_name.replace(/[^a-z0-9]+/gi, "-")}-comparison-report.pdf`;
+      anchor.download = reportFileName(result.project_name);
+      anchor.rel = "noopener";
+      anchor.style.display = "none";
+      document.body.appendChild(anchor);
       anchor.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      anchor.remove();
+      setMessageTone("success");
       setMessage("PDF report created from the completed validation result. Validation was not re-run.");
     } catch (cause) {
+      setMessageTone("error");
       setMessage(cause instanceof Error ? cause.message : "Could not create report.");
     } finally {
+      if (url) window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       setBusy(false);
     }
   };
+
+  const messageClass =
+    messageTone === "success"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+      : messageTone === "error"
+        ? "border-red-200 bg-red-50 text-red-700"
+        : "border-slate-200 bg-slate-50 text-slate-600";
 
   return (
     <div>
@@ -72,11 +97,11 @@ export function ReportExportPage() {
           <div><dt className="text-xs text-slate-500">Rules</dt><dd className="mt-1 font-semibold">{result.rule_summaries.length}</dd></div>
           <div><dt className="text-xs text-slate-500">Discrepancies</dt><dd className="mt-1 font-semibold">{result.discrepancies.length}</dd></div>
         </dl>
-        <button disabled={busy} onClick={download} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
+        <button disabled={busy} onClick={download} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
           <Download className="size-4" />
           {busy ? "Creating report..." : "Export PDF report"}
         </button>
-        {message && <p className="mt-4 text-sm text-slate-600" role="status">{message}</p>}
+        {message && <p className={`mt-4 rounded-2xl border px-3 py-2.5 text-sm ${messageClass}`} role="status">{message}</p>}
       </section>
     </div>
   );
