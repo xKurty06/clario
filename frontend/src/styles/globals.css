@@ -28,6 +28,14 @@ main :where(a, button).rounded-xl:where(.bg-emerald-700, .border-slate-300) {
   line-height: 1.25rem;
 }
 
+body[data-row-setup-blocked="true"] button[title="Run validation with the current sources, rows, fields, and rules"] {
+  pointer-events: none;
+  cursor: not-allowed;
+  background: #cbd5e1;
+  opacity: 0.85;
+  box-shadow: none;
+}
+
 main thead.sticky {
   top: -1px;
   z-index: 30;
