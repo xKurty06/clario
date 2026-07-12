@@ -59,6 +59,10 @@ main :where(.fixed.inset-0.z-\[70\]) {
   z-index: 120;
 }
 
+main label :where(.help-tip) {
+  display: none;
+}
+
 main :where(.truncate) {
   white-space: normal;
   overflow: visible;
