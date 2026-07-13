@@ -29,7 +29,7 @@ const supplementalTips: Record<string, string> = {
   "The first row that contains real data. Rows above this are skipped.": "This should be the first item row, not a repeated header, section label, subtotal, or blank row.",
   "The name used in rules and reports, such as Quantity, Unit Cost, or Brand.": "Use the same field name across sources when those columns should be compared together.",
   "Controls how values are normalized and compared.": "Choose text, number, or currency so the app compares values using the right logic.",
-  "Flags selected rows where this field is blank.": "Turn this on only for columns that must contain a value in every included row.",
+  "Flags selected rows where this field is blank.": "Turn this off only when blanks are acceptable for this column or the field is optional.",
   "The spreadsheet column where this value comes from. Column letters are used so mapping still works with unclear or duplicate headers.": "Use the column letter when headers are merged, duplicated, or not reliable.",
   "Treat uppercase and lowercase text as equal during comparison.": "Useful when capitalization differences should not be reported, such as ITEM A vs item a.",
   "Remove extra spaces at the start and end.": "Use this for copied spreadsheet values that may contain accidental leading or trailing spaces.",

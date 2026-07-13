@@ -48,7 +48,7 @@ function inferField(preview: DataSourcePreview, template: CommonFieldTemplate, d
     column_letter: column.letter,
     original_header_label: column.header_label,
     custom_display_name: template.field_name,
-    required: ["Description", "Quantity"].includes(template.field_name),
+    required: true,
     normalization: { case_insensitive: true, trim_whitespace: true, collapse_whitespace: true },
   };
 }

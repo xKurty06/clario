@@ -193,7 +193,7 @@ function inferField(preview: DataSourcePreview, fieldName: string, terms: string
     column_letter: column.letter,
     original_header_label: column.header_label,
     custom_display_name: fieldName,
-    required: ["Description", "Quantity"].includes(fieldName),
+    required: true,
     normalization: { case_insensitive: true, trim_whitespace: true, collapse_whitespace: true },
   };
 }
@@ -209,7 +209,7 @@ function createFieldDraft(source: ComparisonDataSource, preview: DataSourcePrevi
     column_letter: column.letter,
     original_header_label: column.header_label,
     custom_display_name: null,
-    required: false,
+    required: true,
     normalization: { case_insensitive: true, trim_whitespace: true, collapse_whitespace: true },
   };
 }
