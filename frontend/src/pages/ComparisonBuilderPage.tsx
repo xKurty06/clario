@@ -48,7 +48,7 @@ import type {
   RuleType,
   Severity,
 } from "../types/validation.types";
-import { buildSuggestedFieldsForSource, fieldTypeForLabel } from "../utils/fieldSuggestions";
+import { fieldTypeForLabel } from "../utils/fieldSuggestions";
 
 type BuilderStepId = "sources" | "rows" | "fields" | "rules" | "review";
 type EditorMode = "create" | "edit";
@@ -283,7 +283,91 @@ function makeCompareRule(left: ComparisonDataSource, right: ComparisonDataSource
   };
 }
 
-function buildCompareRulesForMatchingFields(left: ComparisonDataSource, right: ComparisonDataSource) {
+function normalizedCellValue(value: string | number | boolean | null | undefined) {
+  if (value === null || value === undefined) return "";
+  const raw = String(value).trim();
+  if (!raw) return "";
+  const numeric = raw.replace(/[$,%\s,]+/g, "");
+  if (numeric && !Number.isNaN(Number(numeric))) return String(Number(numeric));
+  return raw.toLowerCase().replace(/\s+/g, " ").replace(/[^\p{L}\p{N}. -]+/gu, "").trim();
+}
+
+function previewRowsForSource(source: ComparisonDataSource, preview?: DataSourcePreview) {
+  if (!preview) return [];
+  const selectedRows = new Set(source.selected_row_numbers);
+  return preview.rows
+    .filter((row) => {
+      if (row.ignored || source.ignored_row_numbers.includes(row.row_number)) return false;
+      if (selectedRows.size) return selectedRows.has(row.row_number);
+      return row.selected || row.row_number >= source.first_data_row;
+    })
+    .sort((leftRow, rightRow) => leftRow.row_number - rightRow.row_number);
+}
+
+function previewCellValueForField(row: DataSourcePreview["rows"][number], preview: DataSourcePreview, field: ComparisonField) {
+  const column = preview.columns.find((item) => item.letter.toUpperCase() === field.column_letter.toUpperCase());
+  return row.cells[column?.header_label ?? field.column_letter] ?? row.cells[field.column_letter] ?? null;
+}
+
+function valuesForField(source: ComparisonDataSource, preview: DataSourcePreview | undefined, field: ComparisonField, keepEmpty = false) {
+  if (!preview) return [];
+  const values = previewRowsForSource(source, preview).map((row) => normalizedCellValue(previewCellValueForField(row, preview, field)));
+  return keepEmpty ? values : values.filter(Boolean);
+}
+
+function countOverlappingValues(leftValues: string[], rightValues: string[]) {
+  const rightCounts = new Map<string, number>();
+  for (const value of rightValues) {
+    rightCounts.set(value, (rightCounts.get(value) ?? 0) + 1);
+  }
+
+  let matches = 0;
+  for (const value of leftValues) {
+    const count = rightCounts.get(value) ?? 0;
+    if (count <= 0) continue;
+    matches += 1;
+    rightCounts.set(value, count - 1);
+  }
+  return matches;
+}
+
+function scoreFieldValueMatch(
+  left: ComparisonDataSource,
+  right: ComparisonDataSource,
+  leftPreview: DataSourcePreview | undefined,
+  rightPreview: DataSourcePreview | undefined,
+  leftField: ComparisonField,
+  rightField: ComparisonField,
+) {
+  const alignedLeftValues = valuesForField(left, leftPreview, leftField, true);
+  const alignedRightValues = valuesForField(right, rightPreview, rightField, true);
+  const leftValues = alignedLeftValues.filter(Boolean);
+  const rightValues = alignedRightValues.filter(Boolean);
+  const comparableRows = Math.min(alignedLeftValues.length, alignedRightValues.length);
+  if (!comparableRows) return 0;
+
+  const alignedComparisons = alignedLeftValues
+    .slice(0, comparableRows)
+    .map((value, index) => [value, alignedRightValues[index]] as const)
+    .filter(([leftValue, rightValue]) => leftValue && rightValue);
+  const alignedMatches = alignedComparisons.filter(([leftValue, rightValue]) => leftValue === rightValue).length;
+  const overlapMatches = countOverlappingValues(leftValues, rightValues);
+  const alignedRatio = alignedComparisons.length ? alignedMatches / alignedComparisons.length : 0;
+  const overlapRatio = overlapMatches / Math.max(1, Math.min(leftValues.length, rightValues.length));
+  const uniqueMatches = new Set(leftValues.filter((value) => rightValues.includes(value))).size;
+  const enoughAlignedMatches = alignedMatches >= 1 && alignedRatio >= 0.25;
+  const enoughOverlappingMatches = overlapMatches >= 1 && overlapRatio >= 0.25 && uniqueMatches >= 1;
+
+  if (!enoughAlignedMatches && !enoughOverlappingMatches) return 0;
+  return Math.max(alignedRatio, overlapRatio * 0.85);
+}
+
+function buildCompareRulesForMatchingFields(
+  left: ComparisonDataSource,
+  right: ComparisonDataSource,
+  leftPreview?: DataSourcePreview,
+  rightPreview?: DataSourcePreview,
+) {
   const rightFieldsByName = new Map<string, ComparisonField>();
   for (const field of right.fields) {
     const key = normalizedFieldName(field);
@@ -292,12 +376,40 @@ function buildCompareRulesForMatchingFields(left: ComparisonDataSource, right: C
     }
   }
 
-  return left.fields
-    .map((leftField) => {
-      const rightField = rightFieldsByName.get(normalizedFieldName(leftField));
-      return rightField ? makeCompareRule(left, right, leftField, rightField) : null;
-    })
-    .filter((rule): rule is ComparisonRule => Boolean(rule));
+  const matchedLeftFieldIds = new Set<string>();
+  const matchedRightFieldIds = new Set<string>();
+  const rules: ComparisonRule[] = [];
+
+  for (const leftField of left.fields) {
+    const rightField = rightFieldsByName.get(normalizedFieldName(leftField));
+    if (!rightField || matchedRightFieldIds.has(rightField.id)) continue;
+    matchedLeftFieldIds.add(leftField.id);
+    matchedRightFieldIds.add(rightField.id);
+    rules.push(makeCompareRule(left, right, leftField, rightField));
+  }
+
+  const candidates = left.fields
+    .filter((leftField) => !matchedLeftFieldIds.has(leftField.id))
+    .flatMap((leftField) =>
+      right.fields
+        .filter((rightField) => !matchedRightFieldIds.has(rightField.id))
+        .map((rightField) => ({
+          leftField,
+          rightField,
+          score: scoreFieldValueMatch(left, right, leftPreview, rightPreview, leftField, rightField),
+        }))
+        .filter((candidate) => candidate.score > 0),
+    )
+    .sort((leftCandidate, rightCandidate) => rightCandidate.score - leftCandidate.score);
+
+  for (const candidate of candidates) {
+    if (matchedLeftFieldIds.has(candidate.leftField.id) || matchedRightFieldIds.has(candidate.rightField.id)) continue;
+    matchedLeftFieldIds.add(candidate.leftField.id);
+    matchedRightFieldIds.add(candidate.rightField.id);
+    rules.push(makeCompareRule(left, right, candidate.leftField, candidate.rightField));
+  }
+
+  return rules;
 }
 
 function ruleIsRunnable(rule: ComparisonRule) {
@@ -583,38 +695,14 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
     setPresetDecision("applied");
   };
 
-  const applySuggestedFields = (source: ComparisonDataSource) => {
-    const preview = sourcePreviews[source.id];
-    if (!preview) return;
-    const nextFields = buildSuggestedFieldsForSource(source, preview, sourcePreviews);
-    if (!nextFields.length) {
-      setError("No matching column names were found in another source. Add fields manually or use matching field names across sources.");
-      return;
-    }
-    setError("");
-    if (source.fields.length) {
-      requestConfirm({
-        title: "Replace current field mappings?",
-        description: "Applying suggested fields will replace the current field mappings for this source.",
-        confirmLabel: "Replace fields",
-        onConfirm: () => updateDataSource(source.id, {
-          ...source,
-          fields: nextFields,
-        }),
-      });
-      return;
-    }
-    updateDataSource(source.id, { ...source, fields: nextFields });
-  };
-
   const buildSuggestedRules = () => {
     if (dataSources.length < 2) return;
     const left = dataSources[0];
     const right = dataSources[dataSources.length - 1];
     if (!left || !right) return;
-    const next = buildCompareRulesForMatchingFields(left, right);
+    const next = buildCompareRulesForMatchingFields(left, right, sourcePreviews[left.id], sourcePreviews[right.id]);
     if (!next.length) {
-      setError("No matching field names were found across the first and last sources. Map matching fields before building suggested rules.");
+      setError("No matching field names or preview values were found across the first and last sources. Map matching fields before building suggested rules.");
       return;
     }
     setError("");
@@ -829,9 +917,11 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <button
+                        type="button"
+                        data-suggest-fields-source-id={source.id}
                         disabled={!preview}
-                        title="Suggest field mappings from column names that also appear in another source"
-                        onClick={() => applySuggestedFields(source)}
+                        title="Suggest field mappings from detected source headers"
+                        onClick={() => window.dispatchEvent(new CustomEvent("clario:suggest-fields", { detail: { sourceId: source.id } }))}
                         className={secondaryButtonClass}
                       >
                         Add suggested fields
@@ -1096,7 +1186,7 @@ function RuleSuggestionDialog({
             <div className="min-w-0">
               <h2 id="suggested-rules-title" className="text-lg font-semibold text-slate-950">Choose rules to add</h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                Suggested rules are built from fields with matching names across the first and last sources.
+                Suggested rules use matching field names first, then preview row values when field names differ.
               </p>
             </div>
           </div>

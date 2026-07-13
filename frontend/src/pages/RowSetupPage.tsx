@@ -498,8 +498,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
             const status = confirmedStatus(source, preview);
             const StatusIcon = status.icon;
             const sheetOptions = (file?.sheets ?? []).map((sheet) => ({ value: sheet.name, label: sheet.name, description: `${sheet.row_count} rows • ${sheet.column_count} columns` }));
-            const columns = preview?.columns.slice(0, 8) ?? [];
-            const hasMoreColumns = Boolean(preview && preview.columns.length > columns.length);
+            const columns = preview?.columns ?? [];
             const stalePreview = Boolean(preview && sourceSignature(preview.data_source) !== sourceSignature(source));
             const collapsed = collapsedSourceIds.has(source.id);
             const selectedRowNumber = selectedRowsBySource[source.id] ?? (preview?.rows.some((row) => row.row_number === source.header_row) ? source.header_row : preview?.rows[0]?.row_number);
@@ -695,7 +694,6 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                                             <span className="block whitespace-normal leading-5">{displayCell(row.cells[column.header_label])}</span>
                                           </td>
                                         ))}
-                                        {hasMoreColumns ? <td className={`min-w-32 px-3 py-2.5 text-xs font-medium text-slate-400 ${cellClass}`}>+{preview.columns.length - columns.length} columns</td> : null}
                                       </tr>
                                     );
                                   })}

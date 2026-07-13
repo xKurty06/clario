@@ -175,11 +175,16 @@ function LocationCell({ fileName, sheetName, rowNumber }: LocationCellProps) {
   );
 }
 
+function BlankValueBadge() {
+  return <span className="font-medium text-slate-400">Blank</span>;
+}
+
 function ValueCell({ value }: { value?: string | null }) {
-  if (value === "Blank") {
-    return <span className="font-medium text-slate-400">Blank</span>;
+  const text = value === null || value === undefined ? "" : String(value).trim();
+  if (!text || text === "Blank") {
+    return <BlankValueBadge />;
   }
-  return <>{value ?? "-"}</>;
+  return <>{value}</>;
 }
 
 function firstDiscrepancyRow(item: RuleDiscrepancy) {
@@ -509,7 +514,7 @@ export function ValidationResultsPage() {
               </div>
             ) : null}
 
-            <div className="sticky top-0 z-[80] overflow-hidden rounded-t-2xl bg-white shadow-sm">
+            <div className={`sticky top-0 z-[80] overflow-hidden bg-white shadow-sm ${floatingHeader.visible ? "" : "rounded-t-2xl"}`}>
               {showHorizontalSlider ? (
                 <div
                   ref={topScrollRef}

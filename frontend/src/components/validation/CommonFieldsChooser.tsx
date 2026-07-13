@@ -12,13 +12,6 @@ interface FieldChoice {
 const primaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300";
 const secondaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50";
 
-function findSourceFromButton(button: HTMLButtonElement, sources: ComparisonDataSource[]) {
-  const article = button.closest("article");
-  const heading = article?.querySelector("h2")?.textContent?.trim();
-  if (!heading) return null;
-  return sources.find((source) => source.name === heading) ?? null;
-}
-
 export function CommonFieldsChooser() {
   const { dataSources, sourcePreviews, updateDataSource } = useWorkflow();
   const [targetSourceId, setTargetSourceId] = useState<string | null>(null);
@@ -41,24 +34,20 @@ export function CommonFieldsChooser() {
     .map((choice) => choice.inferredField);
 
   useEffect(() => {
-    const interceptCommonFieldButton = (event: MouseEvent) => {
-      const target = event.target as Element | null;
-      if (!target || target.closest("[data-common-field-chooser]")) return;
-
-      const button = target.closest("button") as HTMLButtonElement | null;
-      if (!button?.textContent?.includes("Suggest fields")) return;
-
-      const source = findSourceFromButton(button, dataSources);
+    const openForSourceId = (sourceId: string) => {
+      const source = dataSources.find((item) => item.id === sourceId);
       if (!source) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
       setTargetSourceId(source.id);
     };
 
-    document.addEventListener("click", interceptCommonFieldButton, true);
-    return () => document.removeEventListener("click", interceptCommonFieldButton, true);
+    const openFromCustomEvent = (event: Event) => {
+      const sourceId = (event as CustomEvent<{ sourceId?: string }>).detail?.sourceId;
+      if (!sourceId) return;
+      openForSourceId(sourceId);
+    };
+
+    window.addEventListener("clario:suggest-fields", openFromCustomEvent);
+    return () => window.removeEventListener("clario:suggest-fields", openFromCustomEvent);
   }, [dataSources]);
 
   useEffect(() => {
@@ -96,7 +85,7 @@ export function CommonFieldsChooser() {
             <div className="min-w-0">
               <h2 id="common-fields-title" className="text-lg font-semibold text-slate-950">Choose fields to add</h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                Select which matching source fields should be added to <span className="font-semibold text-slate-900">{targetSource.name}</span>.
+                Select which suggested fields should be added to <span className="font-semibold text-slate-900">{targetSource.name}</span>.
               </p>
             </div>
           </div>
@@ -112,7 +101,7 @@ export function CommonFieldsChooser() {
         ) : (
           <>
             <div className="mt-5 flex flex-wrap items-center justify-between gap-2">
-              <p className="text-sm text-slate-500">Fields are suggested from column names that also appear in another source. Existing mappings are kept.</p>
+              <p className="text-sm text-slate-500">Related column names are prioritized, then useful headers from this source are offered. Existing mappings are kept.</p>
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={() => setSelectedKeys(selectableKeys)} className={secondaryButtonClass}>Select all available</button>
                 <button type="button" onClick={() => setSelectedKeys([])} className={secondaryButtonClass}>Clear</button>
@@ -155,7 +144,7 @@ export function CommonFieldsChooser() {
               </div>
             ) : (
               <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-                No matching column names were found in another source. Add fields manually or rename columns so matching fields use the same words.
+                No usable column headers were found for this source. Add fields manually or review the selected header row.
               </div>
             )}
           </>
