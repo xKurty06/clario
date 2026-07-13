@@ -219,7 +219,7 @@ function addSelectedRowContentWarnings(source: ComparisonDataSource, preview: Da
         sourceId: source.id,
         severity: "warning",
         title: `${sourceName} row ${row.row_number} should be reviewed`,
-        detail: `This selected row is flagged as ${issue}. Remove it only if it is a section, footer, spacer, or summary row.`,
+        detail: `This selected row is flagged as ${issue}. This is only a warning; continue if the row is a real data row, or exclude it if it is a section, footer, spacer, or summary row.`,
       });
     }
 
@@ -229,7 +229,7 @@ function addSelectedRowContentWarnings(source: ComparisonDataSource, preview: Da
         sourceId: source.id,
         severity: "warning",
         title: `${sourceName} row ${row.row_number} has no mapped field values`,
-        detail: "The row is selected, but none of the mapped columns contain values. It may not be a real data row.",
+        detail: "The row is selected, but none of the mapped columns contain values. Check whether this is a real record or an extra spacer/header row.",
       });
     }
 
@@ -239,7 +239,7 @@ function addSelectedRowContentWarnings(source: ComparisonDataSource, preview: Da
         sourceId: source.id,
         severity: "warning",
         title: `${sourceName} row ${row.row_number} is missing required values`,
-        detail: "Required mapped fields are blank on this selected row. Review it if the row is not an actual item or record.",
+        detail: "Required mapped fields are blank on this selected row. Continue only if blank values are expected for this source.",
       });
     }
   }
@@ -296,7 +296,7 @@ export function buildPreflightReview({ projectName, preset, fileCount, dataSourc
         sourceId: source.id,
         severity: "blocker",
         title: `${sourceName} row setup is not confirmed`,
-        detail: "Confirm the header row and first data row in the visual row setup step.",
+        detail: "Confirm the header row and first data row first. Header row should contain column names; first data row should be the first real record or item, not a title, lot label, blank row, signature row, or total row.",
       });
     }
 
@@ -306,7 +306,7 @@ export function buildPreflightReview({ projectName, preset, fileCount, dataSourc
         sourceId: source.id,
         severity: "blocker",
         title: `${sourceName} has no selected rows`,
-        detail: "Select the real data rows that should be included in validation.",
+        detail: "Select only rows that contain real records or items. Exclude headers, section labels, blank rows, signatures, subtotals, and totals.",
       });
     }
 
@@ -316,7 +316,7 @@ export function buildPreflightReview({ projectName, preset, fileCount, dataSourc
         sourceId: source.id,
         severity: "blocker",
         title: `${sourceName} has no mapped fields`,
-        detail: "Map at least one column field for this source.",
+        detail: "Map the spreadsheet columns that matter for validation, such as Item Description, Quantity, Unit Cost, or Total Cost. Use the header preview to choose the correct column.",
       });
     }
 
@@ -326,7 +326,7 @@ export function buildPreflightReview({ projectName, preset, fileCount, dataSourc
         sourceId: source.id,
         severity: "warning",
         title: `${sourceName} preview is not loaded in this view`,
-        detail: "Reload the preview if you want to visually re-check rows before running.",
+        detail: "Reload the preview if row setup or worksheet selection changed, or if you want to visually re-check the header and data rows before running.",
       });
     }
 
@@ -338,7 +338,7 @@ export function buildPreflightReview({ projectName, preset, fileCount, dataSourc
       id: "enabled-rules",
       severity: "blocker",
       title: "No enabled rules",
-      detail: "Enable or create at least one rule before running validation.",
+      detail: "Enable or create at least one rule before running validation. Start with a direct comparison rule for important fields like description, quantity, unit cost, or total cost.",
     });
   }
 
