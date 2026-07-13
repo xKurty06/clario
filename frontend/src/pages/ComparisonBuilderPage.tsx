@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  ArrowRight,
   Columns3,
   Database,
   Edit3,
@@ -254,6 +255,53 @@ function ruleLabel(rule: ComparisonRule, sources: ComparisonDataSource[]) {
   if (rule.rule_type === "required_field_check") return `${fieldLabel(leftField)} is required`;
   if (rule.rule_type === "duplicate_check") return `${fieldLabel(leftField)} is unique`;
   return `${fieldLabel(leftField)} vs ${fieldLabel(rightField)}`;
+}
+
+function RuleMetaChips({ rule }: { rule: ComparisonRule }) {
+  return (
+    <div className="mt-1.5 flex flex-wrap gap-1.5 text-[11px] font-medium text-slate-600">
+      <span className="rounded-full bg-white/80 px-2 py-0.5 ring-1 ring-slate-200">{ruleTypeLabels[rule.rule_type]}</span>
+      <span className="rounded-full bg-white/80 px-2 py-0.5 ring-1 ring-slate-200">{matchLabels[rule.match_strategy]}</span>
+      <span className="rounded-full bg-white/80 px-2 py-0.5 ring-1 ring-slate-200">{titleCaseStrictness(rule.strictness)}</span>
+    </div>
+  );
+}
+
+function SourceFieldBlock({ label, sourceName, fieldName }: { label: string; sourceName: string; fieldName: string }) {
+  return (
+    <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-lg bg-white/80 px-2 py-1 text-xs ring-1 ring-slate-200">
+      <span className="shrink-0 text-[10px] font-semibold uppercase text-slate-400">{label}</span>
+      <span className="min-w-0 max-w-72 truncate font-medium text-slate-600">{sourceName}</span>
+      <span className="shrink-0 text-slate-300">:</span>
+      <span className="min-w-0 max-w-44 truncate font-semibold text-slate-950">{fieldName}</span>
+    </span>
+  );
+}
+
+function RuleSourceMap({
+  left,
+  right,
+  leftField,
+  rightField,
+}: {
+  left?: ComparisonDataSource;
+  right?: ComparisonDataSource;
+  leftField?: ComparisonField;
+  rightField?: ComparisonField;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+      <SourceFieldBlock label="Reference" sourceName={left?.name ?? "Source"} fieldName={fieldLabel(leftField)} />
+      {right ? (
+        <>
+          <span className="inline-flex size-5 shrink-0 items-center justify-center text-slate-400">
+            <ArrowRight className="size-3.5" />
+          </span>
+          <SourceFieldBlock label="Compared With" sourceName={right.name} fieldName={fieldLabel(rightField)} />
+        </>
+      ) : null}
+    </div>
+  );
 }
 
 function makeCompareRule(left: ComparisonDataSource, right: ComparisonDataSource, leftField: ComparisonField, rightField: ComparisonField): ComparisonRule {
@@ -1010,18 +1058,18 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
                 const leftField = left?.fields.find((field) => field.id === rule.left_field_id);
                 const rightField = right?.fields.find((field) => field.id === rule.right_field_id);
                 return (
-                  <article key={rule.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 gap-y-1">
+                  <article key={rule.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 gap-y-1">
                           <h3 className="truncate text-sm font-semibold">{rule.rule_name || ruleLabel(rule, dataSources)}</h3>
                           <StatusBadge tone={rule.enabled ? "success" : "neutral"}>{rule.enabled ? "Enabled" : "Disabled"}</StatusBadge>
                           <StatusBadge tone={rule.severity === "high" ? "warning" : "neutral"}>{severityLabels[rule.severity]}</StatusBadge>
                         </div>
-                        <p className="mt-2 text-sm text-slate-600">{ruleTypeLabels[rule.rule_type]} / {matchLabels[rule.match_strategy]} / {titleCaseStrictness(rule.strictness)}</p>
-                        <p className="mt-1 truncate text-xs text-slate-500">{left?.name ?? "Source"}: {fieldLabel(leftField)} {right ? `/ ${right.name}: ${fieldLabel(rightField)}` : ""}</p>
+                        <RuleMetaChips rule={rule} />
+                        <RuleSourceMap left={left} right={right} leftField={leftField} rightField={rightField} />
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex shrink-0 gap-1">
                         <button title="Edit rule settings in a draft drawer before saving" aria-label={`Edit rule ${rule.rule_name}`} onClick={() => openEditRule(rule)} className={iconButtonClass}>
                           <Edit3 className="size-4" />
                         </button>
@@ -1215,7 +1263,7 @@ function RuleSuggestionDialog({
               return (
                 <label
                   key={rule.id}
-                  className={`flex gap-3 rounded-2xl border p-4 text-sm transition ${isDuplicate ? "border-slate-200 bg-slate-50 opacity-70" : checked ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}
+                  className={`flex gap-3 rounded-2xl border p-3 text-sm transition ${isDuplicate ? "border-slate-200 bg-slate-50 opacity-70" : checked ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}
                   title={isDuplicate ? "This suggested rule is already in the rule list" : `Add ${rule.rule_name}`}
                 >
                   <input
@@ -1228,20 +1276,15 @@ function RuleSuggestionDialog({
                     }}
                     className="mt-1 size-4 rounded border-slate-300 accent-emerald-700"
                   />
-                  <span className="min-w-0 flex-1">
+                  <div className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-2">
                       <span className="font-semibold text-slate-950">{rule.rule_name}</span>
                       <StatusBadge tone={rule.severity === "high" ? "warning" : "neutral"}>{severityLabels[rule.severity]}</StatusBadge>
                       {isDuplicate ? <StatusBadge tone="neutral">Already added</StatusBadge> : null}
                     </span>
-                    <span className="mt-2 block text-xs leading-5 text-slate-600">
-                      {left?.name ?? "Source"}: <span className="font-semibold text-slate-800">{fieldLabel(leftField)}</span>
-                      {right ? <> / {right.name}: <span className="font-semibold text-slate-800">{fieldLabel(rightField)}</span></> : null}
-                    </span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-500">
-                      {ruleTypeLabels[rule.rule_type]} / {matchLabels[rule.match_strategy]} / {titleCaseStrictness(rule.strictness)}
-                    </span>
-                  </span>
+                    <RuleSourceMap left={left} right={right} leftField={leftField} rightField={rightField} />
+                    <RuleMetaChips rule={rule} />
+                  </div>
                 </label>
               );
             })}
@@ -1898,7 +1941,7 @@ function CheckboxCard({
   help: string;
 }) {
   return (
-    <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+    <label className="flex self-start items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="mt-1 size-4 rounded border-slate-300 accent-emerald-700" />
       <span className="space-y-1">
         <span className="flex items-center gap-1 font-semibold text-slate-900">
