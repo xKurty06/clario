@@ -1,4 +1,4 @@
-import type { ComparisonDataSource, ComparisonRule, DataSourcePreview, PresetType, PreviewRow } from "../../types/validation.types";
+import type { ComparisonDataSource, ComparisonField, ComparisonRule, DataSourcePreview, PresetType, PreviewRow } from "../../types/validation.types";
 
 export type PreflightSeverity = "blocker" | "warning" | "ready";
 
@@ -202,6 +202,116 @@ function selectedRequiredFields(source: ComparisonDataSource) {
   return required.length ? required : source.fields.slice(0, Math.min(2, source.fields.length));
 }
 
+function fieldName(field: ComparisonField) {
+  return (field.custom_display_name || field.field_name || field.original_header_label || field.column_letter || "Unnamed field").trim();
+}
+
+function fieldHeader(field: ComparisonField) {
+  return (field.original_header_label || "").trim();
+}
+
+function fieldColumnExists(field: ComparisonField, preview: DataSourcePreview | undefined) {
+  if (!preview) return true;
+  return preview.columns.some((column) => column.letter.toUpperCase() === field.column_letter.toUpperCase());
+}
+
+function looksGenericFieldName(field: ComparisonField) {
+  const name = normalizeText(fieldName(field));
+  return !name || /^field \d+$/.test(name) || /^column [a-z]+$/.test(name) || name === "blank header" || name === "unnamed field";
+}
+
+function likelyFieldType(label: string) {
+  const key = normalizeText(label);
+  if (/\b(cost|price|amount|total|value|rate)\b/.test(key)) return "currency";
+  if (/\b(qty|quantity|count|percent|percentage)\b/.test(key)) return "number";
+  if (/\b(date|time|deadline|created|updated)\b/.test(key)) return "date";
+  return "text";
+}
+
+function addFieldSetupWarnings(source: ComparisonDataSource, preview: DataSourcePreview | undefined, warnings: PreflightItem[]) {
+  if (!source.fields.length) return;
+
+  const sourceName = source.name.trim() || "Unnamed source";
+  const names = new Map<string, ComparisonField[]>();
+  const columns = new Map<string, ComparisonField[]>();
+
+  for (const field of source.fields) {
+    const normalizedName = normalizeText(fieldName(field));
+    if (normalizedName) names.set(normalizedName, [...(names.get(normalizedName) ?? []), field]);
+    const columnKey = field.column_letter.toUpperCase();
+    if (columnKey) columns.set(columnKey, [...(columns.get(columnKey) ?? []), field]);
+  }
+
+  const duplicateNames = [...names.values()].filter((fields) => fields.length > 1);
+  if (duplicateNames.length) {
+    warnings.push({
+      id: `source-${source.id}-duplicate-field-names`,
+      sourceId: source.id,
+      severity: "warning",
+      title: `${sourceName} has duplicate field names`,
+      detail: "Two or more mapped fields use the same display name. Rename them so rules and reports are easier to read.",
+    });
+  }
+
+  const duplicateColumns = [...columns.values()].filter((fields) => fields.length > 1);
+  if (duplicateColumns.length) {
+    warnings.push({
+      id: `source-${source.id}-duplicate-field-columns`,
+      sourceId: source.id,
+      severity: "warning",
+      title: `${sourceName} maps the same column more than once`,
+      detail: "A spreadsheet column is mapped to multiple fields. Continue only if you intentionally need the same column in more than one check.",
+    });
+  }
+
+  for (const field of source.fields.slice(0, 12)) {
+    const label = fieldName(field);
+    const header = fieldHeader(field);
+
+    if (!fieldColumnExists(field, preview)) {
+      warnings.push({
+        id: `source-${source.id}-field-${field.id}-missing-column`,
+        sourceId: source.id,
+        severity: "warning",
+        title: `${sourceName} field “${label}” points to a missing column`,
+        detail: `Column ${field.column_letter} is not present in the current preview. Recheck the worksheet tab or remap this field.`,
+      });
+      continue;
+    }
+
+    if (looksGenericFieldName(field)) {
+      warnings.push({
+        id: `source-${source.id}-field-${field.id}-generic-name`,
+        sourceId: source.id,
+        severity: "warning",
+        title: `${sourceName} field “${label}” should be renamed`,
+        detail: "Use a clear field name from the header, such as Item Description, Quantity, Unit Cost, or Total Cost.",
+      });
+    }
+
+    if (!header || normalizeText(header) === "blank header") {
+      warnings.push({
+        id: `source-${source.id}-field-${field.id}-blank-header`,
+        sourceId: source.id,
+        severity: "warning",
+        title: `${sourceName} field “${label}” came from a blank header`,
+        detail: "Check that the header row is correct, then rename the field if this column is still valid.",
+      });
+    }
+
+    const expectedType = likelyFieldType(`${label} ${header}`);
+    if (expectedType !== "text" && field.field_type !== expectedType) {
+      warnings.push({
+        id: `source-${source.id}-field-${field.id}-type-review`,
+        sourceId: source.id,
+        severity: "warning",
+        title: `${sourceName} field “${label}” type should be reviewed`,
+        detail: `This field name looks like ${expectedType}, but it is mapped as ${field.field_type}. Update the type if numeric, currency, or date validation is expected.`,
+      });
+    }
+  }
+}
+
 function addSelectedRowContentWarnings(source: ComparisonDataSource, preview: DataSourcePreview | undefined, warnings: PreflightItem[]) {
   if (!preview || !source.selected_row_numbers.length) return;
 
@@ -330,6 +440,7 @@ export function buildPreflightReview({ projectName, preset, fileCount, dataSourc
       });
     }
 
+    addFieldSetupWarnings(source, preview, warnings);
     addSelectedRowContentWarnings(source, preview, warnings);
   }
 
