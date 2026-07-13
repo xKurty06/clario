@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, FileSpreadsheet, LoaderCircle, Play, RefreshCw, Rows3, ShieldCheck } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, FileSpreadsheet, LoaderCircle, Play, RefreshCw, Rows3 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SelectField } from "../components/forms/SelectField";
 import { PageHeader } from "../components/layout/PageHeader";
@@ -26,8 +26,27 @@ function sourceFile(source: ComparisonDataSource, files: UploadedFile[]) {
   return files.find((file) => file.id === source.file_id) ?? files[0] ?? null;
 }
 
+function sourceSheet(source: ComparisonDataSource, files: UploadedFile[]) {
+  return sourceFile(source, files)?.sheets.find((sheet) => sheet.name === source.sheet_name) ?? null;
+}
+
 function clampRow(value: number) {
   return Math.max(1, Number.isFinite(value) ? Math.trunc(value) : 1);
+}
+
+function rowBoundaryError(source: ComparisonDataSource, files: UploadedFile[], preview?: DataSourcePreview) {
+  const sheet = sourceSheet(source, files);
+  const rowCount = sheet?.row_count || preview?.total_rows || (preview?.rows.length ? Math.max(...preview.rows.map((row) => row.row_number)) : undefined);
+  if (source.header_row < 1) return "Header row must be 1 or higher.";
+  if (source.first_data_row <= source.header_row) return "First data row must be below the header row.";
+  if (!rowCount) return "";
+  if (source.header_row > rowCount) {
+    return `Header row ${source.header_row} is outside this worksheet. Choose a row between 1 and ${rowCount}.`;
+  }
+  if (source.first_data_row > rowCount) {
+    return `First data row ${source.first_data_row} is outside this worksheet. Choose a row between ${source.header_row + 1} and ${rowCount}.`;
+  }
+  return "";
 }
 
 function setupBoundaryRows(headerRow: number, firstDataRow: number) {
@@ -215,6 +234,12 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
 
   const loadPreview = useCallback(async (source: ComparisonDataSource, showReloadVisual = false) => {
     if (!source.file_id || !source.sheet_name) return;
+    const boundaryError = rowBoundaryError(source, files, sourcePreviews[source.id]);
+    if (boundaryError) {
+      setReloadVisualState(source.id, undefined);
+      setErrors((current) => ({ ...current, [source.id]: boundaryError }));
+      return;
+    }
     setBusySourceId(source.id);
     if (showReloadVisual) setReloadVisualState(source.id, "loading");
     setErrors((current) => ({ ...current, [source.id]: "" }));
@@ -248,7 +273,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
     } finally {
       setBusySourceId(null);
     }
-  }, [setReloadVisualState, setSourcePreview, updateDataSource]);
+  }, [files, setReloadVisualState, setSourcePreview, sourcePreviews, updateDataSource]);
 
   useEffect(() => {
     dataSources.forEach((source) => {
@@ -428,11 +453,19 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
 
   const confirmSource = (source: ComparisonDataSource) => {
     if (!sourcePreviews[source.id]) return;
+    if (rowBoundaryError(source, files, sourcePreviews[source.id])) return;
     updateDataSource(source.id, { ...source, row_setup_confirmed: true });
   };
 
   const confirmAllPreviewed = () => {
-    setDataSources(dataSources.map((source) => ({ ...source, row_setup_confirmed: Boolean(sourcePreviews[source.id]) })));
+    setDataSources(dataSources.map((source) => {
+      const preview = sourcePreviews[source.id];
+      const hasCurrentPreview = Boolean(preview && sourceSignature(preview.data_source) === sourceSignature(source));
+      return {
+        ...source,
+        row_setup_confirmed: hasCurrentPreview && !rowBoundaryError(source, files, preview),
+      };
+    }));
   };
 
   return (
@@ -442,7 +475,10 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
         title="Confirm row setup"
         description="Check the detected header row and first data row inside Clario before building rows, fields, and rules."
         action={
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+              {confirmedCount} of {dataSources.length} confirmed
+            </span>
             <button type="button" disabled={!hasPreviewedSource} onClick={confirmAllPreviewed} className={secondaryButtonClass}>
               <CheckCircle2 className="size-4" /> Confirm all previewed
             </button>
@@ -454,28 +490,10 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
       />
 
       <div className="space-y-6 pt-6">
-        <section className="rounded-3xl border border-emerald-100 bg-[linear-gradient(135deg,_rgba(16,185,129,0.12),_rgba(255,255,255,0.96))] p-5 shadow-sm" data-fade-section>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-emerald-700 text-white shadow-sm">
-                <ShieldCheck className="size-5" />
-              </span>
-              <div>
-                <h2 className="text-base font-semibold text-slate-950">Visual row setup review</h2>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-                  The preview below shows the spreadsheet in a file-explorer style list. Select a row, then set it as the header or first data row without opening Excel.
-                </p>
-              </div>
-            </div>
-            <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm">
-              {confirmedCount} of {dataSources.length} confirmed
-            </span>
-          </div>
-        </section>
-
         <div className="space-y-5">
           {dataSources.map((source, index) => {
             const file = sourceFile(source, files);
+            const sheet = sourceSheet(source, files);
             const preview = sourcePreviews[source.id];
             const status = confirmedStatus(source, preview);
             const StatusIcon = status.icon;
@@ -489,6 +507,10 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
             const selectedRow = selectedRowNumberValue ? preview?.rows.find((row) => row.row_number === selectedRowNumberValue) : undefined;
             const reloadState = reloadVisualStates[source.id];
             const rowInputDraft = rowInputDrafts[source.id] ?? {};
+            const boundaryError = rowBoundaryError(source, files, preview);
+            const sourceError = boundaryError || errors[source.id];
+            const rowInputInvalidClass = boundaryError ? "border-red-300 focus:border-red-500 focus:ring-red-100" : "border-slate-300 focus:border-emerald-600 focus:ring-emerald-100";
+            const maxRowNumber = sheet?.row_count || preview?.total_rows;
 
             return (
               <section key={source.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" data-fade-section>
@@ -511,9 +533,6 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                           </span>
                         </div>
                         <p className="mt-1 text-sm leading-6 text-slate-500">{status.detail}</p>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">
-                          Header row {source.header_row} · First data row {source.first_data_row} · {source.sheet_name || "No sheet selected"}
-                        </p>
                       </div>
                     </button>
                     <div className="flex shrink-0 items-center gap-2">
@@ -534,20 +553,28 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                   <div className="overflow-hidden">
                     <div className="grid gap-5 p-5 xl:grid-cols-[340px_minmax(0,1fr)]">
                       <div className="space-y-4">
-                        <SelectField
-                          ariaLabel={`${source.name} file`}
-                          helpText="Choose which uploaded workbook this source should use."
-                          value={source.file_id}
-                          options={fileOptions}
-                          onChange={(value) => changeFile(source, value)}
-                        />
-                        <SelectField
-                          ariaLabel={`${source.name} sheet`}
-                          helpText="Choose the worksheet to inspect for this source."
-                          value={source.sheet_name}
-                          options={sheetOptions}
-                          onChange={(value) => changeSheet(source, value)}
-                        />
+                        <label className="block">
+                          <span className="text-xs font-semibold text-slate-600">Workbook file</span>
+                          <SelectField
+                            ariaLabel={`${source.name} file`}
+                            className="mt-1"
+                            helpText="Choose which uploaded workbook this source should use."
+                            value={source.file_id}
+                            options={fileOptions}
+                            onChange={(value) => changeFile(source, value)}
+                          />
+                        </label>
+                        <label className="block">
+                          <span className="text-xs font-semibold text-slate-600">Worksheet tab</span>
+                          <SelectField
+                            ariaLabel={`${source.name} sheet`}
+                            className="mt-1"
+                            helpText="Choose the worksheet to inspect for this source."
+                            value={source.sheet_name}
+                            options={sheetOptions}
+                            onChange={(value) => changeSheet(source, value)}
+                          />
+                        </label>
 
                         <div className="grid grid-cols-2 gap-3">
                           <label className="block">
@@ -555,13 +582,14 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                             <input
                               type="number"
                               min={1}
+                              max={maxRowNumber}
                               value={rowInputDraft.headerRow ?? String(source.header_row)}
                               onChange={(event) => updateRowInputDraft(source, "headerRow", event.target.value)}
                               onBlur={() => commitRowInputDraft(source, "headerRow")}
                               onKeyDown={(event) => {
                                 if (event.key === "Enter") event.currentTarget.blur();
                               }}
-                              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100"
+                              className={`mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold outline-none transition focus:ring-3 ${rowInputInvalidClass}`}
                             />
                           </label>
                           <label className="block">
@@ -569,13 +597,14 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                             <input
                               type="number"
                               min={source.header_row + 1}
+                              max={maxRowNumber}
                               value={rowInputDraft.firstDataRow ?? String(source.first_data_row)}
                               onChange={(event) => updateRowInputDraft(source, "firstDataRow", event.target.value)}
                               onBlur={() => commitRowInputDraft(source, "firstDataRow")}
                               onKeyDown={(event) => {
                                 if (event.key === "Enter") event.currentTarget.blur();
                               }}
-                              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm font-semibold outline-none transition focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100"
+                              className={`mt-1 w-full rounded-xl border px-3 py-2.5 text-sm font-semibold outline-none transition focus:ring-3 ${rowInputInvalidClass}`}
                             />
                           </label>
                         </div>
@@ -584,17 +613,17 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                           Header row should contain column names. First data row should be the first real item row, not a title, lot header, blank row, or total row.
                         </div>
 
-                        {errors[source.id] ? <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errors[source.id]}</p> : null}
+                        {sourceError ? <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{sourceError}</p> : null}
 
                         <div className="flex flex-wrap gap-2">
-                          <button type="button" onClick={() => loadPreview(source, true)} disabled={busySourceId === source.id} className={secondaryButtonClass}>
+                          <button type="button" onClick={() => loadPreview(source, true)} disabled={busySourceId === source.id || Boolean(boundaryError)} className={secondaryButtonClass}>
                             {busySourceId === source.id ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
                             {busySourceId === source.id ? "Reloading..." : preview ? "Refresh preview" : "Load preview"}
                           </button>
                           <button
                             type="button"
                             onClick={() => confirmSource(source)}
-                            disabled={source.row_setup_confirmed || !preview || stalePreview}
+                            disabled={source.row_setup_confirmed || !preview || stalePreview || Boolean(boundaryError)}
                             className={source.row_setup_confirmed ? "inline-flex cursor-default items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700" : primaryButtonClass}
                           >
                             <CheckCircle2 className="size-4" /> {source.row_setup_confirmed ? "Confirmed" : "Confirm setup"}
