@@ -1,4 +1,4 @@
-import type { ComparisonDataSource, ComparisonRule, DataSourcePreview, PresetType } from "../../types/validation.types";
+import type { ComparisonDataSource, ComparisonRule, DataSourcePreview, PresetType, PreviewRow } from "../../types/validation.types";
 
 export type PreflightSeverity = "blocker" | "warning" | "ready";
 
@@ -35,6 +35,22 @@ export interface BuildPreflightReviewInput {
   rules: ComparisonRule[];
   sourcePreviews?: Record<string, DataSourcePreview | undefined>;
 }
+
+const NON_DATA_PATTERNS = [
+  /\bgrand\s+total\b/i,
+  /\bsub\s*total\b/i,
+  /\btotal\b/i,
+  /\blot\b/i,
+  /\bpage\b/i,
+  /\bsignature\b/i,
+  /\bprepared\s+by\b/i,
+  /\bapproved\s+by\b/i,
+  /\bnoted\s+by\b/i,
+  /\bchecked\s+by\b/i,
+  /\bcertified\s+by\b/i,
+  /\bend\s+user\b/i,
+  /\bterms?\s+and\s+conditions?\b/i,
+];
 
 function ruleName(rule: ComparisonRule) {
   return rule.rule_name.trim() || "Unnamed rule";
@@ -104,6 +120,92 @@ function addRuleBlockers(rule: ComparisonRule, blockers: PreflightItem[]) {
       title: `${ruleName(rule)} needs a tolerance`,
       detail: "Enter a currency tolerance before running this rule.",
     });
+  }
+}
+
+function rawCellValue(value: string | number | boolean | null | undefined) {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+function rowText(row: PreviewRow) {
+  return Object.values(row.cells).map(rawCellValue).filter(Boolean).join(" ");
+}
+
+function meaningfulCellValues(row: PreviewRow) {
+  return Object.values(row.cells)
+    .map(rawCellValue)
+    .filter((value) => value.length > 0 && value !== "-" && value !== "—" && value.toLowerCase() !== "n/a");
+}
+
+function mappedValue(row: PreviewRow, preview: DataSourcePreview, columnLetter: string) {
+  const column = preview.columns.find((item) => item.letter.toUpperCase() === columnLetter.toUpperCase());
+  return rawCellValue(row.cells[column?.header_label ?? columnLetter] ?? row.cells[columnLetter] ?? null);
+}
+
+function selectedPreviewRows(source: ComparisonDataSource, preview: DataSourcePreview) {
+  const selected = new Set(source.selected_row_numbers);
+  return preview.rows.filter((row) => selected.has(row.row_number) && !row.ignored && !source.ignored_row_numbers.includes(row.row_number));
+}
+
+function selectedRequiredFields(source: ComparisonDataSource) {
+  const required = source.fields.filter((field) => field.required);
+  return required.length ? required : source.fields.slice(0, Math.min(2, source.fields.length));
+}
+
+function addSelectedRowContentWarnings(source: ComparisonDataSource, preview: DataSourcePreview | undefined, warnings: PreflightItem[]) {
+  if (!preview || !source.selected_row_numbers.length) return;
+
+  const sourceName = source.name.trim() || "Unnamed source";
+  const requiredFields = selectedRequiredFields(source);
+
+  for (const row of selectedPreviewRows(source, preview)) {
+    const values = meaningfulCellValues(row);
+    const text = rowText(row);
+    const matchedPattern = NON_DATA_PATTERNS.find((pattern) => pattern.test(text));
+    const mappedValues = source.fields.map((field) => mappedValue(row, preview, field.column_letter)).filter(Boolean);
+    const requiredValues = requiredFields.map((field) => mappedValue(row, preview, field.column_letter)).filter(Boolean);
+
+    if (!values.length || values.length <= 1) {
+      warnings.push({
+        id: `source-${source.id}-row-${row.row_number}-mostly-empty`,
+        sourceId: source.id,
+        severity: "warning",
+        title: `${sourceName} row ${row.row_number} looks mostly empty`,
+        detail: "This selected row has very little content. Check if it is a spacer, footer, or accidental selection before running validation.",
+      });
+      continue;
+    }
+
+    if (source.fields.length && !mappedValues.length) {
+      warnings.push({
+        id: `source-${source.id}-row-${row.row_number}-no-mapped-values`,
+        sourceId: source.id,
+        severity: "warning",
+        title: `${sourceName} row ${row.row_number} has no mapped field values`,
+        detail: "The row is selected, but none of the mapped columns contain values. It may not be a real data row.",
+      });
+    }
+
+    if (requiredFields.length && !requiredValues.length) {
+      warnings.push({
+        id: `source-${source.id}-row-${row.row_number}-required-blank`,
+        sourceId: source.id,
+        severity: "warning",
+        title: `${sourceName} row ${row.row_number} is missing required values`,
+        detail: "Required mapped fields are blank on this selected row. Review it if the row is not an actual item or record.",
+      });
+    }
+
+    if (matchedPattern) {
+      warnings.push({
+        id: `source-${source.id}-row-${row.row_number}-label-row`,
+        sourceId: source.id,
+        severity: "warning",
+        title: `${sourceName} row ${row.row_number} may be a non-data row`,
+        detail: "This selected row contains text like total, lot, signature, prepared by, or approved by. Remove it if it is a section, footer, or summary row.",
+      });
+    }
   }
 }
 
@@ -192,15 +294,7 @@ export function buildPreflightReview({ projectName, preset, fileCount, dataSourc
       });
     }
 
-    if (source.selected_row_numbers.some((row) => row <= source.header_row)) {
-      warnings.push({
-        id: `source-${source.id}-header-selected`,
-        sourceId: source.id,
-        severity: "warning",
-        title: `${sourceName} may include header/non-data rows`,
-        detail: "One or more selected rows are at or above the header row. Review row selection before running.",
-      });
-    }
+    addSelectedRowContentWarnings(source, preview, warnings);
   }
 
   if (!enabledRules.length) {
