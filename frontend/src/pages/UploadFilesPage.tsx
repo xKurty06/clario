@@ -8,6 +8,7 @@ import { checkBackendHealth } from "../services/apiClient";
 import { uploadFiles } from "../services/fileApi";
 import { listRecentSessions } from "../services/validationApi";
 import type { PresetSelection } from "../types/validation.types";
+import { presetSelectOptions } from "../utils/presetConfig";
 import { isSupportedFileName } from "../utils/validators";
 
 const DEFAULT_SESSION_NAME = "New session";
@@ -147,13 +148,7 @@ export function UploadFilesPage() {
                 setPreset(value as PresetSelection);
                 if (value) setPresetError("");
               }}
-              options={[
-                { value: "", label: "Choose a comparison preset", description: "Required before continuing." },
-                { value: "reference_vs_copied", label: "Reference vs Copied File", description: "Two sources with standard description and quantity checks." },
-                { value: "reference_bidder_abstract", label: "Reference + Bidder + Abstract", description: "Three sources with procurement-oriented formula checks." },
-                { value: "generic_two_file", label: "Generic Two-File Comparison", description: "Two flexible sources for arbitrary field-to-field checks." },
-                { value: "custom_comparison_builder", label: "Custom Comparison Builder", description: "Start empty and define your own sources, fields, and rules." },
-              ]}
+              options={presetSelectOptions}
             />
             {presetError && <p className="mt-2 text-xs font-medium text-red-700" role="alert">{presetError}</p>}
             <p className="mt-2 text-xs leading-5 text-slate-500">The preset only creates a starting structure. You can still customize sources, rows, fields, and rules later.</p>
