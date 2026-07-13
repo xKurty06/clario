@@ -1,3 +1,4 @@
+import { buildPreflightReview, preflightErrorMessage } from "../features/validation/preflightReview";
 import type { ComparisonDataSource, ComparisonRule, PresetType, ValidationResult } from "../types/validation.types";
 import { apiRequest } from "./apiClient";
 
@@ -8,16 +9,17 @@ export interface ValidationPayload {
   rules: ComparisonRule[];
 }
 
-function unconfirmedSourceNames(dataSources: ComparisonDataSource[]) {
-  return dataSources.filter((source) => !source.row_setup_confirmed).map((source) => source.name);
-}
-
 export const runValidation = (payload: ValidationPayload) => {
-  const unconfirmed = unconfirmedSourceNames(payload.data_sources);
-  if (unconfirmed.length) {
-    const names = unconfirmed.slice(0, 3).join(", ");
-    const suffix = unconfirmed.length > 3 ? ` and ${unconfirmed.length - 3} more` : "";
-    throw new Error(`Confirm the header row and first data row for ${names}${suffix} before running validation.`);
+  const review = buildPreflightReview({
+    projectName: payload.project_name,
+    preset: payload.preset,
+    fileCount: new Set(payload.data_sources.map((source) => source.file_id).filter(Boolean)).size,
+    dataSources: payload.data_sources,
+    rules: payload.rules,
+  });
+
+  if (!review.canRun) {
+    throw new Error(preflightErrorMessage(review));
   }
 
   return apiRequest<ValidationResult>("/validation/run", {
