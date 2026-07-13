@@ -74,7 +74,7 @@ function dismissPresetBanner() {
 export function PresetAwareComparisonBuilderPage() {
   const { files, preset, dataSources, setDataSources, removeSourcePreview } = useWorkflow();
   const [reviewRowSetup, setReviewRowSetup] = useState(false);
-  const [rowSetupContinued, setRowSetupContinued] = useState(false);
+  const [rowSetupContinued, setRowSetupContinued] = useState(() => dataSources.length > 0 && dataSources.every((source) => source.row_setup_confirmed));
   const [chooserOpen, setChooserOpen] = useState(false);
   const [presetRolesApplied, setPresetRolesApplied] = useState(false);
   const rowSetupComplete = dataSources.length > 0 && dataSources.every((source) => source.row_setup_confirmed);
