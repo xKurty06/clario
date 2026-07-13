@@ -6,33 +6,24 @@ import { ComparisonBuilderPage } from "./ComparisonBuilderPage";
 import { RowSetupPage } from "./RowSetupPage";
 import { useWorkflow } from "../features/files/WorkflowContext";
 import type { UploadedFile } from "../types/file.types";
-import type { ComparisonDataSource, PresetType } from "../types/validation.types";
-
-const presetRoleLabels: Record<PresetType, string[]> = {
-  reference_vs_copied: ["Reference", "Copied file"],
-  reference_bidder_abstract: ["Reference", "Bidder", "Abstract"],
-  generic_two_file: ["File A", "File B"],
-  custom_comparison_builder: [],
-};
+import type { ComparisonDataSource } from "../types/validation.types";
+import { rolesForPreset } from "../utils/presetConfig";
 
 const primaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300";
 const secondaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50";
-
-function isConfigurablePreset(value: string): value is PresetType {
-  return value === "reference_vs_copied" || value === "reference_bidder_abstract" || value === "generic_two_file";
-}
 
 function makeId(prefix: string) {
   return `${prefix}-${crypto.randomUUID()}`;
 }
 
 function sourceCount(files: UploadedFile[], preset: string) {
-  if (isConfigurablePreset(preset)) return presetRoleLabels[preset].length;
+  const roles = rolesForPreset(preset);
+  if (roles.length) return roles.length;
   return Math.max(1, Math.min(3, files.length));
 }
 
 function sourceRoleName(preset: string, index: number) {
-  return isConfigurablePreset(preset) ? presetRoleLabels[preset][index] : undefined;
+  return rolesForPreset(preset)[index];
 }
 
 function createDataSource(file: UploadedFile, index: number, preset: string): ComparisonDataSource {
@@ -90,7 +81,7 @@ export function PresetAwareComparisonBuilderPage() {
   const [chooserOpen, setChooserOpen] = useState(false);
   const [presetRolesApplied, setPresetRolesApplied] = useState(false);
   const rowSetupComplete = dataSources.length > 0 && dataSources.every((source) => source.row_setup_confirmed);
-  const roles = useMemo(() => (isConfigurablePreset(preset) ? presetRoleLabels[preset] : []), [preset]);
+  const roles = useMemo(() => rolesForPreset(preset), [preset]);
   const roleSourcesApplied = useMemo(() => sourcesMatchPresetRoles(dataSources, roles), [dataSources, roles]);
   const presetSetupApplied = presetRolesApplied || roleSourcesApplied;
 
