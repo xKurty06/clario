@@ -52,7 +52,7 @@ export function ColumnPicker({ columns, value, onChange }: ColumnPickerProps) {
   const samples = useMemo(() => sampleValuesForColumn(preview, selectedColumn), [preview, selectedColumn]);
 
   return (
-    <div>
+    <div className="[&+p]:hidden">
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
