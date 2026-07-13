@@ -19,7 +19,7 @@ interface SetupConfidence {
   label: string;
   score: number;
   tone: SetupConfidenceTone;
-  badgeClassName: string;
+  labelClassName: string;
   barClassName: string;
   detail: string;
   checks: string[];
@@ -174,9 +174,9 @@ function rowCellClass(selected: boolean) {
 }
 
 function confidenceStyle(tone: SetupConfidenceTone) {
-  if (tone === "high") return { badgeClassName: "border-emerald-200 bg-emerald-50 text-emerald-700", barClassName: "bg-emerald-500" };
-  if (tone === "medium") return { badgeClassName: "border-amber-200 bg-amber-50 text-amber-700", barClassName: "bg-amber-500" };
-  return { badgeClassName: "border-slate-200 bg-slate-100 text-slate-600", barClassName: "bg-slate-400" };
+  if (tone === "high") return { labelClassName: "text-emerald-700", barClassName: "bg-emerald-500" };
+  if (tone === "medium") return { labelClassName: "text-amber-700", barClassName: "bg-amber-500" };
+  return { labelClassName: "text-slate-600", barClassName: "bg-slate-400" };
 }
 
 function setupConfidence(source: ComparisonDataSource, files: UploadedFile[], preview: DataSourcePreview | undefined, stalePreview: boolean, boundaryError: string): SetupConfidence {
@@ -633,6 +633,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
             const maxRowNumber = sheet?.row_count || preview?.total_rows;
             const confidence = setupConfidence(source, files, preview, stalePreview, boundaryError);
             const confidenceExpanded = expandedConfidenceSourceIds.has(source.id);
+            const confidenceDetailsId = `confidence-details-${source.id}`;
 
             return (
               <section key={source.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" data-fade-section>
@@ -653,7 +654,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                           <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${status.className}`}>
                             <StatusIcon className="size-3.5" /> {status.label}
                           </span>
-                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${confidence.badgeClassName}`}>
+                          <span className={`text-xs font-semibold ${confidence.labelClassName}`}>
                             {confidence.label}
                           </span>
                         </div>
@@ -736,7 +737,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
 
                         <div className="rounded-2xl border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-sm">
                           <div className="flex items-center justify-between gap-2">
-                            <span className={`inline-flex rounded-full border px-2.5 py-1 font-semibold ${confidence.badgeClassName}`}>{confidence.label}</span>
+                            <span className={`font-semibold ${confidence.labelClassName}`}>{confidence.label}</span>
                             <span className="font-semibold text-slate-700">{confidence.score}%</span>
                           </div>
                           <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-100">
@@ -746,15 +747,23 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                           <button
                             type="button"
                             onClick={() => toggleConfidenceDetails(source.id)}
+                            aria-expanded={confidenceExpanded}
+                            aria-controls={confidenceDetailsId}
                             className="mt-1 text-[11px] font-semibold text-emerald-700 transition hover:text-emerald-800"
                           >
                             {confidenceExpanded ? "Hide details" : "View details"}
                           </button>
-                          {confidenceExpanded ? (
-                            <ul className="mt-2 space-y-1 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
-                              {confidence.checks.map((check) => <li key={check}>• {check}</li>)}
-                            </ul>
-                          ) : null}
+                          <div
+                            id={confidenceDetailsId}
+                            aria-hidden={!confidenceExpanded}
+                            className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${confidenceExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+                          >
+                            <div className="overflow-hidden">
+                              <ul className="mt-2 space-y-1 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
+                                {confidence.checks.map((check) => <li key={check}>• {check}</li>)}
+                              </ul>
+                            </div>
+                          </div>
                         </div>
 
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
