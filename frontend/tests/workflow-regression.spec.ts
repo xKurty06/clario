@@ -164,7 +164,7 @@ test("main comparison workflow stays usable", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Go to step 1: Sources" })).toBeVisible();
   await page.getByRole("button", { name: "Go to step 3: Fields" }).click();
 
-  await expect(page.getByRole("heading", { name: "Fields" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add suggested fields" })).toHaveCount(2);
   for (let index = 0; index < uploadedFiles.length; index += 1) {
     await page.getByRole("button", { name: "Add suggested fields" }).nth(index).click();
     await expect(page.getByRole("dialog", { name: "Choose fields to add" })).toBeVisible();
