@@ -36,21 +36,9 @@ export interface BuildPreflightReviewInput {
   sourcePreviews?: Record<string, DataSourcePreview | undefined>;
 }
 
-const NON_DATA_PATTERNS = [
-  /\bgrand\s+total\b/i,
-  /\bsub\s*total\b/i,
-  /\btotal\b/i,
-  /\blot\b/i,
-  /\bpage\b/i,
-  /\bsignature\b/i,
-  /\bprepared\s+by\b/i,
-  /\bapproved\s+by\b/i,
-  /\bnoted\s+by\b/i,
-  /\bchecked\s+by\b/i,
-  /\bcertified\s+by\b/i,
-  /\bend\s+user\b/i,
-  /\bterms?\s+and\s+conditions?\b/i,
-];
+const summaryTerms = ["grand total", "subtotal", "total"];
+const sectionTerms = ["lot", "section", "category"];
+const footerTerms = ["signature", "prepared by", "approved by", "certified by", "noted by", "checked by"];
 
 function ruleName(rule: ComparisonRule) {
   return rule.rule_name.trim() || "Unnamed rule";
@@ -128,14 +116,75 @@ function rawCellValue(value: string | number | boolean | null | undefined) {
   return String(value).trim();
 }
 
-function rowText(row: PreviewRow) {
-  return Object.values(row.cells).map(rawCellValue).filter(Boolean).join(" ");
+function normalizeText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function containsTerm(text: string, term: string) {
+  return new RegExp(`(^|\\s)${term.replace(/\s+/g, "\\s+")}(\\s|$)`, "i").test(text);
 }
 
 function meaningfulCellValues(row: PreviewRow) {
   return Object.values(row.cells)
     .map(rawCellValue)
     .filter((value) => value.length > 0 && value !== "-" && value !== "—" && value.toLowerCase() !== "n/a");
+}
+
+function rowText(row: PreviewRow) {
+  return meaningfulCellValues(row).join(" ");
+}
+
+function leadingText(row: PreviewRow) {
+  return meaningfulCellValues(row).slice(0, 4).join(" ");
+}
+
+function looksLikeRepeatedLabelRow(values: string[]) {
+  if (values.length < 4) return false;
+  const counts = new Map<string, number>();
+  for (const value of values.map(normalizeText).filter(Boolean)) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  const highestCount = Math.max(0, ...counts.values());
+  return highestCount / values.length >= 0.6;
+}
+
+function looksLikeHeaderRow(row: PreviewRow, preview: DataSourcePreview) {
+  const values = meaningfulCellValues(row);
+  if (preview.columns.length < 2 || values.length < 2) return false;
+  const normalizedHeaders = new Set(preview.columns.map((column) => normalizeText(column.header_label)).filter(Boolean));
+  const exactHeaderHits = values.map(normalizeText).filter((value) => normalizedHeaders.has(value)).length;
+  return exactHeaderHits >= Math.min(2, normalizedHeaders.size);
+}
+
+function looksLikeSummaryOrSectionRow(row: PreviewRow, term: string) {
+  const values = meaningfulCellValues(row);
+  const allText = normalizeText(rowText(row));
+  const leadText = normalizeText(leadingText(row));
+  if (!containsTerm(allText, term)) return false;
+  return containsTerm(leadText, term) || values.length <= 3 || looksLikeRepeatedLabelRow(values);
+}
+
+function selectedRowIssue(row: PreviewRow, preview: DataSourcePreview) {
+  const values = meaningfulCellValues(row);
+  const allText = normalizeText(rowText(row));
+  const leadText = normalizeText(leadingText(row));
+  const nonEmptyRatio = values.length / Math.max(1, Object.keys(row.cells).length);
+
+  if (!values.length) return "blank selected row";
+  if (values.length <= 1 || nonEmptyRatio < 0.2) return "mostly empty selected row";
+  if (looksLikeHeaderRow(row, preview)) return "looks like a header row";
+  if (looksLikeRepeatedLabelRow(values)) return "repeated label row";
+
+  const footerTerm = footerTerms.find((term) => containsTerm(allText, term));
+  if (footerTerm) return `contains “${footerTerm}”`;
+
+  const summaryTerm = summaryTerms.find((term) => looksLikeSummaryOrSectionRow(row, term));
+  if (summaryTerm) return `summary row: “${summaryTerm}”`;
+
+  const sectionTerm = sectionTerms.find((term) => containsTerm(leadText, term) && values.length <= 4);
+  if (sectionTerm) return `section row: “${sectionTerm}”`;
+
+  return null;
 }
 
 function mappedValue(row: PreviewRow, preview: DataSourcePreview, columnLetter: string) {
@@ -160,21 +209,18 @@ function addSelectedRowContentWarnings(source: ComparisonDataSource, preview: Da
   const requiredFields = selectedRequiredFields(source);
 
   for (const row of selectedPreviewRows(source, preview)) {
-    const values = meaningfulCellValues(row);
-    const text = rowText(row);
-    const matchedPattern = NON_DATA_PATTERNS.find((pattern) => pattern.test(text));
+    const issue = selectedRowIssue(row, preview);
     const mappedValues = source.fields.map((field) => mappedValue(row, preview, field.column_letter)).filter(Boolean);
     const requiredValues = requiredFields.map((field) => mappedValue(row, preview, field.column_letter)).filter(Boolean);
 
-    if (!values.length || values.length <= 1) {
+    if (issue) {
       warnings.push({
-        id: `source-${source.id}-row-${row.row_number}-mostly-empty`,
+        id: `source-${source.id}-row-${row.row_number}-review`,
         sourceId: source.id,
         severity: "warning",
-        title: `${sourceName} row ${row.row_number} looks mostly empty`,
-        detail: "This selected row has very little content. Check if it is a spacer, footer, or accidental selection before running validation.",
+        title: `${sourceName} row ${row.row_number} should be reviewed`,
+        detail: `This selected row is flagged as ${issue}. Remove it only if it is a section, footer, spacer, or summary row.`,
       });
-      continue;
     }
 
     if (source.fields.length && !mappedValues.length) {
@@ -194,16 +240,6 @@ function addSelectedRowContentWarnings(source: ComparisonDataSource, preview: Da
         severity: "warning",
         title: `${sourceName} row ${row.row_number} is missing required values`,
         detail: "Required mapped fields are blank on this selected row. Review it if the row is not an actual item or record.",
-      });
-    }
-
-    if (matchedPattern) {
-      warnings.push({
-        id: `source-${source.id}-row-${row.row_number}-label-row`,
-        sourceId: source.id,
-        severity: "warning",
-        title: `${sourceName} row ${row.row_number} may be a non-data row`,
-        detail: "This selected row contains text like total, lot, signature, prepared by, or approved by. Remove it if it is a section, footer, or summary row.",
       });
     }
   }
