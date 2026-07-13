@@ -13,6 +13,17 @@ interface RowSetupPageProps {
 
 type ReloadVisualState = "loading" | "reloaded";
 type RowInputDrafts = Record<string, { headerRow?: string; firstDataRow?: string }>;
+type SetupConfidenceTone = "high" | "medium" | "low";
+
+interface SetupConfidence {
+  label: string;
+  score: number;
+  tone: SetupConfidenceTone;
+  className: string;
+  barClassName: string;
+  detail: string;
+  checks: string[];
+}
 
 const primaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:active:scale-100";
 const secondaryButtonClass = "inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100";
@@ -79,13 +90,20 @@ function escapeRegex(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function meaningfulValues(row?: PreviewRow) {
+  if (!row) return [];
+  return Object.values(row.cells)
+    .map(normalizePreviewText)
+    .filter((value) => value && value !== "-" && value !== "—" && value !== "n/a");
+}
+
 function isRepeatedSectionRow(row: PreviewRow) {
-  const values = Object.values(row.cells).map(normalizePreviewText).filter(Boolean);
+  const values = meaningfulValues(row);
   return values.length >= 3 && new Set(values).size === 1;
 }
 
 function isHeaderLikeRow(row: PreviewRow, headers: string[]) {
-  const values = Object.values(row.cells).map(normalizePreviewText).filter(Boolean);
+  const values = meaningfulValues(row);
   if (!values.length) return false;
   const normalizedHeaders = headers.map(normalizePreviewText).filter(Boolean);
   const exactHits = values.filter((value) => normalizedHeaders.includes(value)).length;
@@ -103,7 +121,7 @@ function sanitizeAutoDetectedPreview(preview: DataSourcePreview): DataSourcePrev
     .filter((row) => {
       if (row.row_number < source.first_data_row || ignoredRows.has(row.row_number)) return false;
       if (isRepeatedSectionRow(row)) return false;
-      const hasValue = Object.values(row.cells).some((value) => normalizePreviewText(value));
+      const hasValue = meaningfulValues(row).length > 0;
       return hasValue && !isHeaderLikeRow(row, headers);
     })
     .map((row) => row.row_number);
@@ -166,6 +184,107 @@ function rowAccentClass(row: PreviewRow, source: ComparisonDataSource, selected:
 
 function rowCellClass(selected: boolean) {
   return selected ? "border-y !border-blue-300 !bg-blue-50" : "border-b border-slate-100";
+}
+
+function confidenceStyle(tone: SetupConfidenceTone) {
+  if (tone === "high") return { className: "border-emerald-200 bg-emerald-50 text-emerald-800", barClassName: "bg-emerald-500" };
+  if (tone === "medium") return { className: "border-amber-200 bg-amber-50 text-amber-800", barClassName: "bg-amber-500" };
+  return { className: "border-slate-200 bg-slate-50 text-slate-700", barClassName: "bg-slate-400" };
+}
+
+function setupConfidence(source: ComparisonDataSource, files: UploadedFile[], preview: DataSourcePreview | undefined, stalePreview: boolean, boundaryError: string): SetupConfidence {
+  if (boundaryError) {
+    return {
+      label: "Low confidence",
+      score: 15,
+      tone: "low",
+      ...confidenceStyle("low"),
+      detail: "The row numbers are outside the valid setup range.",
+      checks: ["Fix the header row and first data row numbers first."],
+    };
+  }
+
+  if (!preview) {
+    return {
+      label: "Not checked",
+      score: 0,
+      tone: "low",
+      ...confidenceStyle("low"),
+      detail: "Load the preview so Clario can inspect the detected rows.",
+      checks: ["Preview not loaded yet."],
+    };
+  }
+
+  if (stalePreview) {
+    return {
+      label: "Needs refresh",
+      score: 25,
+      tone: "low",
+      ...confidenceStyle("low"),
+      detail: "The preview does not match the current row setup.",
+      checks: ["Refresh the preview before confirming this source."],
+    };
+  }
+
+  const sheet = sourceSheet(source, files);
+  const headers = preview.columns.map((column) => column.header_label);
+  const headerRow = preview.rows.find((row) => row.row_number === source.header_row);
+  const firstDataRow = preview.rows.find((row) => row.row_number === source.first_data_row);
+  const headerValues = meaningfulValues(headerRow);
+  const dataValues = meaningfulValues(firstDataRow);
+  const selectedRows = preview.rows.filter((row) => row.selected && !row.ignored).length;
+  const checks: string[] = [];
+  let score = 40;
+
+  if (headerRow && headerValues.length >= Math.min(2, Math.max(1, preview.columns.length))) {
+    score += 20;
+    checks.push(`Header row ${source.header_row} has column labels.`);
+  } else {
+    checks.push(`Header row ${source.header_row} may be blank or incomplete.`);
+  }
+
+  if (firstDataRow && dataValues.length >= 2 && !isHeaderLikeRow(firstDataRow, headers) && !isRepeatedSectionRow(firstDataRow)) {
+    score += 25;
+    checks.push(`First data row ${source.first_data_row} looks like a real item row.`);
+  } else {
+    checks.push(`First data row ${source.first_data_row} should be reviewed.`);
+  }
+
+  if (source.first_data_row === source.header_row + 1) {
+    score += 5;
+    checks.push("Header and first data row are directly connected.");
+  } else {
+    checks.push("Rows between header and first data are excluded from validation.");
+  }
+
+  if (selectedRows > 0) {
+    score += 10;
+    checks.push(`${selectedRows} data row${selectedRows === 1 ? "" : "s"} detected for validation.`);
+  } else {
+    checks.push("No data rows were detected yet.");
+  }
+
+  if (sheet?.detected_header_row === source.header_row) {
+    score += 5;
+  }
+
+  const finalScore = Math.min(100, score);
+  const tone: SetupConfidenceTone = finalScore >= 80 ? "high" : finalScore >= 55 ? "medium" : "low";
+  const label = tone === "high" ? "High confidence" : tone === "medium" ? "Medium confidence" : "Low confidence";
+  const detail = tone === "high"
+    ? "The detected header and first data row look consistent. Still review visually before confirming."
+    : tone === "medium"
+      ? "Most setup signals look usable, but review the highlighted rows before confirming."
+      : "Review the highlighted rows carefully before confirming this setup.";
+
+  return {
+    label,
+    score: finalScore,
+    tone,
+    ...confidenceStyle(tone),
+    detail,
+    checks: checks.slice(0, 4),
+  };
 }
 
 function confirmedStatus(source: ComparisonDataSource, preview?: DataSourcePreview) {
@@ -514,6 +633,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
             const sourceError = boundaryError || errors[source.id];
             const rowInputInvalidClass = boundaryError ? "border-red-300 focus:border-red-500 focus:ring-red-100" : "border-slate-300 focus:border-emerald-600 focus:ring-emerald-100";
             const maxRowNumber = sheet?.row_count || preview?.total_rows;
+            const confidence = setupConfidence(source, files, preview, stalePreview, boundaryError);
 
             return (
               <section key={source.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" data-fade-section>
@@ -533,6 +653,9 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                           <h2 className="text-base font-semibold text-slate-950">{source.name}</h2>
                           <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${status.className}`}>
                             <StatusIcon className="size-3.5" /> {status.label}
+                          </span>
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${confidence.className}`}>
+                            {confidence.label}
                           </span>
                         </div>
                         <p className="mt-1 text-sm leading-6 text-slate-500">{status.detail}</p>
@@ -612,6 +735,20 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                           </label>
                         </div>
 
+                        <div className={`rounded-2xl border p-3 text-xs leading-5 ${confidence.className}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold">Setup confidence</span>
+                            <span className="font-semibold">{confidence.score}%</span>
+                          </div>
+                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/80">
+                            <div className={`h-full rounded-full transition-all ${confidence.barClassName}`} style={{ width: `${confidence.score}%` }} />
+                          </div>
+                          <p className="mt-2">{confidence.detail}</p>
+                          <ul className="mt-2 space-y-1 text-[11px]">
+                            {confidence.checks.map((check) => <li key={check}>• {check}</li>)}
+                          </ul>
+                        </div>
+
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
                           Header row should contain column names. First data row should be the first real item row, not a title, lot header, blank row, or total row.
                         </div>
@@ -676,32 +813,32 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                             <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                               <div className={`max-h-[34rem] overflow-auto transition duration-300 ${reloadState === "loading" ? "scale-[0.998] opacity-65 blur-[0.7px] saturate-[0.96]" : reloadState === "reloaded" ? "shadow-[inset_0_0_0_1px_rgba(16,185,129,0.28),0_16px_40px_rgba(16,185,129,0.08)]" : ""}`}>
                                 <table className="min-w-full border-separate border-spacing-0 text-left text-xs">
-                                <tbody>
-                                  {preview.rows.map((row) => {
-                                    const selected = selectedRowNumberValue === row.row_number;
-                                    const cellClass = rowCellClass(selected);
-                                    return (
-                                      <tr
-                                        key={row.row_number}
-                                        aria-selected={selected}
-                                        onClick={() => selectPreviewRow(source.id, row.row_number)}
-                                        className={`cursor-pointer align-top transition hover:bg-blue-50/70 ${rowTone(row, source, selected)}`}
-                                      >
-                                        <td className={`w-40 min-w-40 border-l-4 px-3 py-2.5 ${cellClass} ${rowAccentClass(row, source, selected)}`}>
-                                          <div className="flex flex-wrap items-center gap-2">
-                                            <span className="font-semibold text-slate-950">Row {row.row_number}</span>
-                                            {rowBadge(row, source)}
-                                          </div>
-                                        </td>
-                                        {columns.map((column) => (
-                                          <td key={`${row.row_number}-${column.letter}`} className={`min-w-52 px-3 py-2.5 text-slate-700 ${cellClass}`}>
-                                            <span className="block whitespace-normal leading-5">{displayCell(row.cells[column.header_label])}</span>
+                                  <tbody>
+                                    {preview.rows.map((row) => {
+                                      const selected = selectedRowNumberValue === row.row_number;
+                                      const cellClass = rowCellClass(selected);
+                                      return (
+                                        <tr
+                                          key={row.row_number}
+                                          aria-selected={selected}
+                                          onClick={() => selectPreviewRow(source.id, row.row_number)}
+                                          className={`cursor-pointer align-top transition hover:bg-blue-50/70 ${rowTone(row, source, selected)}`}
+                                        >
+                                          <td className={`w-40 min-w-40 border-l-4 px-3 py-2.5 ${cellClass} ${rowAccentClass(row, source, selected)}`}>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <span className="font-semibold text-slate-950">Row {row.row_number}</span>
+                                              {rowBadge(row, source)}
+                                            </div>
                                           </td>
-                                        ))}
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
+                                          {columns.map((column) => (
+                                            <td key={`${row.row_number}-${column.letter}`} className={`min-w-52 px-3 py-2.5 text-slate-700 ${cellClass}`}>
+                                              <span className="block whitespace-normal leading-5">{displayCell(row.cells[column.header_label])}</span>
+                                            </td>
+                                          ))}
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
                                 </table>
                               </div>
                               {reloadState ? (
