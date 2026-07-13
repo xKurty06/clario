@@ -122,53 +122,6 @@ main :where(.whitespace-nowrap) {
   white-space: normal;
 }
 
-main :where(section:has(button[title="Build a starter set of comparison rules from the mapped source fields"]) > .mt-5.space-y-3 article) {
-  background: #ffffff;
-}
-
-main :where(section:has(button[title="Build a starter set of comparison rules from the mapped source fields"]) > .mt-5.space-y-3 article > div > div:first-child) {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-main :where(section:has(button[title="Build a starter set of comparison rules from the mapped source fields"]) > .mt-5.space-y-3 article h3) {
-  font-size: 0.95rem;
-}
-
-main :where(section:has(button[title="Build a starter set of comparison rules from the mapped source fields"]) > .mt-5.space-y-3 article p.mt-1.truncate.text-xs.text-slate-500) {
-  order: 1;
-  margin-top: 0;
-  color: #475569;
-  font-size: 0.8rem;
-  line-height: 1.4;
-}
-
-main :where(section:has(button[title="Build a starter set of comparison rules from the mapped source fields"]) > .mt-5.space-y-3 article p.mt-2.text-sm.text-slate-600) {
-  order: 2;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.5rem;
-  align-items: center;
-  margin-top: 0;
-  font-size: 0.78rem;
-  line-height: 1.35rem;
-  color: #64748b;
-}
-
-main :where(section:has(button[title="Build a starter set of comparison rules from the mapped source fields"]) > .mt-5.space-y-3 article p.mt-2.text-sm.text-slate-600)::after {
-  content: "View reason";
-  display: inline-flex;
-  border: 1px solid #dbeafe;
-  border-radius: 999px;
-  background: #eff6ff;
-  padding: 0.15rem 0.5rem;
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: #1d4ed8;
-}
-
 main :where(div:has(> h2.truncate + span.inline-flex)) {
   display: block;
 }
