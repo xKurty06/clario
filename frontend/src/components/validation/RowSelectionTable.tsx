@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, CheckSquare, ChevronDown, MoreHorizontal, RotateCcw, Square, Table2 } from "lucide-react";
+import { AlertTriangle, Ban, CheckSquare, ChevronDown, MoreHorizontal, RotateCcw, Square } from "lucide-react";
 import { useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import type { PreviewRow } from "../../types/validation.types";
 
@@ -22,32 +22,81 @@ const toolbarButtonClass = "inline-flex h-8 items-center gap-1 rounded-lg border
 const rangeInputClass = "h-6 w-14 rounded-md border border-slate-200 bg-white px-1.5 text-center text-xs font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 const menuItemClass = "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus:bg-slate-50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50";
 const menuSectionClass = "px-3 pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400";
-const nonDataTerms = ["grand total", "subtotal", "total", "signature", "prepared by", "approved by", "certified", "noted by", "lot", "section", "category"];
+const summaryTerms = ["grand total", "subtotal", "total"];
+const sectionTerms = ["lot", "section", "category"];
+const footerTerms = ["signature", "prepared by", "approved by", "certified by", "noted by", "checked by"];
 
 function rowValues(row: PreviewRow) {
   return Object.values(row.cells).map((value) => String(value ?? "").trim());
 }
 
-function rowText(row: PreviewRow) {
-  return rowValues(row).join(" ").trim();
+function meaningfulValues(row: PreviewRow) {
+  return rowValues(row).filter((value) => value.length > 0 && value !== "-" && value !== "—" && value.toLowerCase() !== "n/a");
 }
 
-function meaningfulValues(row: PreviewRow) {
-  return rowValues(row).filter(Boolean);
+function normalizeText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function rowText(row: PreviewRow) {
+  return meaningfulValues(row).join(" ").trim();
+}
+
+function leadingText(row: PreviewRow) {
+  return meaningfulValues(row).slice(0, 4).join(" ").trim();
+}
+
+function containsTerm(text: string, term: string) {
+  return new RegExp(`(^|\\s)${term.replace(/\s+/g, "\\s+")}(\\s|$)`, "i").test(text);
+}
+
+function looksLikeRepeatedLabelRow(values: string[]) {
+  if (values.length < 4) return false;
+  const counts = new Map<string, number>();
+  for (const value of values.map(normalizeText).filter(Boolean)) {
+    counts.set(value, (counts.get(value) ?? 0) + 1);
+  }
+  const highestCount = Math.max(0, ...counts.values());
+  return highestCount / values.length >= 0.6;
+}
+
+function looksLikeHeaderRow(values: string[], headers: string[]) {
+  if (headers.length < 2 || values.length < 2) return false;
+  const normalizedHeaders = new Set(headers.map(normalizeText).filter(Boolean));
+  const exactHeaderHits = values.map(normalizeText).filter((value) => normalizedHeaders.has(value)).length;
+  return exactHeaderHits >= Math.min(2, normalizedHeaders.size);
+}
+
+function looksLikeSummaryOrSectionRow(row: PreviewRow, term: string) {
+  const values = meaningfulValues(row);
+  const allText = normalizeText(rowText(row));
+  const leadText = normalizeText(leadingText(row));
+  if (!containsTerm(allText, term)) return false;
+  return containsTerm(leadText, term) || values.length <= 3 || looksLikeRepeatedLabelRow(values);
 }
 
 function rowWarning(row: PreviewRow, headers: string[], headerRowNumber?: number): string | null {
   if (!row.selected) return null;
-  const text = rowText(row).toLowerCase();
   const values = meaningfulValues(row);
+  const allText = normalizeText(rowText(row));
+  const leadText = normalizeText(leadingText(row));
   const nonEmptyRatio = values.length / Math.max(1, Object.keys(row.cells).length);
+
   if (row.row_number === headerRowNumber) return "selected header row";
-  if (!text) return "blank selected row";
-  if (values.length <= 1 || nonEmptyRatio < 0.25) return "mostly empty selected row";
-  const matchedTerm = nonDataTerms.find((term) => text.includes(term));
-  if (matchedTerm) return `contains “${matchedTerm}”`;
-  const headerHits = headers.filter((header) => header && text.includes(header.toLowerCase())).length;
-  if (headers.length > 1 && headerHits >= Math.min(2, headers.length)) return "looks like a header/title row";
+  if (!values.length) return "blank selected row";
+  if (values.length <= 1 || nonEmptyRatio < 0.2) return "mostly empty selected row";
+  if (looksLikeHeaderRow(values, headers)) return "looks like a header row";
+  if (looksLikeRepeatedLabelRow(values)) return "repeated label row";
+
+  const footerTerm = footerTerms.find((term) => containsTerm(allText, term));
+  if (footerTerm) return `contains “${footerTerm}”`;
+
+  const summaryTerm = summaryTerms.find((term) => looksLikeSummaryOrSectionRow(row, term));
+  if (summaryTerm) return `summary row: “${summaryTerm}”`;
+
+  const sectionTerm = sectionTerms.find((term) => containsTerm(leadText, term) && values.length <= 4);
+  if (sectionTerm) return `section row: “${sectionTerm}”`;
+
   return null;
 }
 
@@ -59,20 +108,19 @@ function rowStatus(row: PreviewRow, headers: string[], headerRowNumber?: number)
   if (row.selected) return { label: "Included", className: "bg-emerald-50 text-emerald-700" };
   if (row.ignored) return { label: "Excluded", className: "bg-slate-100 text-slate-600" };
   if (!text) return { label: "Blank", className: "bg-zinc-100 text-zinc-600" };
-  const headerHits = headers.filter((header) => header && text.toLowerCase().includes(header.toLowerCase())).length;
-  if (headerHits >= Math.min(2, headers.length)) return { label: "Header-like", className: "bg-amber-50 text-amber-700" };
+  if (looksLikeHeaderRow(meaningfulValues(row), headers)) return { label: "Header-like", className: "bg-amber-50 text-amber-700" };
   return { label: "Not included", className: "bg-slate-50 text-slate-500" };
 }
 
-function rowsContaining(rows: PreviewRow[], term: string) {
-  return rows.filter((row) => rowText(row).toLowerCase().includes(term)).map((row) => row.row_number);
+function rowsMatchingSummaryTerm(rows: PreviewRow[], term: string) {
+  return rows.filter((row) => looksLikeSummaryOrSectionRow(row, term)).map((row) => row.row_number);
 }
 
 function rowWarningSummary(warnings: RowWarning[]) {
   if (!warnings.length) return "";
-  const rows = warnings.slice(0, 5).map((warning) => `Row ${warning.rowNumber}`).join(", ");
-  const extra = warnings.length > 5 ? ` and ${warnings.length - 5} more` : "";
-  return `${rows}${extra} should be reviewed before validation.`;
+  const rows = warnings.slice(0, 3).map((warning) => `Row ${warning.rowNumber}`).join(", ");
+  const extra = warnings.length > 3 ? ` +${warnings.length - 3}` : "";
+  return `${warnings.length} row${warnings.length === 1 ? "" : "s"} to review: ${rows}${extra}`;
 }
 
 export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], headerRowNumber, onToggleRow, onSelectRows, onIgnoreRows, onMarkDataRows }: RowSelectionTableProps) {
@@ -224,14 +272,14 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
               <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(blankRows))} disabled={!blankRows.length} className={menuItemClass} title="Exclude blank preview rows so they are skipped during validation">
                 Exclude blank rows
               </button>
-              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsContaining(selectableRows, "total")))} className={menuItemClass} title="Exclude rows containing the word total">
-                Exclude rows containing total
+              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsMatchingSummaryTerm(selectableRows, "total")))} className={menuItemClass} title="Exclude rows where total appears like a summary label, not just inside notes">
+                Exclude total summary rows
               </button>
-              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsContaining(selectableRows, "subtotal")))} className={menuItemClass} title="Exclude rows containing the word subtotal">
-                Exclude rows containing subtotal
+              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsMatchingSummaryTerm(selectableRows, "subtotal")))} className={menuItemClass} title="Exclude rows where subtotal appears like a summary label">
+                Exclude subtotal rows
               </button>
-              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsContaining(selectableRows, "grand total")))} className={menuItemClass} title="Exclude rows containing the phrase grand total">
-                Exclude rows containing grand total
+              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsMatchingSummaryTerm(selectableRows, "grand total")))} className={menuItemClass} title="Exclude rows where grand total appears like a summary label">
+                Exclude grand total rows
               </button>
             </div>
           ) : null}
@@ -239,20 +287,17 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
       </div>
 
       {selectedRowWarnings.length ? (
-        <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
-          <div className="flex gap-2">
-            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-            <div>
-              <p className="font-semibold">Review selected rows that may not be real data.</p>
-              <p className="mt-1 text-xs leading-5 text-amber-800">{rowWarningSummary(selectedRowWarnings)}</p>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {selectedRowWarnings.slice(0, 6).map((warning) => (
-                  <span key={warning.rowNumber} className="rounded-full bg-white/75 px-2 py-1 text-[11px] font-semibold text-amber-900 ring-1 ring-amber-200">
-                    Row {warning.rowNumber}: {warning.reason}
-                  </span>
-                ))}
-              </div>
-            </div>
+        <div className="border-b border-amber-200 bg-amber-50/90 px-3 py-1.5 text-xs text-amber-900" role="status">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 font-semibold">
+              <AlertTriangle className="size-3.5 shrink-0" /> {rowWarningSummary(selectedRowWarnings)}
+            </span>
+            {selectedRowWarnings.slice(0, 3).map((warning) => (
+              <span key={warning.rowNumber} className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-amber-900 ring-1 ring-amber-200">
+                Row {warning.rowNumber}: {warning.reason}
+              </span>
+            ))}
+            <span className="text-[11px] font-medium text-amber-700">Use More row actions to exclude them.</span>
           </div>
         </div>
       ) : null}
