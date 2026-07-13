@@ -122,6 +122,59 @@ main :where(.whitespace-nowrap) {
   white-space: normal;
 }
 
+main :where(section:has(button[title="Build a starter set of comparison rules from the mapped source fields"]) > .mt-5.space-y-3 article) {
+  background: #ffffff;
+}
+
+main :where(section:has(button[title="Build a starter set of comparison rules from the mapped source fields"]) > .mt-5.space-y-3 article > div > div:first-child) {
+  flex: 1 1 auto;
+}
+
+main :where(section:has(button[title="Build a starter set of comparison rules from the mapped source fields"]) > .mt-5.space-y-3 article h3) {
+  font-size: 0.95rem;
+}
+
+main :where(section:has(button[title="Build a starter set of comparison rules from the mapped source fields"]) > .mt-5.space-y-3 article p.mt-2.text-sm.text-slate-600) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.45rem;
+  align-items: center;
+  font-size: 0.75rem;
+  line-height: 1.25rem;
+  color: #475569;
+}
+
+main :where(section:has(button[title="Build a starter set of comparison rules from the mapped source fields"]) > .mt-5.space-y-3 article p.mt-2.text-sm.text-slate-600)::before {
+  content: "Check setup";
+  border-radius: 999px;
+  background: #f1f5f9;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+main :where(section:has(button[title="Build a starter set of comparison rules from the mapped source fields"]) > .mt-5.space-y-3 article p.mt-1.truncate.text-xs.text-slate-500) {
+  margin-top: 0.65rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.9rem;
+  background: #f8fafc;
+  padding: 0.6rem 0.75rem;
+  color: #475569;
+  line-height: 1.45;
+}
+
+main :where(section:has(button[title="Build a starter set of comparison rules from the mapped source fields"]) > .mt-5.space-y-3 article p.mt-1.truncate.text-xs.text-slate-500)::before {
+  content: "Sources and fields";
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
 main :where(div:has(> h2.truncate + span.inline-flex)) {
   display: block;
 }
