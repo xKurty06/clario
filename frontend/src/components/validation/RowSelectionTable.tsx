@@ -1,5 +1,5 @@
 import { AlertTriangle, Ban, CheckSquare, ChevronDown, MoreHorizontal, RotateCcw, Square } from "lucide-react";
-import { useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useId, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import type { PreviewRow } from "../../types/validation.types";
 
 interface RowSelectionTableProps {
@@ -18,8 +18,8 @@ interface RowWarning {
   reason: string;
 }
 
-const toolbarButtonClass = "inline-flex h-8 items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50";
-const rangeInputClass = "h-6 w-14 rounded-md border border-slate-200 bg-white px-1.5 text-center text-xs font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
+const toolbarButtonClass = "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50";
+const rangeInputClass = "h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-center text-xs font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 const menuItemClass = "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus:bg-slate-50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50";
 const menuSectionClass = "px-3 pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400";
 const summaryTerms = ["grand total", "subtotal", "total"];
@@ -124,6 +124,8 @@ function rowWarningSummary(warnings: RowWarning[]) {
 }
 
 export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], headerRowNumber, onToggleRow, onSelectRows, onIgnoreRows, onMarkDataRows }: RowSelectionTableProps) {
+  const rowRangeStartId = useId();
+  const rowRangeEndId = useId();
   const lockedRows = new Set([...lockedRowNumbers, ...(headerRowNumber ? [headerRowNumber] : [])]);
   const selectableRows = rows.filter((row) => !lockedRows.has(row.row_number));
   const selectableRowNumbers = selectableRows.map((row) => row.row_number);
@@ -162,6 +164,7 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
 
     onSelectRows([...new Set([...selectedRows, ...rowsInRange])]);
     setRangeError("");
+    setMoreActionsOpen(false);
   };
 
   const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, rowNumber: number) => {
@@ -178,111 +181,111 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-      <div className="flex flex-wrap items-center gap-2 rounded-t-2xl border-b border-slate-200 bg-white p-3 text-xs font-semibold text-slate-700">
-        <button type="button" title="Include all rows in this preview" aria-label="Include all rows in this preview" onClick={() => onSelectRows(selectableRowNumbers)} className={toolbarButtonClass}>
-          <CheckSquare className="size-3.5" /> Select all
-        </button>
-        <button type="button" title="Clear the current row selection" aria-label="Clear the current row selection" onClick={() => onSelectRows([])} className={toolbarButtonClass}>
-          <Square className="size-3.5" /> Select none
-        </button>
-        <button type="button" title="Invert which preview rows are included" aria-label="Invert which preview rows are included" onClick={() => onSelectRows(selectableRows.filter((row) => !row.selected).map((row) => row.row_number))} className={toolbarButtonClass}>
-          <RotateCcw className="size-3.5" /> Invert
-        </button>
-        <form
-          className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-within:border-emerald-500 focus-within:ring-2 focus:ring-emerald-100"
-          onSubmit={handleSelectRange}
-          title="Select preview rows by Excel row number range. These numbers come from the Excel row column in the table."
-          aria-label="Select range by Excel row numbers"
-        >
-          <span className="whitespace-nowrap">Select range</span>
-          <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold leading-4 text-slate-500" title="The start and end values use the Excel row numbers shown in the Excel row column.">
-            Excel row
-          </span>
-          <label className="sr-only" htmlFor="row-range-start">Start Excel row</label>
-          <input
-            id="row-range-start"
-            type="number"
-            min={1}
-            inputMode="numeric"
-            placeholder="Start"
-            value={rangeStart}
-            onChange={(event) => {
-              setRangeStart(event.target.value);
-              setRangeError("");
-            }}
-            className={rangeInputClass}
-            title="Starting Excel row number, based on the Excel row column"
-          />
-          <span className="text-slate-400">–</span>
-          <label className="sr-only" htmlFor="row-range-end">End Excel row</label>
-          <input
-            id="row-range-end"
-            type="number"
-            min={1}
-            inputMode="numeric"
-            placeholder="End"
-            value={rangeEnd}
-            onChange={(event) => {
-              setRangeEnd(event.target.value);
-              setRangeError("");
-            }}
-            className={rangeInputClass}
-            title="Ending Excel row number, based on the Excel row column"
-          />
-          <button
-            type="submit"
-            className="inline-flex h-6 items-center rounded-md bg-emerald-700 px-2 text-[11px] font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600"
-            title="Select all preview rows between the entered Excel row numbers"
-            aria-label="Select Excel row range"
-          >
-            Select
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-2xl border-b border-slate-200 bg-white p-3 text-xs text-slate-700">
+        <div className="min-w-0">
+          <p className="font-semibold text-slate-900">{selectedRows.length} of {selectableRowNumbers.length} row{selectableRowNumbers.length === 1 ? "" : "s"} included</p>
+          <p className="mt-0.5 text-[11px] leading-4 text-slate-500">Click rows to include or exclude them from validation.</p>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <button type="button" title="Include all rows in this preview" aria-label="Include all rows in this preview" onClick={() => onSelectRows(selectableRowNumbers)} className={toolbarButtonClass}>
+            <CheckSquare className="size-3.5" /> Select all
           </button>
-        </form>
-        {rangeError ? <span className="rounded-lg bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700" role="alert">{rangeError}</span> : null}
-        <span className="mx-1 h-5 w-px bg-slate-200" />
-        <div className="relative">
-          <button
-            type="button"
-            title="Open extra row cleanup and include/exclude actions"
-            aria-label="Open more row actions"
-            aria-haspopup="menu"
-            aria-expanded={moreActionsOpen}
-            onClick={() => setMoreActionsOpen((open) => !open)}
-            className={toolbarButtonClass}
-          >
-            <MoreHorizontal className="size-3.5" /> More row actions <ChevronDown className={`size-3.5 transition ${moreActionsOpen ? "rotate-180" : ""}`} />
+          <button type="button" title="Clear the current row selection" aria-label="Clear the current row selection" onClick={() => onSelectRows([])} className={toolbarButtonClass}>
+            <Square className="size-3.5" /> Select none
           </button>
-          {moreActionsOpen ? (
-            <div
-              role="menu"
-              className="absolute right-0 top-full z-30 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/70"
+          <div className="relative">
+            <button
+              type="button"
+              title="Open row range, invert, cleanup, and include/exclude actions"
+              aria-label="Open more row actions"
+              aria-haspopup="menu"
+              aria-expanded={moreActionsOpen}
+              onClick={() => setMoreActionsOpen((open) => !open)}
+              className={toolbarButtonClass}
             >
-              <p className={menuSectionClass}>Selection</p>
-              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(selectedRows))} disabled={!selectedRows.length} className={menuItemClass} title="Move the currently selected rows to excluded rows so validation skips them">
-                <Ban className="size-3.5" /> Exclude selected
-              </button>
-              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onMarkDataRows(selectedRows))} disabled={!selectedRows.length} className={menuItemClass} title="Move selected rows back into included data rows">
-                <CheckSquare className="size-3.5" /> Include selected
-              </button>
-              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(selectedRowWarnings.map((warning) => warning.rowNumber)))} disabled={!selectedRowWarnings.length} className={menuItemClass} title="Exclude selected rows that look blank, header-like, summary-like, or non-data">
-                <AlertTriangle className="size-3.5" /> Exclude review rows
-              </button>
-              <div className="my-1 h-px bg-slate-100" />
-              <p className={menuSectionClass}>Clean rows</p>
-              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(blankRows))} disabled={!blankRows.length} className={menuItemClass} title="Exclude blank preview rows so they are skipped during validation">
-                Exclude blank rows
-              </button>
-              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsMatchingSummaryTerm(selectableRows, "total")))} className={menuItemClass} title="Exclude rows where total appears like a summary label, not just inside notes">
-                Exclude total summary rows
-              </button>
-              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsMatchingSummaryTerm(selectableRows, "subtotal")))} className={menuItemClass} title="Exclude rows where subtotal appears like a summary label">
-                Exclude subtotal rows
-              </button>
-              <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsMatchingSummaryTerm(selectableRows, "grand total")))} className={menuItemClass} title="Exclude rows where grand total appears like a summary label">
-                Exclude grand total rows
-              </button>
-            </div>
-          ) : null}
+              <MoreHorizontal className="size-3.5" /> More <ChevronDown className={`size-3.5 transition ${moreActionsOpen ? "rotate-180" : ""}`} />
+            </button>
+            {moreActionsOpen ? (
+              <div
+                role="menu"
+                className="absolute right-0 top-full z-30 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/70"
+              >
+                <p className={menuSectionClass}>Quick actions</p>
+                <button role="menuitem" type="button" onClick={() => runMoreAction(() => onSelectRows(selectableRows.filter((row) => !row.selected).map((row) => row.row_number)))} className={menuItemClass} title="Invert which preview rows are included">
+                  <RotateCcw className="size-3.5" /> Invert selection
+                </button>
+                <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(selectedRows))} disabled={!selectedRows.length} className={menuItemClass} title="Move the currently selected rows to excluded rows so validation skips them">
+                  <Ban className="size-3.5" /> Exclude selected
+                </button>
+                <button role="menuitem" type="button" onClick={() => runMoreAction(() => onMarkDataRows(selectedRows))} disabled={!selectedRows.length} className={menuItemClass} title="Move selected rows back into included data rows">
+                  <CheckSquare className="size-3.5" /> Include selected
+                </button>
+                <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(selectedRowWarnings.map((warning) => warning.rowNumber)))} disabled={!selectedRowWarnings.length} className={menuItemClass} title="Exclude selected rows that look blank, header-like, summary-like, or non-data">
+                  <AlertTriangle className="size-3.5" /> Exclude review rows
+                </button>
+                <div className="my-1 h-px bg-slate-100" />
+                <p className={menuSectionClass}>Select row range</p>
+                <form className="px-3 py-2" onSubmit={handleSelectRange} title="Select preview rows by Excel row number range. These numbers come from the Excel row column in the table." aria-label="Select range by Excel row numbers">
+                  <div className="flex items-center gap-2">
+                    <label className="sr-only" htmlFor={rowRangeStartId}>Start Excel row</label>
+                    <input
+                      id={rowRangeStartId}
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      placeholder="Start"
+                      value={rangeStart}
+                      onChange={(event) => {
+                        setRangeStart(event.target.value);
+                        setRangeError("");
+                      }}
+                      className={rangeInputClass}
+                      title="Starting Excel row number, based on the Excel row column"
+                    />
+                    <span className="text-slate-400">–</span>
+                    <label className="sr-only" htmlFor={rowRangeEndId}>End Excel row</label>
+                    <input
+                      id={rowRangeEndId}
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      placeholder="End"
+                      value={rangeEnd}
+                      onChange={(event) => {
+                        setRangeEnd(event.target.value);
+                        setRangeError("");
+                      }}
+                      className={rangeInputClass}
+                      title="Ending Excel row number, based on the Excel row column"
+                    />
+                    <button
+                      type="submit"
+                      className="inline-flex h-8 items-center rounded-lg bg-emerald-700 px-3 text-xs font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600"
+                      title="Select all preview rows between the entered Excel row numbers"
+                      aria-label="Select Excel row range"
+                    >
+                      Select
+                    </button>
+                  </div>
+                  {rangeError ? <p className="mt-2 rounded-lg bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700" role="alert">{rangeError}</p> : null}
+                </form>
+                <div className="my-1 h-px bg-slate-100" />
+                <p className={menuSectionClass}>Clean rows</p>
+                <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(blankRows))} disabled={!blankRows.length} className={menuItemClass} title="Exclude blank preview rows so they are skipped during validation">
+                  Exclude blank rows
+                </button>
+                <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsMatchingSummaryTerm(selectableRows, "total")))} className={menuItemClass} title="Exclude rows where total appears like a summary label, not just inside notes">
+                  Exclude total summary rows
+                </button>
+                <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsMatchingSummaryTerm(selectableRows, "subtotal")))} className={menuItemClass} title="Exclude rows where subtotal appears like a summary label">
+                  Exclude subtotal rows
+                </button>
+                <button role="menuitem" type="button" onClick={() => runMoreAction(() => onIgnoreRows(rowsMatchingSummaryTerm(selectableRows, "grand total")))} className={menuItemClass} title="Exclude rows where grand total appears like a summary label">
+                  Exclude grand total rows
+                </button>
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
 
