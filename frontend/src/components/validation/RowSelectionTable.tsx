@@ -22,7 +22,7 @@ const toolbarButtonClass = "inline-flex h-9 items-center justify-center gap-1.5 
 const rangeInputClass = "h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-center text-xs font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 const menuItemClass = "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus:bg-slate-50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50";
 const menuSectionClass = "px-3 pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400";
-const rowCellClass = "border-b border-slate-100 p-2.5 align-middle text-[13px] font-medium leading-5 text-slate-800 subpixel-antialiased";
+const rowCellClass = "border-b border-slate-100 p-2.5 align-middle text-xs font-normal leading-5 text-slate-700 antialiased";
 const summaryTerms = ["grand total", "subtotal", "total"];
 const sectionTerms = ["lot", "section", "category"];
 const footerTerms = ["signature", "prepared by", "approved by", "certified by", "noted by", "checked by"];
@@ -181,11 +181,11 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white font-sans text-slate-900 subpixel-antialiased [text-rendering:optimizeLegibility]">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white font-sans text-slate-900 antialiased">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-2xl border-b border-slate-200 bg-white p-3 text-xs text-slate-700">
         <div className="min-w-0">
           <p className="font-semibold text-slate-950">{selectedRows.length} of {selectableRowNumbers.length} row{selectableRowNumbers.length === 1 ? "" : "s"} included</p>
-          <p className="mt-0.5 text-[11px] font-medium leading-4 text-slate-600">Click rows to include or exclude them from validation.</p>
+          <p className="mt-0.5 text-[11px] leading-4 text-slate-500">Click rows to include or exclude them from validation.</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button type="button" title="Include all rows in this preview" aria-label="Include all rows in this preview" onClick={() => onSelectRows(selectableRowNumbers)} className={toolbarButtonClass}>
@@ -307,8 +307,8 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
       ) : null}
 
       <div className="relative max-h-[520px] overflow-auto rounded-b-2xl bg-white">
-        <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-[13px] leading-5">
-          <thead className="sticky top-0 z-10 bg-slate-50 text-[12px] font-bold text-slate-700">
+        <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs leading-5">
+          <thead className="sticky top-0 z-10 bg-slate-50 text-[12px] font-semibold text-slate-700">
             <tr>
               <th className="w-12 border-b border-slate-200 p-2.5 text-center">Use</th>
               <th className="w-24 border-b border-slate-200 p-2.5">Excel row</th>
@@ -334,7 +334,7 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
                     if (!locked) onToggleRow(row.row_number);
                   }}
                   onKeyDown={(event) => handleRowKeyDown(event, row.row_number)}
-                  className={`group border-t border-slate-100 align-middle transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${locked ? "cursor-not-allowed" : "cursor-pointer hover:bg-slate-50"} ${needsReview ? "bg-amber-50/70" : isHeaderRow ? "bg-sky-50/80" : row.selected ? "bg-emerald-50/35" : ""} ${locked && !isHeaderRow ? "opacity-80" : ""} ${row.ignored && !row.selected && !locked ? "opacity-80" : ""}`}
+                  className={`group border-t border-slate-100 align-middle transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${locked ? "cursor-not-allowed" : "cursor-pointer hover:bg-slate-50"} ${needsReview ? "bg-amber-50/70" : isHeaderRow ? "bg-sky-50/80" : row.selected ? "bg-emerald-50/35" : ""} ${locked && !isHeaderRow ? "opacity-90" : ""} ${row.ignored && !row.selected && !locked ? "opacity-90" : ""}`}
                 >
                   <td className="border-b border-slate-100 p-0 align-middle">
                     <div className="flex min-h-11 items-center justify-center px-2.5 py-2">
@@ -349,9 +349,9 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
                       />
                     </div>
                   </td>
-                  <td className={`${rowCellClass} font-bold text-slate-800`}>{row.row_number}</td>
+                  <td className={`${rowCellClass} font-semibold text-slate-700`}>{row.row_number}</td>
                   <td className="border-b border-slate-100 p-2.5 align-middle">
-                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-bold ${status.className}`}>{status.label}</span>
+                    <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${status.className}`}>{status.label}</span>
                   </td>
                   {headers.map((header) => (
                     <td key={`${row.row_number}-${header}`} className={`${rowCellClass} max-w-64 truncate`} title={String(row.cells[header] ?? "")}>
