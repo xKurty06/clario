@@ -381,3 +381,78 @@ def test_missing_match_discrepancy_keeps_configured_missing_side_source(tmp_path
     assert discrepancy.right_field_name == "Description"
     assert discrepancy.expected_value == "Cooling fan"
     assert discrepancy.actual_value == "Blank"
+
+
+def test_discrepancies_are_sorted_by_severity_then_row(tmp_path: Path) -> None:
+    path = tmp_path / "sorted-discrepancies.xlsx"
+    book = openpyxl.Workbook()
+    sheet = book.active
+    sheet.title = "Rows"
+    sheet.append(["SKU", "Description"])
+    sheet.append(["B", "Medium later"])
+    sheet.append(["A", "High first"])
+    sheet.append(["B", "Medium later duplicate"])
+    sheet.append(["A", "High first duplicate"])
+    sheet.append(["C", "Low last"])
+    sheet.append(["C", "Low last duplicate"])
+    book.save(path)
+
+    register_file("sorted-source", path)
+
+    source = ComparisonDataSource(
+        id="sorted-source",
+        name="Rows",
+        file_id="sorted-source",
+        file_name=path.name,
+        sheet_name="Rows",
+        header_row=1,
+        first_data_row=2,
+        row_selection_mode="manual_include",
+        selected_row_numbers=[2, 3, 4, 5, 6, 7],
+        fields=[
+            make_field("sorted-source", "SKU", "A"),
+            make_field("sorted-source", "Description", "B"),
+        ],
+    )
+    request = ValidationRequest(
+        project_name="Sorted validation",
+        data_sources=[source],
+        rules=[
+            ComparisonRule(
+                id="medium-rule",
+                rule_name="Medium duplicate",
+                rule_type="duplicate_check",
+                left_data_source_id="sorted-source",
+                left_field_id="sorted-source-sku",
+                left_match_field_ids=["sorted-source-sku"],
+                severity="medium",
+            ),
+            ComparisonRule(
+                id="low-rule",
+                rule_name="Low duplicate",
+                rule_type="duplicate_check",
+                left_data_source_id="sorted-source",
+                left_field_id="sorted-source-sku",
+                left_match_field_ids=["sorted-source-sku"],
+                severity="low",
+            ),
+            ComparisonRule(
+                id="high-rule",
+                rule_name="High duplicate",
+                rule_type="duplicate_check",
+                left_data_source_id="sorted-source",
+                left_field_id="sorted-source-sku",
+                left_match_field_ids=["sorted-source-sku"],
+                severity="high",
+            ),
+        ],
+    )
+
+    result = run_validation(request)
+
+    assert [(item.severity, item.left_row_number) for item in result.discrepancies] == sorted(
+        [(item.severity, item.left_row_number) for item in result.discrepancies],
+        key=lambda item: ({"high": 0, "medium": 1, "low": 2}[item[0]], item[1]),
+    )
+    assert result.discrepancies[0].severity == "high"
+    assert result.discrepancies[0].left_row_number == 2

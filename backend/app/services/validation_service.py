@@ -31,10 +31,12 @@ _MATCH_STRATEGY_LABELS = {
 
 _STRICTNESS_LABELS = {
     "exact": "exact matching",
-    "normalized_exact": "normalized exact matching",
+    "normalized_exact": "exact text matching while ignoring case and extra spacing",
     "numeric_tolerance": "numeric tolerance matching",
     "currency_tolerance": "currency tolerance matching",
 }
+
+_SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
 def _stringify(value: object) -> str | None:
@@ -473,6 +475,21 @@ def _duplicate_rule(rule: ComparisonRule, records: list[ExtractedRecord]) -> lis
     return discrepancies
 
 
+def _discrepancy_sort_key(discrepancy: RuleDiscrepancy) -> tuple[int, int, str, str]:
+    row_numbers = [
+        row_number
+        for row_number in (discrepancy.left_row_number, discrepancy.right_row_number)
+        if row_number is not None
+    ]
+    first_row = min(row_numbers) if row_numbers else 1_000_000_000
+    return (
+        _SEVERITY_ORDER.get(discrepancy.severity, 99),
+        first_row,
+        discrepancy.rule_name,
+        discrepancy.rule_id,
+    )
+
+
 def run_validation(request: ValidationRequest) -> ValidationResult:
     data_sources = request.data_sources
     records: list[ExtractedRecord] = []
@@ -492,6 +509,7 @@ def run_validation(request: ValidationRequest) -> ValidationResult:
         elif rule.rule_type == "duplicate_check":
             discrepancies.extend(_duplicate_rule(rule, records))
 
+    discrepancies.sort(key=_discrepancy_sort_key)
     rule_counts = Counter(item.rule_id for item in discrepancies)
     summaries = [
         RuleSummary(

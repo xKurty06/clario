@@ -16,6 +16,12 @@ const ruleLabels: Record<RuleType, string> = {
   duplicate_check: "Duplicate check",
 };
 
+const severityOrder: Record<string, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+
 interface SmartNote {
   title: string;
   detail: string;
@@ -176,6 +182,40 @@ function ValueCell({ value }: { value?: string | null }) {
   return <>{value ?? "-"}</>;
 }
 
+function firstDiscrepancyRow(item: RuleDiscrepancy) {
+  const rows = [item.left_row_number, item.right_row_number].filter((row): row is number => typeof row === "number");
+  return rows.length ? Math.min(...rows) : Number.MAX_SAFE_INTEGER;
+}
+
+function compareDiscrepancies(left: RuleDiscrepancy, right: RuleDiscrepancy) {
+  const severityDelta = (severityOrder[left.severity] ?? 99) - (severityOrder[right.severity] ?? 99);
+  if (severityDelta !== 0) return severityDelta;
+
+  const rowDelta = firstDiscrepancyRow(left) - firstDiscrepancyRow(right);
+  if (rowDelta !== 0) return rowDelta;
+
+  return left.rule_name.localeCompare(right.rule_name, undefined, { sensitivity: "base" });
+}
+
+function compareRuleSummaries(
+  left: NonNullable<ReturnType<typeof useWorkflow>["result"]>["rule_summaries"][number],
+  right: NonNullable<ReturnType<typeof useWorkflow>["result"]>["rule_summaries"][number],
+) {
+  const countDelta = right.discrepancy_count - left.discrepancy_count;
+  if (countDelta !== 0) return countDelta;
+
+  const severityDelta = (severityOrder[left.severity] ?? 99) - (severityOrder[right.severity] ?? 99);
+  if (severityDelta !== 0) return severityDelta;
+
+  return left.rule_name.localeCompare(right.rule_name, undefined, { sensitivity: "base" });
+}
+
+function severityPillClass(severity: string) {
+  if (severity === "high") return "bg-red-50 text-red-700";
+  if (severity === "medium") return "bg-amber-50 text-amber-700";
+  return "bg-slate-100 text-slate-600";
+}
+
 function isValidPreset(value: string): value is PresetType {
   return value === "reference_vs_copied" || value === "reference_bidder_abstract" || value === "generic_two_file" || value === "custom_comparison_builder";
 }
@@ -234,7 +274,8 @@ export function ValidationResultsPage() {
     const matchesSeverity = severity === "all" || item.severity === severity;
     const haystack = `${item.rule_name} ${item.expected_value ?? ""} ${item.actual_value ?? ""} ${item.notes ?? ""} ${item.suggested_correction ?? ""} ${note.title} ${note.detail}`.toLowerCase();
     return matchesSeverity && haystack.includes(query.toLowerCase());
-  });
+  }).sort((left, right) => compareDiscrepancies(left.item, right.item));
+  const sortedRuleSummaries = [...(result?.rule_summaries ?? [])].sort(compareRuleSummaries);
   const canRerun = isValidPreset(preset) && dataSources.length > 0 && rules.length > 0;
 
   const rerunValidation = async () => {
@@ -378,14 +419,15 @@ export function ValidationResultsPage() {
 
       {rerunError ? <p className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{rerunError}</p> : null}
 
-      <div className="grid grid-cols-4 divide-x divide-slate-200 border-b border-slate-200 py-3">
+      <div className="grid grid-cols-2 divide-x divide-y divide-slate-200 border-b border-slate-200 py-3 sm:grid-cols-3 lg:grid-cols-5 lg:divide-y-0">
         {[
           ["Discrepancies", result.discrepancies.length],
-          ["High severity", result.breakdown.high ?? 0],
-          ["Rules", result.rule_summaries.length],
+          ["High", result.breakdown.high ?? 0],
+          ["Medium", result.breakdown.medium ?? 0],
+          ["Low", result.breakdown.low ?? 0],
           ["Selected rows", result.total_selected_rows],
         ].map(([label, value]) => (
-          <div key={String(label)} className="px-5 first:pl-0">
+          <div key={String(label)} className="px-4 py-2 first:pl-0 lg:py-0">
             <p className="text-xs text-slate-500">{label}</p>
             <p className="mt-0.5 text-xl font-semibold">{value}</p>
           </div>
@@ -394,15 +436,21 @@ export function ValidationResultsPage() {
 
       <div className="grid items-start gap-5 pt-4 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="h-fit self-start rounded-2xl border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-semibold">Rule breakdown</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold">Rule breakdown</h2>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{result.rule_summaries.length}</span>
+          </div>
           <div className="mt-3 max-h-[calc(100dvh-18rem)] space-y-2 overflow-y-auto pr-1">
-            {result.rule_summaries.map((rule) => (
-              <div key={rule.rule_id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            {sortedRuleSummaries.map((rule) => (
+              <div key={rule.rule_id} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm shadow-slate-200/40">
                 <div className="flex items-start justify-between gap-2">
                   <p className="min-w-0 text-sm font-semibold leading-5">{rule.rule_name}</p>
-                  <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">{rule.discrepancy_count}</span>
+                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{rule.discrepancy_count}</span>
                 </div>
-                <p className="mt-0.5 text-xs leading-5 text-slate-500">{ruleLabels[rule.rule_type]} - {rule.severity}</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs leading-5 text-slate-500">{ruleLabels[rule.rule_type]}</span>
+                  <span className={`rounded-full px-1.5 py-0.5 text-[11px] font-semibold leading-4 ${severityPillClass(rule.severity)}`}>{rule.severity}</span>
+                </div>
               </div>
             ))}
           </div>

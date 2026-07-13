@@ -110,7 +110,7 @@ const matchLabels: Record<MatchStrategy, string> = {
 
 const strictnessLabels: Record<RuleStrictness, string> = {
   exact: "Exact",
-  normalized_exact: "Normalized exact",
+  normalized_exact: "Exact text, ignore case",
   numeric_tolerance: "Numeric tolerance",
   currency_tolerance: "Currency tolerance",
 };
@@ -244,6 +244,33 @@ function fieldLabel(field?: ComparisonField | null) {
   return field?.custom_display_name || field?.field_name || "Not selected";
 }
 
+function normalizedFieldName(field: ComparisonField) {
+  return fieldLabel(field).toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function suggestedRuleStrictness(field: ComparisonField): RuleStrictness {
+  if (field.field_type === "currency") return "currency_tolerance";
+  if (field.field_type === "number") return "exact";
+  return "normalized_exact";
+}
+
+function suggestedRuleSeverity(field: ComparisonField) {
+  const name = normalizedFieldName(field);
+  return name.includes("description") || name.includes("desc") ? "high" : "medium";
+}
+
+function findSuggestedMatchKey(left: ComparisonDataSource, right: ComparisonDataSource, comparedFieldKey: string) {
+  const keyPriority = ["itemnumber", "itemno", "sku", "productcode", "quoteref", "line"];
+  for (const key of keyPriority) {
+    const leftField = left.fields.find((field) => normalizedFieldName(field).includes(key));
+    const rightField = right.fields.find((field) => normalizedFieldName(field) === normalizedFieldName(leftField ?? field));
+    if (leftField && rightField && normalizedFieldName(leftField) !== comparedFieldKey) {
+      return { leftField, rightField };
+    }
+  }
+  return null;
+}
+
 function ruleLabel(rule: ComparisonRule, sources: ComparisonDataSource[]) {
   const left = sources.find((source) => source.id === rule.left_data_source_id);
   const right = sources.find((source) => source.id === rule.right_data_source_id);
@@ -255,12 +282,13 @@ function ruleLabel(rule: ComparisonRule, sources: ComparisonDataSource[]) {
   return `${fieldLabel(leftField)} vs ${fieldLabel(rightField)}`;
 }
 
-function makeCompareRule(left: ComparisonDataSource, right: ComparisonDataSource, fieldName: string): ComparisonRule | null {
-  const leftField = left.fields.find((field) => field.field_name.toLowerCase() === fieldName.toLowerCase());
-  const rightField = right.fields.find((field) => field.field_name.toLowerCase() === fieldName.toLowerCase());
-  if (!leftField || !rightField) return null;
-  const leftKey = left.fields.find((field) => field.field_name.toLowerCase() === "item number") ?? leftField;
-  const rightKey = right.fields.find((field) => field.field_name.toLowerCase() === "item number") ?? rightField;
+function makeCompareRule(left: ComparisonDataSource, right: ComparisonDataSource, leftField: ComparisonField, rightField: ComparisonField): ComparisonRule {
+  const fieldName = fieldLabel(leftField);
+  const fieldKey = normalizedFieldName(leftField);
+  const matchKey = findSuggestedMatchKey(left, right, fieldKey);
+  const leftKey = matchKey?.leftField ?? leftField;
+  const rightKey = matchKey?.rightField ?? rightField;
+  const strictness = suggestedRuleStrictness(leftField);
   return {
     id: makeId("rule"),
     rule_name: `${fieldName} comparison`,
@@ -272,13 +300,30 @@ function makeCompareRule(left: ComparisonDataSource, right: ComparisonDataSource
     left_match_field_ids: [leftKey.id],
     right_match_field_ids: [rightKey.id],
     match_strategy: leftKey.id === leftField.id ? "by_row_order" : "by_item_number_field",
-    strictness: leftField.field_type === "number" ? "exact" : leftField.field_type === "currency" ? "currency_tolerance" : "normalized_exact",
+    strictness,
     numeric_tolerance: null,
-    currency_tolerance: leftField.field_type === "currency" ? "0.01" : null,
+    currency_tolerance: strictness === "currency_tolerance" ? "0.01" : null,
     formula_settings: null,
-    severity: fieldName === "Description" ? "high" : "medium",
+    severity: suggestedRuleSeverity(leftField),
     enabled: true,
   };
+}
+
+function buildCompareRulesForMatchingFields(left: ComparisonDataSource, right: ComparisonDataSource) {
+  const rightFieldsByName = new Map<string, ComparisonField>();
+  for (const field of right.fields) {
+    const key = normalizedFieldName(field);
+    if (key && !rightFieldsByName.has(key)) {
+      rightFieldsByName.set(key, field);
+    }
+  }
+
+  return left.fields
+    .map((leftField) => {
+      const rightField = rightFieldsByName.get(normalizedFieldName(leftField));
+      return rightField ? makeCompareRule(left, right, leftField, rightField) : null;
+    })
+    .filter((rule): rule is ComparisonRule => Boolean(rule));
 }
 
 function ruleIsRunnable(rule: ComparisonRule) {
@@ -574,7 +619,7 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
     const left = dataSources[0];
     const right = dataSources[dataSources.length - 1];
     if (!left || !right) return;
-    const next = ["Description", "Quantity", "Unit Cost", "Total Cost"].map((fieldName) => makeCompareRule(left, right, fieldName)).filter((rule): rule is ComparisonRule => Boolean(rule));
+    const next = buildCompareRulesForMatchingFields(left, right);
     if (rules.length) {
       requestConfirm({
         title: "Replace current rules?",
