@@ -72,9 +72,9 @@ export function ColumnPicker({ columns, value, onChange }: ColumnPickerProps) {
             <p className="text-[11px] text-slate-500">Column {selectedColumn.letter}</p>
           </div>
           {samples.length ? (
-            <div className="mt-2 flex flex-wrap gap-1.5">
+            <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
               {samples.map((sample, index) => (
-                <span key={`${sample}-${index}`} className="max-w-full truncate rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700" title={sample}>
+                <span key={`${sample}-${index}`} className="block min-w-0 truncate rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700" title={sample}>
                   {sample}
                 </span>
               ))}
