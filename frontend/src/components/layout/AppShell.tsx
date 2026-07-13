@@ -16,6 +16,8 @@ import { appConfig } from "../../app/config";
 import { CommonFieldsChooser } from "../validation/CommonFieldsChooser";
 import { RowPreviewControls } from "../validation/RowPreviewControls";
 
+const logoSrc = "/assets/clario-logo_light.png";
+
 interface NavigationSection {
   label: string;
   items: Array<{ to: string; label: string; icon: LucideIcon; end?: boolean }>;
@@ -114,14 +116,21 @@ export function AppShell() {
               title="Expand sidebar"
               className="group relative grid size-10 place-items-center rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
             >
-              <span className="relative grid size-8 place-items-center overflow-hidden rounded-[10px] bg-emerald-700 text-white transition-transform duration-200 group-hover:scale-105 group-active:scale-95">
-                <span className="text-xs font-bold transition-all duration-200 group-hover:-translate-x-2 group-hover:opacity-0 group-focus-visible:-translate-x-2 group-focus-visible:opacity-0">C</span>
+              <span className="relative grid size-8 place-items-center overflow-hidden rounded-[10px] bg-white transition-transform duration-200 group-hover:scale-105 group-active:scale-95">
+                <img
+                  src={logoSrc}
+                  alt=""
+                  aria-hidden="true"
+                  className="size-7 object-contain transition-all duration-200 group-hover:-translate-x-2 group-hover:opacity-0 group-focus-visible:-translate-x-2 group-focus-visible:opacity-0"
+                />
                 <PanelRightOpen aria-hidden="true" className="absolute size-[17px] translate-x-2 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100" />
               </span>
             </button>
           ) : (
             <>
-              <div className="sidebar-expand-enter grid size-8 shrink-0 place-items-center rounded-[10px] bg-emerald-700 text-xs font-bold text-white">C</div>
+              <div className="sidebar-expand-enter grid size-8 shrink-0 place-items-center rounded-[10px] bg-white">
+                <img src={logoSrc} alt="" aria-hidden="true" className="size-7 object-contain" />
+              </div>
               <div className="sidebar-expand-enter absolute left-[60px] right-[56px] min-w-0">
                 <p className="truncate text-sm font-semibold" title={appConfig.displayName}>{appConfig.displayName}</p>
                 <p className="truncate text-xs text-slate-500" title="Local validation workspace">Local validation workspace</p>
