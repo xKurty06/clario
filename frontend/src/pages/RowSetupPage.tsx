@@ -19,7 +19,7 @@ interface SetupConfidence {
   label: string;
   score: number;
   tone: SetupConfidenceTone;
-  className: string;
+  badgeClassName: string;
   barClassName: string;
   detail: string;
   checks: string[];
@@ -51,12 +51,8 @@ function rowBoundaryError(source: ComparisonDataSource, files: UploadedFile[], p
   if (source.header_row < 1) return "Header row must be 1 or higher.";
   if (source.first_data_row <= source.header_row) return "First data row must be below the header row.";
   if (!rowCount) return "";
-  if (source.header_row > rowCount) {
-    return `Header row ${source.header_row} is outside this worksheet. Choose a row between 1 and ${rowCount}.`;
-  }
-  if (source.first_data_row > rowCount) {
-    return `First data row ${source.first_data_row} is outside this worksheet. Choose a row between ${source.header_row + 1} and ${rowCount}.`;
-  }
+  if (source.header_row > rowCount) return `Header row ${source.header_row} is outside this worksheet. Choose a row between 1 and ${rowCount}.`;
+  if (source.first_data_row > rowCount) return `First data row ${source.first_data_row} is outside this worksheet. Choose a row between ${source.header_row + 1} and ${rowCount}.`;
   return "";
 }
 
@@ -121,8 +117,7 @@ function sanitizeAutoDetectedPreview(preview: DataSourcePreview): DataSourcePrev
     .filter((row) => {
       if (row.row_number < source.first_data_row || ignoredRows.has(row.row_number)) return false;
       if (isRepeatedSectionRow(row)) return false;
-      const hasValue = meaningfulValues(row).length > 0;
-      return hasValue && !isHeaderLikeRow(row, headers);
+      return meaningfulValues(row).length > 0 && !isHeaderLikeRow(row, headers);
     })
     .map((row) => row.row_number);
   const selectedRowSet = new Set(selectedRows);
@@ -158,18 +153,10 @@ function rowTone(row: PreviewRow, source: ComparisonDataSource, selected: boolea
 
 function rowBadge(row: PreviewRow, source: ComparisonDataSource) {
   const className = "inline-flex w-fit max-w-full shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px]";
-  if (row.row_number === source.header_row) {
-    return <span className={`${className} bg-sky-100 font-semibold text-sky-700`}>Header row</span>;
-  }
-  if (row.row_number === source.first_data_row) {
-    return <span className={`${className} bg-amber-100 font-semibold text-amber-800`}>First data row</span>;
-  }
-  if (row.ignored || row.row_number < source.first_data_row || isVisualAutoExcludedRow(row, source)) {
-    return <span className={`${className} bg-slate-100 font-medium text-slate-500`}>Excluded row</span>;
-  }
-  if (row.selected) {
-    return <span className={`${className} bg-emerald-50 font-semibold text-emerald-700`}>Selected data</span>;
-  }
+  if (row.row_number === source.header_row) return <span className={`${className} bg-sky-100 font-semibold text-sky-700`}>Header row</span>;
+  if (row.row_number === source.first_data_row) return <span className={`${className} bg-amber-100 font-semibold text-amber-800`}>First data row</span>;
+  if (row.ignored || row.row_number < source.first_data_row || isVisualAutoExcludedRow(row, source)) return <span className={`${className} bg-slate-100 font-medium text-slate-500`}>Excluded row</span>;
+  if (row.selected) return <span className={`${className} bg-emerald-50 font-semibold text-emerald-700`}>Selected data</span>;
   return <span className={`${className} bg-slate-100 font-medium text-slate-500`}>Preview row</span>;
 }
 
@@ -187,9 +174,9 @@ function rowCellClass(selected: boolean) {
 }
 
 function confidenceStyle(tone: SetupConfidenceTone) {
-  if (tone === "high") return { className: "border-emerald-200 bg-emerald-50 text-emerald-800", barClassName: "bg-emerald-500" };
-  if (tone === "medium") return { className: "border-amber-200 bg-amber-50 text-amber-800", barClassName: "bg-amber-500" };
-  return { className: "border-slate-200 bg-slate-50 text-slate-700", barClassName: "bg-slate-400" };
+  if (tone === "high") return { badgeClassName: "border-emerald-200 bg-emerald-50 text-emerald-700", barClassName: "bg-emerald-500" };
+  if (tone === "medium") return { badgeClassName: "border-amber-200 bg-amber-50 text-amber-700", barClassName: "bg-amber-500" };
+  return { badgeClassName: "border-slate-200 bg-slate-100 text-slate-600", barClassName: "bg-slate-400" };
 }
 
 function setupConfidence(source: ComparisonDataSource, files: UploadedFile[], preview: DataSourcePreview | undefined, stalePreview: boolean, boundaryError: string): SetupConfidence {
@@ -199,8 +186,8 @@ function setupConfidence(source: ComparisonDataSource, files: UploadedFile[], pr
       score: 15,
       tone: "low",
       ...confidenceStyle("low"),
-      detail: "The row numbers are outside the valid setup range.",
-      checks: ["Fix the header row and first data row numbers first."],
+      detail: "Fix the row numbers before confirming this source.",
+      checks: ["Header row and first data row must be inside the worksheet range."],
     };
   }
 
@@ -221,8 +208,8 @@ function setupConfidence(source: ComparisonDataSource, files: UploadedFile[], pr
       score: 25,
       tone: "low",
       ...confidenceStyle("low"),
-      detail: "The preview does not match the current row setup.",
-      checks: ["Refresh the preview before confirming this source."],
+      detail: "Refresh the preview before confirming this source.",
+      checks: ["Preview does not match the current row setup."],
     };
   }
 
@@ -264,18 +251,16 @@ function setupConfidence(source: ComparisonDataSource, files: UploadedFile[], pr
     checks.push("No data rows were detected yet.");
   }
 
-  if (sheet?.detected_header_row === source.header_row) {
-    score += 5;
-  }
+  if (sheet?.detected_header_row === source.header_row) score += 5;
 
   const finalScore = Math.min(100, score);
   const tone: SetupConfidenceTone = finalScore >= 80 ? "high" : finalScore >= 55 ? "medium" : "low";
   const label = tone === "high" ? "High confidence" : tone === "medium" ? "Medium confidence" : "Low confidence";
   const detail = tone === "high"
-    ? "The detected header and first data row look consistent. Still review visually before confirming."
+    ? "Header and first data row look consistent."
     : tone === "medium"
-      ? "Most setup signals look usable, but review the highlighted rows before confirming."
-      : "Review the highlighted rows carefully before confirming this setup.";
+      ? "Most setup signals look usable, but review the highlighted rows."
+      : "Review the highlighted rows carefully before confirming.";
 
   return {
     label,
@@ -328,6 +313,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
   const [selectedRowsBySource, setSelectedRowsBySource] = useState<Record<string, number>>({});
   const [reloadVisualStates, setReloadVisualStates] = useState<Record<string, ReloadVisualState | undefined>>({});
   const [rowInputDrafts, setRowInputDrafts] = useState<RowInputDrafts>({});
+  const [expandedConfidenceSourceIds, setExpandedConfidenceSourceIds] = useState<Set<string>>(() => new Set());
   const autoPreviewed = useRef<Set<string>>(new Set());
   const reloadTimersRef = useRef<Record<string, number>>({});
   const rowInputTimersRef = useRef<Record<string, number>>({});
@@ -444,6 +430,18 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
 
   const toggleSource = (sourceId: string) => {
     setCollapsedSourceIds((current) => {
+      const next = new Set(current);
+      if (next.has(sourceId)) {
+        next.delete(sourceId);
+      } else {
+        next.add(sourceId);
+      }
+      return next;
+    });
+  };
+
+  const toggleConfidenceDetails = (sourceId: string) => {
+    setExpandedConfidenceSourceIds((current) => {
       const next = new Set(current);
       if (next.has(sourceId)) {
         next.delete(sourceId);
@@ -634,6 +632,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
             const rowInputInvalidClass = boundaryError ? "border-red-300 focus:border-red-500 focus:ring-red-100" : "border-slate-300 focus:border-emerald-600 focus:ring-emerald-100";
             const maxRowNumber = sheet?.row_count || preview?.total_rows;
             const confidence = setupConfidence(source, files, preview, stalePreview, boundaryError);
+            const confidenceExpanded = expandedConfidenceSourceIds.has(source.id);
 
             return (
               <section key={source.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm" data-fade-section>
@@ -654,7 +653,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                           <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ${status.className}`}>
                             <StatusIcon className="size-3.5" /> {status.label}
                           </span>
-                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${confidence.className}`}>
+                          <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${confidence.badgeClassName}`}>
                             {confidence.label}
                           </span>
                         </div>
@@ -735,18 +734,27 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                           </label>
                         </div>
 
-                        <div className={`rounded-2xl border p-3 text-xs leading-5 ${confidence.className}`}>
+                        <div className="rounded-2xl border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-sm">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-semibold">Setup confidence</span>
-                            <span className="font-semibold">{confidence.score}%</span>
+                            <span className={`inline-flex rounded-full border px-2.5 py-1 font-semibold ${confidence.badgeClassName}`}>{confidence.label}</span>
+                            <span className="font-semibold text-slate-700">{confidence.score}%</span>
                           </div>
-                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/80">
+                          <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-100">
                             <div className={`h-full rounded-full transition-all ${confidence.barClassName}`} style={{ width: `${confidence.score}%` }} />
                           </div>
-                          <p className="mt-2">{confidence.detail}</p>
-                          <ul className="mt-2 space-y-1 text-[11px]">
-                            {confidence.checks.map((check) => <li key={check}>• {check}</li>)}
-                          </ul>
+                          <p className="mt-2 text-slate-500">{confidence.detail}</p>
+                          <button
+                            type="button"
+                            onClick={() => toggleConfidenceDetails(source.id)}
+                            className="mt-1 text-[11px] font-semibold text-emerald-700 transition hover:text-emerald-800"
+                          >
+                            {confidenceExpanded ? "Hide details" : "View details"}
+                          </button>
+                          {confidenceExpanded ? (
+                            <ul className="mt-2 space-y-1 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
+                              {confidence.checks.map((check) => <li key={check}>• {check}</li>)}
+                            </ul>
+                          ) : null}
                         </div>
 
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
