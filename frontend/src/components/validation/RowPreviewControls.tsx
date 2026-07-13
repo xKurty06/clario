@@ -316,6 +316,7 @@ export function RowPreviewControls() {
   };
 
   const reloadPreview = async (source: ComparisonDataSource) => {
+    if (busySourceId) return;
     setBusySourceId(source.id);
     setReloadVisualState(source.id, "loading");
     setSourceErrors((current) => ({ ...current, [source.id]: "" }));
@@ -344,6 +345,8 @@ export function RowPreviewControls() {
         const collapsed = Boolean(collapsedSources[source.id]);
         const error = sourceErrors[source.id];
         const reloadState = reloadVisualStates[source.id];
+        const isReloadingThisSource = busySourceId === source.id;
+        const isReloadLocked = Boolean(busySourceId);
 
         return (
           <>
@@ -352,13 +355,14 @@ export function RowPreviewControls() {
                 {error ? <span className="max-w-64 rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-700" title={error}>{error}</span> : null}
                 <button
                   type="button"
-                  title="Reload this source preview after changing row selections, source settings, or workbook data"
+                  title={isReloadingThisSource ? "Preview reload is already running" : "Reload this source preview after changing row selections, source settings, or workbook data"}
                   onClick={() => reloadPreview(source)}
-                  disabled={busySourceId === source.id}
+                  disabled={isReloadLocked}
+                  aria-busy={isReloadingThisSource}
                   className={toolbarButtonClass}
                 >
-                  {busySourceId === source.id ? <LoaderCircle className="size-4 animate-spin" /> : <Rows3 className="size-4" />}
-                  {busySourceId === source.id ? "Reloading..." : "Reload preview"}
+                  {isReloadingThisSource ? <LoaderCircle className="size-4 animate-spin" /> : <Rows3 className="size-4" />}
+                  {isReloadingThisSource ? "Reloading preview..." : "Reload preview"}
                 </button>
                 <button
                   type="button"
