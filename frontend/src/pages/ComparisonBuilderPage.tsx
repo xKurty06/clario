@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   Trash2,
   Wand2,
+  X,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -47,6 +48,7 @@ import type {
   RuleType,
   Severity,
 } from "../types/validation.types";
+import { buildSuggestedFieldsForSource, fieldTypeForLabel } from "../utils/fieldSuggestions";
 
 type BuilderStepId = "sources" | "rows" | "fields" | "rules" | "review";
 type EditorMode = "create" | "edit";
@@ -76,15 +78,6 @@ interface ConfirmDialogState {
   tone?: "danger" | "default";
   onConfirm: () => void;
 }
-
-const commonFields = [
-  { field_name: "Item Number", match: ["item", "no"] },
-  { field_name: "Description", match: ["description", "particular", "specification"] },
-  { field_name: "Quantity", match: ["qty", "quantity"] },
-  { field_name: "Unit", match: ["unit", "uom"] },
-  { field_name: "Unit Cost", match: ["unit cost", "unit price", "price"] },
-  { field_name: "Total Cost", match: ["total", "amount"] },
-];
 
 const presetNames: Record<PresetType, string[]> = {
   reference_vs_copied: ["Reference", "Copied file"],
@@ -176,26 +169,7 @@ function scaffoldSources(files: UploadedFile[]) {
 }
 
 function fieldTypeForName(fieldName: string): FieldType {
-  const text = fieldName.toLowerCase();
-  if (text.includes("cost") || text.includes("amount") || text.includes("price")) return "currency";
-  if (text.includes("qty") || text.includes("quantity")) return "number";
-  return "text";
-}
-
-function inferField(preview: DataSourcePreview, fieldName: string, terms: string[], dataSourceId: string): ComparisonField | null {
-  const column = preview.columns.find((item) => terms.some((term) => item.header_label.toLowerCase().includes(term)));
-  if (!column) return null;
-  return {
-    id: makeId("field"),
-    data_source_id: dataSourceId,
-    field_name: fieldName,
-    field_type: fieldTypeForName(fieldName),
-    column_letter: column.letter,
-    original_header_label: column.header_label,
-    custom_display_name: fieldName,
-    required: true,
-    normalization: { case_insensitive: true, trim_whitespace: true, collapse_whitespace: true },
-  };
+  return fieldTypeForLabel(fieldName);
 }
 
 function createFieldDraft(source: ComparisonDataSource, preview: DataSourcePreview) {
@@ -333,6 +307,19 @@ function ruleIsRunnable(rule: ComparisonRule) {
   return Boolean(rule.left_data_source_id && rule.left_field_id);
 }
 
+function ruleSuggestionKey(rule: ComparisonRule) {
+  return [
+    rule.rule_type,
+    rule.left_data_source_id ?? "",
+    rule.left_field_id ?? "",
+    rule.right_data_source_id ?? "",
+    rule.right_field_id ?? "",
+    rule.match_strategy,
+    [...rule.left_match_field_ids].sort().join(","),
+    [...rule.right_match_field_ids].sort().join(","),
+  ].join("|");
+}
+
 function sourceConfigSignature(source: ComparisonDataSource) {
   return [source.file_id, source.sheet_name, source.header_row, source.first_data_row].join("|");
 }
@@ -430,6 +417,7 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
   const [sourceEditor, setSourceEditor] = useState<SourceEditorState | null>(null);
   const [fieldEditor, setFieldEditor] = useState<FieldEditorState | null>(null);
   const [ruleEditor, setRuleEditor] = useState<RuleEditorState | null>(null);
+  const [ruleSuggestions, setRuleSuggestions] = useState<ComparisonRule[] | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
 
   useEffect(() => {
@@ -595,22 +583,27 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
     setPresetDecision("applied");
   };
 
-  const applyCommonFields = (source: ComparisonDataSource) => {
+  const applySuggestedFields = (source: ComparisonDataSource) => {
     const preview = sourcePreviews[source.id];
     if (!preview) return;
+    const nextFields = buildSuggestedFieldsForSource(source, preview, sourcePreviews);
+    if (!nextFields.length) {
+      setError("No matching column names were found in another source. Add fields manually or use matching field names across sources.");
+      return;
+    }
+    setError("");
     if (source.fields.length) {
       requestConfirm({
         title: "Replace current field mappings?",
-        description: "Applying the common procurement field preset will replace the current field mappings for this source.",
+        description: "Applying suggested fields will replace the current field mappings for this source.",
         confirmLabel: "Replace fields",
         onConfirm: () => updateDataSource(source.id, {
           ...source,
-          fields: commonFields.map((field) => inferField(preview, field.field_name, field.match, source.id)).filter((field): field is ComparisonField => Boolean(field)),
+          fields: nextFields,
         }),
       });
       return;
     }
-    const nextFields = commonFields.map((field) => inferField(preview, field.field_name, field.match, source.id)).filter((field): field is ComparisonField => Boolean(field));
     updateDataSource(source.id, { ...source, fields: nextFields });
   };
 
@@ -620,16 +613,25 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
     const right = dataSources[dataSources.length - 1];
     if (!left || !right) return;
     const next = buildCompareRulesForMatchingFields(left, right);
-    if (rules.length) {
-      requestConfirm({
-        title: "Replace current rules?",
-        description: "Building suggested rules will replace the current rule list with a new starter set based on the mapped fields.",
-        confirmLabel: "Replace rules",
-        onConfirm: () => setRules(next),
-      });
+    if (!next.length) {
+      setError("No matching field names were found across the first and last sources. Map matching fields before building suggested rules.");
       return;
     }
-    setRules(next);
+    setError("");
+    setRuleSuggestions(next);
+  };
+
+  const addSuggestedRules = (selectedRules: ComparisonRule[]) => {
+    const existingKeys = new Set(rules.map(ruleSuggestionKey));
+    const additions = selectedRules.filter((rule) => !existingKeys.has(ruleSuggestionKey(rule)));
+    if (!additions.length) {
+      setRuleSuggestions(null);
+      setError("Selected suggested rules are already in the rule list.");
+      return;
+    }
+    setRules([...rules, ...additions]);
+    setRuleSuggestions(null);
+    setError("");
   };
 
   const run = async () => {
@@ -828,11 +830,11 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
                     <div className="flex flex-wrap gap-2">
                       <button
                         disabled={!preview}
-                        title="Apply a starter set of common procurement field mappings to this source"
-                        onClick={() => applyCommonFields(source)}
+                        title="Suggest field mappings from column names that also appear in another source"
+                        onClick={() => applySuggestedFields(source)}
                         className={secondaryButtonClass}
                       >
-                        Apply common procurement fields
+                        Add suggested fields
                       </button>
                       <button
                         disabled={!preview}
@@ -1023,6 +1025,13 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
         onSave={saveRule}
         requestConfirm={requestConfirm}
       />
+      <RuleSuggestionDialog
+        suggestions={ruleSuggestions}
+        existingRules={rules}
+        sources={dataSources}
+        onAdd={addSuggestedRules}
+        onClose={() => setRuleSuggestions(null)}
+      />
       <ConfirmationDialog state={confirmDialog} onClose={() => setConfirmDialog(null)} />
     </div>
   );
@@ -1044,6 +1053,133 @@ function Metric({ label, value }: { label: string; value: string }) {
       <dd className="mt-1 font-semibold text-slate-900">{value}</dd>
     </div>
   );
+}
+
+function RuleSuggestionDialog({
+  suggestions,
+  existingRules,
+  sources,
+  onAdd,
+  onClose,
+}: {
+  suggestions: ComparisonRule[] | null;
+  existingRules: ComparisonRule[];
+  sources: ComparisonDataSource[];
+  onAdd: (rules: ComparisonRule[]) => void;
+  onClose: () => void;
+}) {
+  const existingKeys = useMemo(() => new Set(existingRules.map(ruleSuggestionKey)), [existingRules]);
+  const availableSuggestions = useMemo(() => suggestions?.filter((rule) => !existingKeys.has(ruleSuggestionKey(rule))) ?? [], [existingKeys, suggestions]);
+  const [selectedRuleIds, setSelectedRuleIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    setSelectedRuleIds(availableSuggestions.map((rule) => rule.id));
+  }, [availableSuggestions]);
+
+  if (!suggestions) return null;
+
+  const selectedRules = suggestions.filter((rule) => selectedRuleIds.includes(rule.id));
+  const dialog = (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center px-4">
+      <button aria-label="Close suggested rules dialog" className="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px]" onClick={onClose} />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="suggested-rules-title"
+        className="relative max-h-[88vh] w-full max-w-3xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl animate-[builder-dialog-in_180ms_cubic-bezier(0.16,1,0.3,1)_forwards]"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 p-6">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-2xl bg-emerald-50 text-emerald-700">
+              <Wand2 className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <h2 id="suggested-rules-title" className="text-lg font-semibold text-slate-950">Choose rules to add</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                Suggested rules are built from fields with matching names across the first and last sources.
+              </p>
+            </div>
+          </div>
+          <button type="button" aria-label="Close" title="Close" onClick={onClose} className="grid size-9 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600">
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="max-h-[56vh] overflow-auto p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-sm text-slate-500">{availableSuggestions.length} new of {suggestions.length} suggested rule{suggestions.length === 1 ? "" : "s"}</p>
+            <div className="flex flex-wrap gap-2">
+              <button type="button" onClick={() => setSelectedRuleIds(availableSuggestions.map((rule) => rule.id))} className={secondaryButtonClass}>Select all new</button>
+              <button type="button" onClick={() => setSelectedRuleIds([])} className={secondaryButtonClass}>Clear</button>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {suggestions.map((rule) => {
+              const isDuplicate = existingKeys.has(ruleSuggestionKey(rule));
+              const checked = selectedRuleIds.includes(rule.id);
+              const left = sources.find((source) => source.id === rule.left_data_source_id);
+              const right = sources.find((source) => source.id === rule.right_data_source_id);
+              const leftField = left?.fields.find((field) => field.id === rule.left_field_id);
+              const rightField = right?.fields.find((field) => field.id === rule.right_field_id);
+              return (
+                <label
+                  key={rule.id}
+                  className={`flex gap-3 rounded-2xl border p-4 text-sm transition ${isDuplicate ? "border-slate-200 bg-slate-50 opacity-70" : checked ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}
+                  title={isDuplicate ? "This suggested rule is already in the rule list" : `Add ${rule.rule_name}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={isDuplicate}
+                    onChange={(event) => {
+                      const nextChecked = event.target.checked;
+                      setSelectedRuleIds((current) => nextChecked ? [...new Set([...current, rule.id])] : current.filter((id) => id !== rule.id));
+                    }}
+                    className="mt-1 size-4 rounded border-slate-300 accent-emerald-700"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-slate-950">{rule.rule_name}</span>
+                      <StatusBadge tone={rule.severity === "high" ? "warning" : "neutral"}>{severityLabels[rule.severity]}</StatusBadge>
+                      {isDuplicate ? <StatusBadge tone="neutral">Already added</StatusBadge> : null}
+                    </span>
+                    <span className="mt-2 block text-xs leading-5 text-slate-600">
+                      {left?.name ?? "Source"}: <span className="font-semibold text-slate-800">{fieldLabel(leftField)}</span>
+                      {right ? <> / {right.name}: <span className="font-semibold text-slate-800">{fieldLabel(rightField)}</span></> : null}
+                    </span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-500">
+                      {ruleTypeLabels[rule.rule_type]} / {matchLabels[rule.match_strategy]} / {titleCaseStrictness(rule.strictness)}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+
+          {!availableSuggestions.length ? (
+            <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+              All suggested rules are already in the rule list.
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 p-5">
+          <div className="text-sm text-slate-500">
+            {selectedRules.length} rule{selectedRules.length === 1 ? "" : "s"} selected
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" onClick={onClose} className={secondaryButtonClass}>Cancel</button>
+            <button type="button" disabled={!selectedRules.length} onClick={() => onAdd(selectedRules)} className={primaryButtonClass}>
+              Add selected rules
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  return createPortal(dialog, document.body);
 }
 
 function SourceDrawer({
