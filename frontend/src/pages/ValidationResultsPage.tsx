@@ -1,5 +1,5 @@
 import { FileDown, FileSearch, Search } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState, type UIEvent } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState } from "../components/common/EmptyState";
 import { SelectField } from "../components/forms";
@@ -140,6 +140,47 @@ export function ValidationResultsPage() {
   const { result } = useWorkflow();
   const [query, setQuery] = useState("");
   const [severity, setSeverity] = useState("all");
+  const [showHorizontalSlider, setShowHorizontalSlider] = useState(false);
+  const headerScrollRef = useRef<HTMLDivElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+
+  const syncHorizontalScroll = (event: UIEvent<HTMLDivElement>, targets: Array<HTMLDivElement | null>) => {
+    for (const target of targets) {
+      if (!target || target.scrollLeft === event.currentTarget.scrollLeft) continue;
+      target.scrollLeft = event.currentTarget.scrollLeft;
+    }
+  };
+
+  useEffect(() => {
+    const tableScroller = tableScrollRef.current;
+    if (!tableScroller) {
+      setShowHorizontalSlider(false);
+      return;
+    }
+
+    const updateOverflow = () => {
+      const hasOverflow = tableScroller.scrollWidth > tableScroller.clientWidth + 1;
+      setShowHorizontalSlider(hasOverflow);
+
+      if (!hasOverflow) {
+        tableScroller.scrollLeft = 0;
+        if (headerScrollRef.current) headerScrollRef.current.scrollLeft = 0;
+        if (topScrollRef.current) topScrollRef.current.scrollLeft = 0;
+      }
+    };
+
+    updateOverflow();
+
+    const resizeObserver = new ResizeObserver(updateOverflow);
+    resizeObserver.observe(tableScroller);
+    window.addEventListener("resize", updateOverflow);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updateOverflow);
+    };
+  }, [query, result, severity]);
 
   if (!result) {
     return (
@@ -176,7 +217,7 @@ export function ValidationResultsPage() {
         )}
       />
 
-      <div className="grid grid-cols-4 divide-x divide-slate-200 border-b border-slate-200 py-6">
+      <div className="grid grid-cols-4 divide-x divide-slate-200 border-b border-slate-200 py-3">
         {[
           ["Discrepancies", result.discrepancies.length],
           ["High severity", result.breakdown.high ?? 0],
@@ -185,22 +226,22 @@ export function ValidationResultsPage() {
         ].map(([label, value]) => (
           <div key={String(label)} className="px-5 first:pl-0">
             <p className="text-xs text-slate-500">{label}</p>
-            <p className="mt-1 text-2xl font-semibold">{value}</p>
+            <p className="mt-0.5 text-xl font-semibold">{value}</p>
           </div>
         ))}
       </div>
 
-      <div className="grid items-start gap-8 pt-6 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <aside className="h-fit self-start rounded-2xl border border-slate-200 bg-white p-5">
-          <h2 className="text-base font-semibold">Rule breakdown</h2>
-          <div className="mt-4 max-h-[calc(100dvh-18rem)] space-y-3 overflow-y-auto pr-1">
+      <div className="grid items-start gap-5 pt-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="h-fit self-start rounded-2xl border border-slate-200 bg-white p-4">
+          <h2 className="text-sm font-semibold">Rule breakdown</h2>
+          <div className="mt-3 max-h-[calc(100dvh-18rem)] space-y-2 overflow-y-auto pr-1">
             {result.rule_summaries.map((rule) => (
-              <div key={rule.rule_id} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold">{rule.rule_name}</p>
-                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">{rule.discrepancy_count}</span>
+              <div key={rule.rule_id} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="min-w-0 text-sm font-semibold leading-5">{rule.rule_name}</p>
+                  <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">{rule.discrepancy_count}</span>
                 </div>
-                <p className="mt-1 text-xs text-slate-500">{ruleLabels[rule.rule_type]} - {rule.severity}</p>
+                <p className="mt-0.5 text-xs leading-5 text-slate-500">{ruleLabels[rule.rule_type]} - {rule.severity}</p>
               </div>
             ))}
           </div>
@@ -231,42 +272,85 @@ export function ValidationResultsPage() {
             />
           </div>
 
-          <div className="overflow-auto rounded-2xl border border-slate-200 bg-white">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-100 text-xs text-slate-600">
-                <tr>
-                  <th className="p-3">Rule</th>
-                  <th className="p-3">Severity</th>
-                  <th className="p-3">Expected location</th>
-                  <th className="p-3">Actual location</th>
-                  <th className="p-3">Expected</th>
-                  <th className="p-3">Actual</th>
-                  <th className="p-3">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(({ item, note }, index) => (
-                  <tr key={`${item.rule_id}-${index}`} className="border-t border-slate-100 align-top">
-                    <td className="p-3">
-                      <p className="font-semibold">{item.rule_name}</p>
-                      <p className="mt-1 text-xs text-slate-500">{item.left_field_name ?? item.right_field_name ?? ruleLabels[item.rule_type]}</p>
-                    </td>
-                    <td className="p-3">
-                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.severity === "high" ? "bg-red-50 text-red-700" : item.severity === "medium" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-700"}`}>{item.severity}</span>
-                    </td>
-                    <td className="p-3 text-xs text-slate-600">{item.left_file_name ?? "-"}<br />{item.left_sheet_name ?? "-"} - row {item.left_row_number ?? "-"}</td>
-                    <td className="p-3 text-xs text-slate-600">{item.right_file_name ?? "-"}<br />{item.right_sheet_name ?? "-"} - row {item.right_row_number ?? "-"}</td>
-                    <td className="max-w-xs p-3">{item.expected_value ?? "-"}</td>
-                    <td className="max-w-xs p-3">{item.actual_value ?? "-"}</td>
-                    <td className="max-w-sm p-3 text-slate-600">
-                      <p className="font-semibold text-slate-900">{note.title}</p>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">{note.detail}</p>
-                    </td>
+          <div className="rounded-2xl border border-slate-200 bg-white">
+            {showHorizontalSlider ? (
+              <div
+                ref={topScrollRef}
+                aria-label="Scroll discrepancy table horizontally"
+                className="overflow-x-auto overflow-y-hidden border-b border-slate-200 bg-white"
+                onScroll={(event) => syncHorizontalScroll(event, [headerScrollRef.current, tableScrollRef.current])}
+              >
+                <div className="h-1 min-w-[1080px]" />
+              </div>
+            ) : null}
+
+            <div
+              ref={headerScrollRef}
+              className="sticky top-0 z-[80] overflow-hidden border-b border-slate-200 bg-white shadow-sm"
+            >
+              <table className="min-w-[1080px] w-full table-fixed text-left text-sm">
+                <colgroup>
+                  <col className="w-[140px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[180px]" />
+                  <col className="w-[180px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[200px]" />
+                </colgroup>
+                <thead className="bg-slate-100 text-xs text-slate-600">
+                  <tr>
+                    <th className="p-3">Rule</th>
+                    <th className="p-3">Severity</th>
+                    <th className="p-3">Expected location</th>
+                    <th className="p-3">Actual location</th>
+                    <th className="p-3">Expected</th>
+                    <th className="p-3">Actual</th>
+                    <th className="p-3">Notes</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {!filtered.length && <p className="p-8 text-center text-sm text-slate-500">No discrepancies match the current filters.</p>}
+                </thead>
+              </table>
+            </div>
+
+            <div
+              ref={tableScrollRef}
+              className="overflow-x-auto"
+              onScroll={(event) => syncHorizontalScroll(event, [headerScrollRef.current, topScrollRef.current])}
+            >
+              <table className="min-w-[1080px] w-full table-fixed text-left text-sm">
+                <colgroup>
+                  <col className="w-[140px]" />
+                  <col className="w-[80px]" />
+                  <col className="w-[180px]" />
+                  <col className="w-[180px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[200px]" />
+                </colgroup>
+                <tbody>
+                  {filtered.map(({ item, note }, index) => (
+                    <tr key={`${item.rule_id}-${index}`} className="border-t border-slate-100 align-top first:border-t-0">
+                      <td className="p-3">
+                        <p className="font-semibold leading-5">{item.rule_name}</p>
+                        <p className="mt-1 text-xs text-slate-500">{item.left_field_name ?? item.right_field_name ?? ruleLabels[item.rule_type]}</p>
+                      </td>
+                      <td className="p-3">
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.severity === "high" ? "bg-red-50 text-red-700" : item.severity === "medium" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-700"}`}>{item.severity}</span>
+                      </td>
+                      <td className="break-words p-3 text-xs text-slate-600">{item.left_file_name ?? "-"}<br />{item.left_sheet_name ?? "-"} - row {item.left_row_number ?? "-"}</td>
+                      <td className="break-words p-3 text-xs text-slate-600">{item.right_file_name ?? "-"}<br />{item.right_sheet_name ?? "-"} - row {item.right_row_number ?? "-"}</td>
+                      <td className="break-words p-3">{item.expected_value ?? "-"}</td>
+                      <td className="break-words p-3">{item.actual_value ?? "-"}</td>
+                      <td className="break-words p-3 text-slate-600">
+                        <p className="font-semibold text-slate-900">{note.title}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">{note.detail}</p>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {!filtered.length && <p className="p-8 text-center text-sm text-slate-500">No discrepancies match the current filters.</p>}
+            </div>
           </div>
         </section>
       </div>

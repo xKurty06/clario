@@ -103,7 +103,7 @@ export function AppShell() {
   }, []);
 
   return (
-    <div className="min-h-[100dvh] overflow-x-hidden bg-slate-50 text-slate-950" style={shellStyle}>
+    <div className="min-h-[100dvh] overflow-x-clip bg-slate-50 text-slate-950" style={shellStyle}>
       <aside
         className={`fixed inset-y-0 left-0 z-30 flex flex-col overflow-hidden border-r border-slate-200 bg-white transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${collapsed ? "w-[72px]" : "w-[272px]"}`}
       >

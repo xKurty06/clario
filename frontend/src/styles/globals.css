@@ -9,8 +9,8 @@
 }
 
 * { box-sizing: border-box; }
-html { min-width: 0; overflow-x: hidden; }
-body { margin: 0; min-width: 0; min-height: 100dvh; overflow-x: hidden; }
+html { min-width: 0; overflow-x: clip; }
+body { margin: 0; min-width: 0; min-height: 100dvh; overflow-x: clip; }
 button, input, select, textarea { font: inherit; }
 
 :where(p, h1, h2, h3, h4, h5, h6, dd, dt, li, label) {
