@@ -63,12 +63,24 @@ function scaffoldSources(files: UploadedFile[], preset: string) {
   }).filter((source): source is ComparisonDataSource => Boolean(source));
 }
 
+function sourcesMatchPresetRoles(dataSources: ComparisonDataSource[], roles: string[]) {
+  if (!roles.length || dataSources.length < roles.length) return false;
+  return roles.every((role, index) => dataSources[index]?.name.startsWith(`${role} - `));
+}
+
 function dismissPresetBanner() {
-  window.setTimeout(() => {
+  let attempts = 0;
+  const clickStartManual = () => {
+    attempts += 1;
     const buttons = Array.from(document.querySelectorAll("button"));
     const startManualButton = buttons.find((button) => button.textContent?.trim().includes("Start manually"));
-    startManualButton?.click();
-  }, 0);
+    if (startManualButton) {
+      startManualButton.click();
+      return;
+    }
+    if (attempts < 20) window.setTimeout(clickStartManual, 50);
+  };
+  window.setTimeout(clickStartManual, 0);
 }
 
 export function PresetAwareComparisonBuilderPage() {
@@ -79,6 +91,8 @@ export function PresetAwareComparisonBuilderPage() {
   const [presetRolesApplied, setPresetRolesApplied] = useState(false);
   const rowSetupComplete = dataSources.length > 0 && dataSources.every((source) => source.row_setup_confirmed);
   const roles = useMemo(() => (isConfigurablePreset(preset) ? presetRoleLabels[preset] : []), [preset]);
+  const roleSourcesApplied = useMemo(() => sourcesMatchPresetRoles(dataSources, roles), [dataSources, roles]);
+  const presetSetupApplied = presetRolesApplied || roleSourcesApplied;
 
   const needsRowSetup = useMemo(
     () => files.length > 0 && (!dataSources.length || reviewRowSetup || !rowSetupComplete || !rowSetupContinued),
@@ -99,12 +113,12 @@ export function PresetAwareComparisonBuilderPage() {
   }, [preset]);
 
   useEffect(() => {
-    if (presetRolesApplied && !needsRowSetup) dismissPresetBanner();
-  }, [needsRowSetup, presetRolesApplied]);
+    if (presetSetupApplied && !needsRowSetup) dismissPresetBanner();
+  }, [needsRowSetup, presetSetupApplied]);
 
   useEffect(() => {
     const interceptPresetSetup = (event: MouseEvent) => {
-      if (!roles.length || chooserOpen || needsRowSetup || presetRolesApplied) return;
+      if (!roles.length || chooserOpen || needsRowSetup || presetSetupApplied) return;
       const target = event.target as Element | null;
       if (!target || target.closest("[data-preset-role-dialog]")) return;
       const button = target.closest("button");
@@ -118,7 +132,7 @@ export function PresetAwareComparisonBuilderPage() {
 
     document.addEventListener("click", interceptPresetSetup, true);
     return () => document.removeEventListener("click", interceptPresetSetup, true);
-  }, [chooserOpen, needsRowSetup, presetRolesApplied, roles.length]);
+  }, [chooserOpen, needsRowSetup, presetSetupApplied, roles.length]);
 
   const applyRoleChoices = (roleFileIds: string[]) => {
     const selectedFiles = roleFileIds
