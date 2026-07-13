@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   ArrowRight,
+  ChevronDown,
   Columns3,
   Database,
   Edit3,
@@ -134,6 +135,7 @@ const formulaOperatorLabels: Record<FormulaSettings["operator"], string> = {
 const primaryButtonClass = "inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300";
 const secondaryButtonClass = "inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50";
 const iconButtonClass = "grid size-9 place-items-center rounded-xl border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600";
+const rowPreviewButtonClass = "inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-60";
 
 function isValidPreset(value: string): value is PresetType {
   return value === "reference_vs_copied" || value === "reference_bidder_abstract" || value === "generic_two_file" || value === "custom_comparison_builder";
@@ -579,6 +581,7 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
   const [ruleEditor, setRuleEditor] = useState<RuleEditorState | null>(null);
   const [ruleSuggestions, setRuleSuggestions] = useState<ComparisonRule[] | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
+  const [collapsedRowPreviews, setCollapsedRowPreviews] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!files.length || dataSources.length) return;
@@ -926,26 +929,51 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
                   <div className="flex items-end justify-between gap-4">
                     <div>
                       <h2 className="font-semibold">{source.name}</h2>
-                      <p className="mt-1 text-sm text-slate-500">{source.selected_row_numbers.length} selected / {source.ignored_row_numbers.length} ignored</p>
+                      <p className="mt-1 text-sm leading-5 text-slate-500">Click rows to include or exclude them from validation.</p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        title={busy === source.id ? "Preview reload is already running" : "Reload this source preview after changing row selections, source settings, or workbook data"}
+                        onClick={() => refreshPreview(source)}
+                        disabled={Boolean(busy)}
+                        aria-busy={busy === source.id}
+                        className={rowPreviewButtonClass}
+                      >
+                        {busy === source.id ? <LoaderCircle className="size-4 animate-spin" /> : <Rows3 className="size-4" />}
+                        {busy === source.id ? "Reloading preview..." : "Reload preview"}
+                      </button>
+                      <button
+                        type="button"
+                        title={collapsedRowPreviews[source.id] ? "Expand this preview table" : "Collapse this preview table to reduce page clutter"}
+                        aria-expanded={!collapsedRowPreviews[source.id]}
+                        onClick={() => setCollapsedRowPreviews((current) => ({ ...current, [source.id]: !current[source.id] }))}
+                        className={rowPreviewButtonClass}
+                      >
+                        <ChevronDown className={`size-4 transition-transform ease-[cubic-bezier(0.16,1,0.3,1)] duration-[240ms] ${collapsedRowPreviews[source.id] ? "-rotate-90" : ""}`} />
+                        {collapsedRowPreviews[source.id] ? "Expand" : "Collapse"}
+                      </button>
                     </div>
                   </div>
-                  <RowSelectionTable
-                    headers={headers}
-                    rows={dataRows}
-                    onToggleRow={(rowNumber) => {
-                      const selected = source.selected_row_numbers.includes(rowNumber) ? source.selected_row_numbers.filter((item) => item !== rowNumber) : [...source.selected_row_numbers, rowNumber];
-                      setRowsForSource(source, preview, selected);
-                    }}
-                    onSelectRows={(rowNumbers) => setRowsForSource(source, preview, rowNumbers)}
-                    onIgnoreRows={(rowNumbers) => {
-                      const ignored = [...new Set([...source.ignored_row_numbers, ...rowNumbers])];
-                      setRowsForSource(source, preview, source.selected_row_numbers.filter((row) => !ignored.includes(row)), ignored);
-                    }}
-                    onMarkDataRows={(rowNumbers) => {
-                      const ignored = source.ignored_row_numbers.filter((row) => !rowNumbers.includes(row));
-                      setRowsForSource(source, preview, [...new Set([...source.selected_row_numbers, ...rowNumbers])], ignored);
-                    }}
-                  />
+                  {collapsedRowPreviews[source.id] ? null : (
+                    <RowSelectionTable
+                      headers={headers}
+                      rows={dataRows}
+                      onToggleRow={(rowNumber) => {
+                        const selected = source.selected_row_numbers.includes(rowNumber) ? source.selected_row_numbers.filter((item) => item !== rowNumber) : [...source.selected_row_numbers, rowNumber];
+                        setRowsForSource(source, preview, selected);
+                      }}
+                      onSelectRows={(rowNumbers) => setRowsForSource(source, preview, rowNumbers)}
+                      onIgnoreRows={(rowNumbers) => {
+                        const ignored = [...new Set([...source.ignored_row_numbers, ...rowNumbers])];
+                        setRowsForSource(source, preview, source.selected_row_numbers.filter((row) => !ignored.includes(row)), ignored);
+                      }}
+                      onMarkDataRows={(rowNumbers) => {
+                        const ignored = source.ignored_row_numbers.filter((row) => !rowNumbers.includes(row));
+                        setRowsForSource(source, preview, [...new Set([...source.selected_row_numbers, ...rowNumbers])], ignored);
+                      }}
+                    />
+                  )}
                 </article>
               );
             })}

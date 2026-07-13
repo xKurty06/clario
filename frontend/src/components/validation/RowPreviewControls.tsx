@@ -13,7 +13,7 @@ interface RowPreviewTarget {
 
 type ReloadVisualState = "loading" | "reloaded";
 
-const toolbarButtonClass = "inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-60";
+const toolbarButtonClass = "inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-60";
 const smoothCollapseTiming = "360ms cubic-bezier(0.16, 1, 0.3, 1)";
 const smoothFeedbackTiming = "260ms cubic-bezier(0.16, 1, 0.3, 1)";
 
@@ -23,13 +23,12 @@ function prefersReducedMotion() {
 
 function findRowPreviewArticle(source: ComparisonDataSource) {
   const headings = Array.from(document.querySelectorAll<HTMLElement>("main article h2"));
-  const summaryText = `${source.selected_row_numbers.length} selected / ${source.ignored_row_numbers.length} ignored`;
 
   for (const heading of headings) {
     if (heading.textContent?.trim() !== source.name) continue;
     const article = heading.closest("article") as HTMLElement | null;
     if (!article) continue;
-    const isRowsPreview = Boolean(article.querySelector("table")) && Boolean(article.textContent?.includes(summaryText));
+    const isRowsPreview = Boolean(article.querySelector("table"));
     if (isRowsPreview) return article;
   }
 
@@ -41,11 +40,11 @@ function previewBodyElements(article: HTMLElement) {
 }
 
 function ensureControlsMount(article: HTMLElement, sourceId: string) {
-  const header = article.firstElementChild as HTMLElement | null;
-  if (!header) return null;
-
   const existing = article.querySelector<HTMLElement>(`[data-row-preview-controls-slot="${sourceId}"]`);
   if (existing) return existing;
+
+  const header = article.firstElementChild as HTMLElement | null;
+  if (!header) return null;
 
   const mount = document.createElement("div");
   mount.dataset.rowPreviewControlsSlot = sourceId;
@@ -81,7 +80,7 @@ function prepareCollapsibleElement(element: HTMLElement) {
     `transform ${smoothCollapseTiming}`,
     `box-shadow ${smoothFeedbackTiming}`,
   ].join(", ");
-  element.style.willChange = "max-height, opacity, filter, transform, box-shadow";
+  element.style.willChange = "";
 }
 
 function applyReloadVisualState(article: HTMLElement, state?: ReloadVisualState) {
@@ -90,6 +89,7 @@ function applyReloadVisualState(article: HTMLElement, state?: ReloadVisualState)
     if (element.dataset.rowPreviewAnimating === "true") continue;
 
     if (state === "loading") {
+      element.style.willChange = "opacity, filter, transform, box-shadow";
       element.style.opacity = "0.66";
       element.style.filter = "blur(0.7px) saturate(0.96)";
       element.style.transform = "scale(0.998)";
@@ -98,6 +98,7 @@ function applyReloadVisualState(article: HTMLElement, state?: ReloadVisualState)
     }
 
     if (state === "reloaded") {
+      element.style.willChange = "box-shadow";
       element.style.opacity = "1";
       element.style.filter = "none";
       element.style.transform = "none";
@@ -107,6 +108,7 @@ function applyReloadVisualState(article: HTMLElement, state?: ReloadVisualState)
 
     element.style.filter = "";
     element.style.boxShadow = "";
+    element.style.willChange = "";
     if (element.dataset.rowPreviewCollapsed !== "true") {
       element.style.opacity = "";
       element.style.transform = "";
@@ -124,6 +126,7 @@ function finishExpandedElement(element: HTMLElement) {
   element.style.transform = "";
   element.style.boxShadow = "";
   element.style.pointerEvents = "";
+  element.style.willChange = "";
 }
 
 function finishCollapsedElement(element: HTMLElement) {
@@ -136,6 +139,7 @@ function finishCollapsedElement(element: HTMLElement) {
   element.style.transform = "translateY(-4px)";
   element.style.boxShadow = "";
   element.style.pointerEvents = "none";
+  element.style.willChange = "";
 }
 
 function setCollapsibleElementState(element: HTMLElement, collapsed: boolean) {
@@ -177,6 +181,7 @@ function setCollapsibleElementState(element: HTMLElement, collapsed: boolean) {
 
   element.dataset.rowPreviewAnimating = "true";
   element.ontransitionend = null;
+  element.style.willChange = "max-height, opacity, transform";
 
   if (collapsed) {
     element.hidden = false;

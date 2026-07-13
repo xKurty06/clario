@@ -14,7 +14,6 @@ import { useState, type CSSProperties } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { appConfig } from "../../app/config";
 import { CommonFieldsChooser } from "../validation/CommonFieldsChooser";
-import { RowPreviewControls } from "../validation/RowPreviewControls";
 
 const logoSrc = "/assets/clario-logo_light.png";
 
@@ -147,7 +146,6 @@ export function AppShell() {
           </div>
         </div>
       </main>
-      <RowPreviewControls />
       <CommonFieldsChooser />
     </div>
   );

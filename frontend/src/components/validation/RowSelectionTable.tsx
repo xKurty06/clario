@@ -18,11 +18,11 @@ interface RowWarning {
   reason: string;
 }
 
-const toolbarButtonClass = "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50";
+const toolbarButtonClass = "inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50";
 const rangeInputClass = "h-8 w-20 rounded-lg border border-slate-200 bg-white px-2 text-center text-xs font-semibold text-slate-800 outline-none placeholder:font-medium placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100";
 const menuItemClass = "flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus:bg-slate-50 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50";
 const menuSectionClass = "px-3 pt-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400";
-const rowCellClass = "border-b border-slate-100 p-2.5 align-middle text-xs font-normal leading-5 text-slate-700 antialiased";
+const rowCellClass = "border-b border-slate-100 p-2.5 align-middle text-sm font-normal leading-5 text-slate-950";
 const summaryTerms = ["grand total", "subtotal", "total"];
 const sectionTerms = ["lot", "section", "category"];
 const footerTerms = ["signature", "prepared by", "approved by", "certified by", "noted by", "checked by"];
@@ -181,18 +181,17 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
   };
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white font-sans text-slate-900 antialiased">
+    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white font-sans text-slate-900 subpixel-antialiased [text-rendering:auto]">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-t-2xl border-b border-slate-200 bg-white p-3 text-xs text-slate-700">
         <div className="min-w-0">
-          <p className="font-semibold text-slate-950">{selectedRows.length} of {selectableRowNumbers.length} row{selectableRowNumbers.length === 1 ? "" : "s"} included</p>
-          <p className="mt-0.5 text-[11px] leading-4 text-slate-500">Click rows to include or exclude them from validation.</p>
+          <p className="text-sm font-semibold leading-5 text-slate-950">{selectedRows.length} of {selectableRowNumbers.length} row{selectableRowNumbers.length === 1 ? "" : "s"} included</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button type="button" title="Include all rows in this preview" aria-label="Include all rows in this preview" onClick={() => onSelectRows(selectableRowNumbers)} className={toolbarButtonClass}>
-            <CheckSquare className="size-3.5" /> Select all
+            <CheckSquare className="size-4" /> Select all
           </button>
           <button type="button" title="Clear the current row selection" aria-label="Clear the current row selection" onClick={() => onSelectRows([])} className={toolbarButtonClass}>
-            <Square className="size-3.5" /> Select none
+            <Square className="size-4" /> Select none
           </button>
           <div className="relative">
             <button
@@ -204,7 +203,7 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
               onClick={() => setMoreActionsOpen((open) => !open)}
               className={toolbarButtonClass}
             >
-              <MoreHorizontal className="size-3.5" /> More <ChevronDown className={`size-3.5 transition ${moreActionsOpen ? "rotate-180" : ""}`} />
+              <MoreHorizontal className="size-4" /> More <ChevronDown className={`size-4 transition ${moreActionsOpen ? "rotate-180" : ""}`} />
             </button>
             {moreActionsOpen ? (
               <div
@@ -307,13 +306,13 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
       ) : null}
 
       <div className="relative max-h-[520px] overflow-auto rounded-b-2xl bg-white">
-        <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs leading-5">
-          <thead className="sticky top-0 z-10 bg-slate-50 text-[12px] font-semibold text-slate-700">
+        <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm leading-5">
+          <thead className="sticky top-0 z-10 bg-slate-50 text-sm font-normal text-slate-950">
             <tr>
-              <th className="w-12 border-b border-slate-200 p-2.5 text-center">Use</th>
-              <th className="w-24 border-b border-slate-200 p-2.5">Excel row</th>
-              <th className="w-28 border-b border-slate-200 p-2.5">Status</th>
-              {headers.map((header) => <th key={header} className="max-w-64 border-b border-slate-200 p-2.5">{header}</th>)}
+              <th className="w-12 border-b border-slate-200 p-2.5 text-center font-normal">Use</th>
+              <th className="w-24 border-b border-slate-200 p-2.5 font-normal">Excel row</th>
+              <th className="w-28 border-b border-slate-200 p-2.5 font-normal">Status</th>
+              {headers.map((header) => <th key={header} className="max-w-64 border-b border-slate-200 p-2.5 font-normal">{header}</th>)}
             </tr>
           </thead>
           <tbody>
@@ -334,7 +333,7 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
                     if (!locked) onToggleRow(row.row_number);
                   }}
                   onKeyDown={(event) => handleRowKeyDown(event, row.row_number)}
-                  className={`group border-t border-slate-100 align-middle transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${locked ? "cursor-not-allowed" : "cursor-pointer hover:bg-slate-50"} ${needsReview ? "bg-amber-50/70" : isHeaderRow ? "bg-sky-50/80" : row.selected ? "bg-emerald-50/35" : ""} ${locked && !isHeaderRow ? "opacity-90" : ""} ${row.ignored && !row.selected && !locked ? "opacity-90" : ""}`}
+                  className={`group border-t border-slate-100 align-middle transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${locked ? "cursor-not-allowed" : "cursor-pointer hover:bg-emerald-100/55"} ${needsReview ? "bg-amber-50/70" : isHeaderRow ? "bg-sky-50/80" : row.selected ? "bg-emerald-50/35" : ""} ${locked && !isHeaderRow ? "opacity-90" : ""} ${row.ignored && !row.selected && !locked ? "opacity-90" : ""}`}
                 >
                   <td className="border-b border-slate-100 p-0 align-middle">
                     <div className="flex min-h-11 items-center justify-center px-2.5 py-2">
@@ -349,7 +348,7 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
                       />
                     </div>
                   </td>
-                  <td className={`${rowCellClass} font-semibold text-slate-700`}>{row.row_number}</td>
+                  <td className={rowCellClass}>{row.row_number}</td>
                   <td className="border-b border-slate-100 p-2.5 align-middle">
                     <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${status.className}`}>{status.label}</span>
                   </td>
