@@ -228,6 +228,12 @@ def _data_source_map(data_sources: list[ComparisonDataSource]) -> dict[str, Comp
     return {data_source.id: data_source for data_source in data_sources}
 
 
+def _source_file_name(data_source: ComparisonDataSource | None) -> str | None:
+    if not data_source:
+        return None
+    return data_source.file_name or data_source.name
+
+
 def _rule_records(records: list[ExtractedRecord], data_source_id: str | None) -> list[ExtractedRecord]:
     if not data_source_id:
         return []
@@ -242,6 +248,10 @@ def _compare_rule(
     left_records = _rule_records(records, rule.left_data_source_id)
     right_records = _rule_records(records, rule.right_data_source_id)
     left_field = get_field(data_sources, rule.left_field_id) if rule.left_field_id else None
+    right_field = get_field(data_sources, rule.right_field_id) if rule.right_field_id else None
+    sources_by_id = _data_source_map(data_sources)
+    left_source = sources_by_id.get(rule.left_data_source_id or "")
+    right_source = sources_by_id.get(rule.right_data_source_id or "")
     discrepancies: list[RuleDiscrepancy] = []
     pairs = _matched_pairs(left_records, right_records, rule)
     left_match_fields = _match_field_ids(rule, "left")
@@ -297,20 +307,24 @@ def _compare_rule(
             source_match_fields = _match_field_ids(rule, "left" if left_record else "right")
             if source and _has_blank_match_key(source, source_match_fields):
                 continue
+            left_value = get_field_value(left_record, rule.left_field_id) if left_record and rule.left_field_id else None
+            right_value = get_field_value(right_record, rule.right_field_id) if right_record and rule.right_field_id else None
             discrepancies.append(
                 RuleDiscrepancy(
                     rule_id=rule.id,
                     rule_name=rule.rule_name,
                     rule_type=rule.rule_type,
                     severity=rule.severity,
-                    left_file_name=left_record.source_file_name if left_record else None,
-                    left_sheet_name=left_record.sheet_name if left_record else None,
+                    left_file_name=left_record.source_file_name if left_record else _source_file_name(left_source),
+                    left_sheet_name=left_record.sheet_name if left_record else left_source.sheet_name if left_source else None,
                     left_row_number=left_record.excel_row_number if left_record else None,
-                    right_file_name=right_record.source_file_name if right_record else None,
-                    right_sheet_name=right_record.sheet_name if right_record else None,
+                    right_file_name=right_record.source_file_name if right_record else _source_file_name(right_source),
+                    right_sheet_name=right_record.sheet_name if right_record else right_source.sheet_name if right_source else None,
                     right_row_number=right_record.excel_row_number if right_record else None,
-                    expected_value="Matching row",
-                    actual_value=f"Missing {missing_side} match",
+                    left_field_name=left_value.display_name if left_value else left_field.display_name if left_field else None,
+                    right_field_name=right_value.display_name if right_value else right_field.display_name if right_field else None,
+                    expected_value=_stringify(left_value.raw_value) if left_value else "Blank",
+                    actual_value=_stringify(right_value.raw_value) if right_value else "Blank",
                     suggested_correction="Check selected rows and match fields; one side may be missing this item.",
                     notes=f"No matching row was found using {_friendly_match_strategy(rule)}.",
                 )
@@ -477,24 +491,6 @@ def run_validation(request: ValidationRequest) -> ValidationResult:
             discrepancies.extend(_required_field_rule(rule, records))
         elif rule.rule_type == "duplicate_check":
             discrepancies.extend(_duplicate_rule(rule, records))
-
-    for record in records:
-        for issue in record.extraction_issues:
-            discrepancies.append(
-                RuleDiscrepancy(
-                    rule_id="extraction",
-                    rule_name="Extraction issue",
-                    rule_type="required_field_check",
-                    severity="high",
-                    left_file_name=record.source_file_name,
-                    left_sheet_name=record.sheet_name,
-                    left_row_number=record.excel_row_number,
-                    expected_value="Valid extracted row",
-                    actual_value=issue,
-                    suggested_correction="Review field mapping and source row selection before trusting this row.",
-                    notes="This issue was raised during extraction before rule comparison.",
-                )
-            )
 
     rule_counts = Counter(item.rule_id for item in discrepancies)
     summaries = [

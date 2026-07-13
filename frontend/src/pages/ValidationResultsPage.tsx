@@ -1,11 +1,13 @@
-import { FileDown, FileSearch, Search } from "lucide-react";
+import { CheckCircle2, FileDown, FileSearch, LoaderCircle, RefreshCw, Search } from "lucide-react";
 import { useEffect, useRef, useState, type UIEvent } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState } from "../components/common/EmptyState";
 import { SelectField } from "../components/forms";
 import { PageHeader } from "../components/layout/PageHeader";
 import { useWorkflow } from "../features/files/WorkflowContext";
-import type { RuleDiscrepancy, RuleType } from "../types/validation.types";
+import { checkBackendHealth } from "../services/apiClient";
+import { runValidation } from "../services/validationApi";
+import type { PresetType, RuleDiscrepancy, RuleType } from "../types/validation.types";
 
 const ruleLabels: Record<RuleType, string> = {
   compare_values: "Compare two fields",
@@ -76,6 +78,17 @@ function compareValueNote(item: RuleDiscrepancy): SmartNote {
   const { expectedField, actualField } = fieldPair(item);
   const expectedNumber = numberValue(expected);
   const actualNumber = numberValue(actual);
+  const missingLeftLocation = !item.left_row_number;
+  const missingRightLocation = !item.right_row_number;
+
+  if (missingLeftLocation || missingRightLocation) {
+    const missingSide = missingLeftLocation ? "left" : "right";
+    const presentSide = missingSide === "left" ? "right" : "left";
+    return {
+      title: "Missing row match",
+      detail: `The ${presentSide} side has a selected row, but the ${missingSide} side has no row with the same match key. The missing side is shown as Blank; check the match field or exclude the row if it should not be compared.`,
+    };
+  }
 
   if (!expected && actual) {
     return {
@@ -136,17 +149,53 @@ function smartNoteFor(item: RuleDiscrepancy): SmartNote {
   return ruleTypeNote(item) ?? compareValueNote(item);
 }
 
+interface LocationCellProps {
+  fileName?: string | null;
+  sheetName?: string | null;
+  rowNumber?: number | null;
+}
+
+function LocationCell({ fileName, sheetName, rowNumber }: LocationCellProps) {
+  if (!fileName && !sheetName && !rowNumber) {
+    return <span className="font-medium text-slate-400">No matching row</span>;
+  }
+
+  return (
+    <>
+      {fileName ?? "-"}
+      <br />
+      {sheetName ?? "-"} - row {rowNumber ?? <span className="font-medium text-slate-400">Blank</span>}
+    </>
+  );
+}
+
+function ValueCell({ value }: { value?: string | null }) {
+  if (value === "Blank") {
+    return <span className="font-medium text-slate-400">Blank</span>;
+  }
+  return <>{value ?? "-"}</>;
+}
+
+function isValidPreset(value: string): value is PresetType {
+  return value === "reference_vs_copied" || value === "reference_bidder_abstract" || value === "generic_two_file" || value === "custom_comparison_builder";
+}
+
 export function ValidationResultsPage() {
-  const { result } = useWorkflow();
+  const { projectName, preset, dataSources, rules, result, setResult } = useWorkflow();
   const [query, setQuery] = useState("");
   const [severity, setSeverity] = useState("all");
+  const [rerunBusy, setRerunBusy] = useState(false);
+  const [rerunError, setRerunError] = useState("");
+  const [rerunVisualState, setRerunVisualState] = useState<"loading" | "reloaded" | null>(null);
   const [showHorizontalSlider, setShowHorizontalSlider] = useState(false);
+  const [tableScrollWidth, setTableScrollWidth] = useState(1080);
   const [floatingHeader, setFloatingHeader] = useState({ visible: false, left: 0, width: 0 });
   const tableFrameRef = useRef<HTMLDivElement>(null);
   const headerScrollRef = useRef<HTMLDivElement>(null);
   const floatingHeaderScrollRef = useRef<HTMLDivElement>(null);
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
+  const rerunVisualTimerRef = useRef<number | null>(null);
 
   const syncHorizontalScroll = (event: UIEvent<HTMLDivElement>, targets: Array<HTMLDivElement | null>) => {
     for (const target of targets) {
@@ -186,6 +235,37 @@ export function ValidationResultsPage() {
     const haystack = `${item.rule_name} ${item.expected_value ?? ""} ${item.actual_value ?? ""} ${item.notes ?? ""} ${item.suggested_correction ?? ""} ${note.title} ${note.detail}`.toLowerCase();
     return matchesSeverity && haystack.includes(query.toLowerCase());
   });
+  const canRerun = isValidPreset(preset) && dataSources.length > 0 && rules.length > 0;
+
+  const rerunValidation = async () => {
+    setRerunBusy(true);
+    setRerunError("");
+    setRerunVisualState("loading");
+    if (rerunVisualTimerRef.current) {
+      window.clearTimeout(rerunVisualTimerRef.current);
+      rerunVisualTimerRef.current = null;
+    }
+    try {
+      if (!isValidPreset(preset)) {
+        setRerunError("Please choose a comparison preset before re-running validation.");
+        setRerunVisualState(null);
+        return;
+      }
+      await checkBackendHealth();
+      const nextResult = await runValidation({ project_name: projectName, preset, data_sources: dataSources, rules });
+      setResult(nextResult);
+      setRerunVisualState("reloaded");
+      rerunVisualTimerRef.current = window.setTimeout(() => {
+        setRerunVisualState(null);
+        rerunVisualTimerRef.current = null;
+      }, 900);
+    } catch (cause) {
+      setRerunError(cause instanceof Error ? cause.message : "Validation failed.");
+      setRerunVisualState(null);
+    } finally {
+      setRerunBusy(false);
+    }
+  };
 
   useEffect(() => {
     const tableScroller = tableScrollRef.current;
@@ -195,8 +275,10 @@ export function ValidationResultsPage() {
     }
 
     const updateOverflow = () => {
-      const hasOverflow = tableScroller.scrollWidth > tableScroller.clientWidth + 1;
+      const maxScroll = Math.max(0, tableScroller.scrollWidth - tableScroller.clientWidth);
+      const hasOverflow = maxScroll > 1;
       setShowHorizontalSlider(hasOverflow);
+      setTableScrollWidth(tableScroller.scrollWidth);
 
       if (!hasOverflow) {
         tableScroller.scrollLeft = 0;
@@ -247,6 +329,14 @@ export function ValidationResultsPage() {
     };
   }, [filtered.length, result]);
 
+  useEffect(() => {
+    return () => {
+      if (rerunVisualTimerRef.current) {
+        window.clearTimeout(rerunVisualTimerRef.current);
+      }
+    };
+  }, []);
+
   if (!result) {
     return (
       <div>
@@ -265,15 +355,28 @@ export function ValidationResultsPage() {
         title="Review rule-based discrepancies"
         description={`${result.discrepancies.length} discrepancy(s) across ${result.total_selected_rows} selected rows. Every issue remains traceable to file, sheet, row, field, and rule.`}
         action={(
-          <Link
-            to="/reports"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 active:scale-[0.99]"
-          >
-            <FileDown className="size-4" />
-            Export report
-          </Link>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={rerunValidation}
+              disabled={rerunBusy || !canRerun}
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50 active:scale-[0.99]"
+            >
+              {rerunBusy ? <LoaderCircle className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+              {rerunBusy ? "Re-running..." : "Re-run validation"}
+            </button>
+            <Link
+              to="/reports"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 active:scale-[0.99]"
+            >
+              <FileDown className="size-4" />
+              Export report
+            </Link>
+          </div>
         )}
       />
+
+      {rerunError ? <p className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{rerunError}</p> : null}
 
       <div className="grid grid-cols-4 divide-x divide-slate-200 border-b border-slate-200 py-3">
         {[
@@ -330,7 +433,23 @@ export function ValidationResultsPage() {
             />
           </div>
 
-          <div ref={tableFrameRef} className="rounded-2xl border border-slate-200 bg-white">
+          <div
+            ref={tableFrameRef}
+            className="relative rounded-2xl border border-slate-200 bg-white"
+          >
+            {rerunVisualState ? (
+              <div className="pointer-events-none absolute inset-0 z-[85] rounded-2xl" aria-live="polite" aria-label="Re-running validation">
+                <div
+                  className={`absolute left-1/2 top-20 inline-flex -translate-x-1/2 items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold shadow-lg shadow-slate-200/60 animate-[app-section-fade-in_180ms_cubic-bezier(0.16,1,0.3,1)_both] ${
+                    rerunVisualState === "loading" ? "border-slate-200 bg-white text-slate-700" : "border-emerald-100 bg-white text-emerald-700"
+                  }`}
+                >
+                  {rerunVisualState === "loading" ? <LoaderCircle className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
+                  {rerunVisualState === "loading" ? "Re-running validation..." : "Validation re-run"}
+                </div>
+              </div>
+            ) : null}
+
             {floatingHeader.visible ? (
               <div
                 className="fixed top-0 z-[90] overflow-hidden border-b border-slate-200 bg-white shadow-md"
@@ -342,27 +461,29 @@ export function ValidationResultsPage() {
               </div>
             ) : null}
 
-            {showHorizontalSlider ? (
-              <div
-                ref={topScrollRef}
-                aria-label="Scroll discrepancy table horizontally"
-                className="overflow-x-auto overflow-y-hidden border-b border-slate-200 bg-white"
-                onScroll={(event) => syncHorizontalScroll(event, [headerScrollRef.current, floatingHeaderScrollRef.current, tableScrollRef.current])}
-              >
-                <div className="h-1 min-w-[1080px]" />
-              </div>
-            ) : null}
+            <div className="sticky top-0 z-[80] overflow-hidden rounded-t-2xl bg-white shadow-sm">
+              {showHorizontalSlider ? (
+                <div
+                  ref={topScrollRef}
+                  aria-label="Scroll discrepancy table horizontally"
+                  className="h-4 overflow-x-auto overflow-y-hidden border-b border-slate-200 bg-white"
+                  onScroll={(event) => syncHorizontalScroll(event, [headerScrollRef.current, floatingHeaderScrollRef.current, tableScrollRef.current])}
+                >
+                  <div className="h-px" style={{ width: tableScrollWidth }} />
+                </div>
+              ) : null}
 
-            <div
-              ref={headerScrollRef}
-              className="sticky top-0 z-[80] overflow-hidden border-b border-slate-200 bg-white shadow-sm"
-            >
-              {headerTable}
+              <div
+                ref={headerScrollRef}
+                className="overflow-hidden border-b border-slate-200 bg-white"
+              >
+                {headerTable}
+              </div>
             </div>
 
             <div
               ref={tableScrollRef}
-              className="overflow-x-auto"
+              className={`overflow-x-auto transition duration-300 ${rerunVisualState === "loading" ? "scale-[0.998] opacity-65 blur-[0.7px] saturate-[0.96]" : ""}`}
               onScroll={(event) => syncHorizontalScroll(event, [headerScrollRef.current, floatingHeaderScrollRef.current, topScrollRef.current])}
             >
               <table className="min-w-[1080px] w-full table-fixed text-left text-sm">
@@ -385,10 +506,14 @@ export function ValidationResultsPage() {
                       <td className="p-3">
                         <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.severity === "high" ? "bg-red-50 text-red-700" : item.severity === "medium" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-700"}`}>{item.severity}</span>
                       </td>
-                      <td className="break-words p-3 text-xs text-slate-600">{item.left_file_name ?? "-"}<br />{item.left_sheet_name ?? "-"} - row {item.left_row_number ?? "-"}</td>
-                      <td className="break-words p-3 text-xs text-slate-600">{item.right_file_name ?? "-"}<br />{item.right_sheet_name ?? "-"} - row {item.right_row_number ?? "-"}</td>
-                      <td className="break-words p-3">{item.expected_value ?? "-"}</td>
-                      <td className="break-words p-3">{item.actual_value ?? "-"}</td>
+                      <td className="break-words p-3 text-xs text-slate-600">
+                        <LocationCell fileName={item.left_file_name} rowNumber={item.left_row_number} sheetName={item.left_sheet_name} />
+                      </td>
+                      <td className="break-words p-3 text-xs text-slate-600">
+                        <LocationCell fileName={item.right_file_name} rowNumber={item.right_row_number} sheetName={item.right_sheet_name} />
+                      </td>
+                      <td className="break-words p-3"><ValueCell value={item.expected_value} /></td>
+                      <td className="break-words p-3"><ValueCell value={item.actual_value} /></td>
                       <td className="break-words p-3 text-slate-600">
                         <p className="font-semibold text-slate-900">{note.title}</p>
                         <p className="mt-1 text-xs leading-5 text-slate-500">{note.detail}</p>

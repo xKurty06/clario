@@ -217,9 +217,10 @@ def test_blank_match_key_rows_do_not_create_redundant_missing_match_discrepancie
 
     result = run_validation(request)
 
-    assert any(item.rule_id == "extraction" and item.left_row_number == 3 for item in result.discrepancies)
+    assert any(record.excel_row_number == 3 and record.extraction_issues for record in result.extracted_records)
+    assert not any(item.rule_id == "extraction" for item in result.discrepancies)
     assert not any(
-        item.rule_id == "quantity-rule" and item.left_row_number == 3 and item.actual_value == "Missing right match"
+        item.rule_id == "quantity-rule" and item.left_row_number == 3
         for item in result.discrepancies
     )
 
@@ -297,3 +298,86 @@ def test_same_row_match_key_typo_reports_one_discrepancy_with_both_locations(tmp
     assert description_discrepancies[0].right_row_number == 2
     assert description_discrepancies[0].expected_value == "INK-MRK-BLK"
     assert description_discrepancies[0].actual_value == "INK-MRK-BLCK"
+
+
+def test_missing_match_discrepancy_keeps_configured_missing_side_source(tmp_path: Path) -> None:
+    path = tmp_path / "missing-match.xlsx"
+    book = openpyxl.Workbook()
+    reference = book.active
+    reference.title = "Reference"
+    reference.append(["SKU", "Description"])
+    reference.append(["A-1", "Bond Paper"])
+    reference.append(["B-2", "Cooling fan"])
+
+    comparison = book.create_sheet("Comparison")
+    comparison.append(["SKU", "Description"])
+    comparison.append(["A-1", "Bond Paper"])
+    book.save(path)
+
+    register_file("missing-reference", path)
+    register_file("missing-comparison", path)
+
+    reference_source = ComparisonDataSource(
+        id="missing-reference-source",
+        name="Reference",
+        file_id="missing-reference",
+        file_name=path.name,
+        sheet_name="Reference",
+        header_row=1,
+        first_data_row=2,
+        row_selection_mode="manual_include",
+        selected_row_numbers=[2, 3],
+        fields=[
+            make_field("missing-reference-source", "SKU", "A"),
+            make_field("missing-reference-source", "Description", "B"),
+        ],
+    )
+    comparison_source = ComparisonDataSource(
+        id="missing-comparison-source",
+        name="Comparison",
+        file_id="missing-comparison",
+        file_name=path.name,
+        sheet_name="Comparison",
+        header_row=1,
+        first_data_row=2,
+        row_selection_mode="manual_include",
+        selected_row_numbers=[2],
+        fields=[
+            make_field("missing-comparison-source", "SKU", "A"),
+            make_field("missing-comparison-source", "Description", "B"),
+        ],
+    )
+    request = ValidationRequest(
+        project_name="Missing match validation",
+        data_sources=[reference_source, comparison_source],
+        rules=[
+            ComparisonRule(
+                id="description-rule",
+                rule_name="Description comparison",
+                rule_type="compare_values",
+                left_data_source_id="missing-reference-source",
+                left_field_id="missing-reference-source-description",
+                right_data_source_id="missing-comparison-source",
+                right_field_id="missing-comparison-source-description",
+                left_match_field_ids=["missing-reference-source-sku"],
+                right_match_field_ids=["missing-comparison-source-sku"],
+                match_strategy="by_item_number_field",
+                strictness="normalized_exact",
+                severity="high",
+            )
+        ],
+    )
+
+    result = run_validation(request)
+    discrepancy = next(item for item in result.discrepancies if item.rule_id == "description-rule")
+
+    assert discrepancy.left_file_name == path.name
+    assert discrepancy.left_sheet_name == "Reference"
+    assert discrepancy.left_row_number == 3
+    assert discrepancy.right_file_name == path.name
+    assert discrepancy.right_sheet_name == "Comparison"
+    assert discrepancy.right_row_number is None
+    assert discrepancy.left_field_name == "Description"
+    assert discrepancy.right_field_name == "Description"
+    assert discrepancy.expected_value == "Cooling fan"
+    assert discrepancy.actual_value == "Blank"
