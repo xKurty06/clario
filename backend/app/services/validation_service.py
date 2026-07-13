@@ -171,6 +171,25 @@ def _key_for_record(record: ExtractedRecord, field_ids: list[str]) -> tuple[str,
     return tuple(values)
 
 
+def _match_field_ids(rule: ComparisonRule, side: str) -> list[str]:
+    if side == "left":
+        return rule.left_match_field_ids or ([rule.left_field_id] if rule.left_field_id else [])
+    return rule.right_match_field_ids or ([rule.right_field_id] if rule.right_field_id else [])
+
+
+def _has_blank_match_key(record: ExtractedRecord, field_ids: list[str]) -> bool:
+    key = _key_for_record(record, field_ids)
+    return bool(field_ids) and any(not value for value in key)
+
+
+def _format_match_key(record: ExtractedRecord, field_ids: list[str]) -> str:
+    values: list[str] = []
+    for field_id in field_ids:
+        field_value = get_field_value(record, field_id)
+        values.append(_stringify(field_value.raw_value if field_value else None) or "")
+    return " / ".join(values) or "-"
+
+
 def _matched_pairs(
     left_records: list[ExtractedRecord],
     right_records: list[ExtractedRecord],
@@ -224,11 +243,60 @@ def _compare_rule(
     right_records = _rule_records(records, rule.right_data_source_id)
     left_field = get_field(data_sources, rule.left_field_id) if rule.left_field_id else None
     discrepancies: list[RuleDiscrepancy] = []
+    pairs = _matched_pairs(left_records, right_records, rule)
+    left_match_fields = _match_field_ids(rule, "left")
+    right_match_fields = _match_field_ids(rule, "right")
+    skipped_pair_indexes: set[int] = set()
 
-    for left_record, right_record in _matched_pairs(left_records, right_records, rule):
+    left_only = [(index, left_record) for index, (left_record, right_record) in enumerate(pairs) if left_record and not right_record]
+    right_only = [(index, right_record) for index, (left_record, right_record) in enumerate(pairs) if right_record and not left_record]
+    used_right_indexes: set[int] = set()
+    for left_index, left_record in left_only:
+        if _has_blank_match_key(left_record, left_match_fields):
+            continue
+        match = next(
+            (
+                (right_index, right_record)
+                for right_index, right_record in right_only
+                if right_index not in used_right_indexes
+                and right_record.excel_row_number == left_record.excel_row_number
+                and not _has_blank_match_key(right_record, right_match_fields)
+            ),
+            None,
+        )
+        if not match:
+            continue
+        right_index, right_record = match
+        skipped_pair_indexes.update({left_index, right_index})
+        used_right_indexes.add(right_index)
+        discrepancies.append(
+            RuleDiscrepancy(
+                rule_id=rule.id,
+                rule_name=rule.rule_name,
+                rule_type=rule.rule_type,
+                severity=rule.severity,
+                left_file_name=left_record.source_file_name,
+                left_sheet_name=left_record.sheet_name,
+                left_row_number=left_record.excel_row_number,
+                right_file_name=right_record.source_file_name,
+                right_sheet_name=right_record.sheet_name,
+                right_row_number=right_record.excel_row_number,
+                expected_value=_format_match_key(left_record, left_match_fields),
+                actual_value=_format_match_key(right_record, right_match_fields),
+                suggested_correction="Review the match fields on both rows; they appear to refer to the same row position but use different match values.",
+                notes=f"Match key differs using {_friendly_match_strategy(rule)}.",
+            )
+        )
+
+    for pair_index, (left_record, right_record) in enumerate(pairs):
+        if pair_index in skipped_pair_indexes:
+            continue
         if not left_record or not right_record:
             missing_side = "right" if left_record else "left"
             source = left_record or right_record
+            source_match_fields = _match_field_ids(rule, "left" if left_record else "right")
+            if source and _has_blank_match_key(source, source_match_fields):
+                continue
             discrepancies.append(
                 RuleDiscrepancy(
                     rule_id=rule.id,

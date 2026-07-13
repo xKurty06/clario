@@ -141,7 +141,10 @@ export function ValidationResultsPage() {
   const [query, setQuery] = useState("");
   const [severity, setSeverity] = useState("all");
   const [showHorizontalSlider, setShowHorizontalSlider] = useState(false);
+  const [floatingHeader, setFloatingHeader] = useState({ visible: false, left: 0, width: 0 });
+  const tableFrameRef = useRef<HTMLDivElement>(null);
   const headerScrollRef = useRef<HTMLDivElement>(null);
+  const floatingHeaderScrollRef = useRef<HTMLDivElement>(null);
   const topScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
 
@@ -151,6 +154,38 @@ export function ValidationResultsPage() {
       target.scrollLeft = event.currentTarget.scrollLeft;
     }
   };
+
+  const headerTable = (
+    <table className="min-w-[1080px] w-full table-fixed text-left text-sm">
+      <colgroup>
+        <col className="w-[140px]" />
+        <col className="w-[80px]" />
+        <col className="w-[180px]" />
+        <col className="w-[180px]" />
+        <col className="w-[150px]" />
+        <col className="w-[150px]" />
+        <col className="w-[200px]" />
+      </colgroup>
+      <thead className="bg-slate-100 text-xs text-slate-600">
+        <tr>
+          <th className="p-3">Rule</th>
+          <th className="p-3">Severity</th>
+          <th className="p-3">Expected location</th>
+          <th className="p-3">Actual location</th>
+          <th className="p-3">Expected</th>
+          <th className="p-3">Actual</th>
+          <th className="p-3">Notes</th>
+        </tr>
+      </thead>
+    </table>
+  );
+
+  const enriched = result?.discrepancies.map((item) => ({ item, note: smartNoteFor(item) })) ?? [];
+  const filtered = enriched.filter(({ item, note }) => {
+    const matchesSeverity = severity === "all" || item.severity === severity;
+    const haystack = `${item.rule_name} ${item.expected_value ?? ""} ${item.actual_value ?? ""} ${item.notes ?? ""} ${item.suggested_correction ?? ""} ${note.title} ${note.detail}`.toLowerCase();
+    return matchesSeverity && haystack.includes(query.toLowerCase());
+  });
 
   useEffect(() => {
     const tableScroller = tableScrollRef.current;
@@ -167,6 +202,7 @@ export function ValidationResultsPage() {
         tableScroller.scrollLeft = 0;
         if (headerScrollRef.current) headerScrollRef.current.scrollLeft = 0;
         if (topScrollRef.current) topScrollRef.current.scrollLeft = 0;
+        if (floatingHeaderScrollRef.current) floatingHeaderScrollRef.current.scrollLeft = 0;
       }
     };
 
@@ -182,6 +218,35 @@ export function ValidationResultsPage() {
     };
   }, [query, result, severity]);
 
+  useEffect(() => {
+    const updateFloatingHeader = () => {
+      const frame = tableFrameRef.current;
+      const header = headerScrollRef.current;
+      if (!frame || !header) {
+        setFloatingHeader((current) => (current.visible ? { visible: false, left: 0, width: 0 } : current));
+        return;
+      }
+
+      const frameRect = frame.getBoundingClientRect();
+      const headerHeight = header.getBoundingClientRect().height;
+      const visible = frameRect.top < 0 && frameRect.bottom > headerHeight;
+      setFloatingHeader({ visible, left: frameRect.left, width: frameRect.width });
+
+      if (floatingHeaderScrollRef.current && tableScrollRef.current) {
+        floatingHeaderScrollRef.current.scrollLeft = tableScrollRef.current.scrollLeft;
+      }
+    };
+
+    updateFloatingHeader();
+    window.addEventListener("scroll", updateFloatingHeader, { passive: true });
+    window.addEventListener("resize", updateFloatingHeader);
+
+    return () => {
+      window.removeEventListener("scroll", updateFloatingHeader);
+      window.removeEventListener("resize", updateFloatingHeader);
+    };
+  }, [filtered.length, result]);
+
   if (!result) {
     return (
       <div>
@@ -192,13 +257,6 @@ export function ValidationResultsPage() {
       </div>
     );
   }
-
-  const enriched = result.discrepancies.map((item) => ({ item, note: smartNoteFor(item) }));
-  const filtered = enriched.filter(({ item, note }) => {
-    const matchesSeverity = severity === "all" || item.severity === severity;
-    const haystack = `${item.rule_name} ${item.expected_value ?? ""} ${item.actual_value ?? ""} ${item.notes ?? ""} ${item.suggested_correction ?? ""} ${note.title} ${note.detail}`.toLowerCase();
-    return matchesSeverity && haystack.includes(query.toLowerCase());
-  });
 
   return (
     <div>
@@ -272,13 +330,24 @@ export function ValidationResultsPage() {
             />
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white">
+          <div ref={tableFrameRef} className="rounded-2xl border border-slate-200 bg-white">
+            {floatingHeader.visible ? (
+              <div
+                className="fixed top-0 z-[90] overflow-hidden border-b border-slate-200 bg-white shadow-md"
+                style={{ left: floatingHeader.left, width: floatingHeader.width }}
+              >
+                <div ref={floatingHeaderScrollRef} className="overflow-hidden">
+                  {headerTable}
+                </div>
+              </div>
+            ) : null}
+
             {showHorizontalSlider ? (
               <div
                 ref={topScrollRef}
                 aria-label="Scroll discrepancy table horizontally"
                 className="overflow-x-auto overflow-y-hidden border-b border-slate-200 bg-white"
-                onScroll={(event) => syncHorizontalScroll(event, [headerScrollRef.current, tableScrollRef.current])}
+                onScroll={(event) => syncHorizontalScroll(event, [headerScrollRef.current, floatingHeaderScrollRef.current, tableScrollRef.current])}
               >
                 <div className="h-1 min-w-[1080px]" />
               </div>
@@ -288,34 +357,13 @@ export function ValidationResultsPage() {
               ref={headerScrollRef}
               className="sticky top-0 z-[80] overflow-hidden border-b border-slate-200 bg-white shadow-sm"
             >
-              <table className="min-w-[1080px] w-full table-fixed text-left text-sm">
-                <colgroup>
-                  <col className="w-[140px]" />
-                  <col className="w-[80px]" />
-                  <col className="w-[180px]" />
-                  <col className="w-[180px]" />
-                  <col className="w-[150px]" />
-                  <col className="w-[150px]" />
-                  <col className="w-[200px]" />
-                </colgroup>
-                <thead className="bg-slate-100 text-xs text-slate-600">
-                  <tr>
-                    <th className="p-3">Rule</th>
-                    <th className="p-3">Severity</th>
-                    <th className="p-3">Expected location</th>
-                    <th className="p-3">Actual location</th>
-                    <th className="p-3">Expected</th>
-                    <th className="p-3">Actual</th>
-                    <th className="p-3">Notes</th>
-                  </tr>
-                </thead>
-              </table>
+              {headerTable}
             </div>
 
             <div
               ref={tableScrollRef}
               className="overflow-x-auto"
-              onScroll={(event) => syncHorizontalScroll(event, [headerScrollRef.current, topScrollRef.current])}
+              onScroll={(event) => syncHorizontalScroll(event, [headerScrollRef.current, floatingHeaderScrollRef.current, topScrollRef.current])}
             >
               <table className="min-w-[1080px] w-full table-fixed text-left text-sm">
                 <colgroup>

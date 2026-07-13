@@ -67,11 +67,12 @@ function closePresetBanner() {
 
 export function PresetAwareComparisonBuilderPage() {
   const { files, preset, dataSources, setDataSources } = useWorkflow();
-  const [rowSetupComplete, setRowSetupComplete] = useState(false);
+  const [reviewRowSetup, setReviewRowSetup] = useState(false);
+  const rowSetupComplete = dataSources.length > 0 && dataSources.every((source) => source.row_setup_confirmed);
 
   const needsRowSetup = useMemo(
-    () => files.length > 0 && (!dataSources.length || !rowSetupComplete),
-    [dataSources.length, files.length, rowSetupComplete],
+    () => files.length > 0 && (!dataSources.length || reviewRowSetup || !rowSetupComplete),
+    [dataSources.length, files.length, reviewRowSetup, rowSetupComplete],
   );
 
   useEffect(() => {
@@ -80,12 +81,14 @@ export function PresetAwareComparisonBuilderPage() {
   }, [dataSources.length, files, preset, setDataSources]);
 
   useEffect(() => {
-    if (rowSetupComplete) closePresetBanner();
+    if (!rowSetupComplete) return;
+    setReviewRowSetup(false);
+    closePresetBanner();
   }, [rowSetupComplete]);
 
   if (needsRowSetup) {
-    return <RowSetupPage onContinue={() => setRowSetupComplete(true)} />;
+    return <RowSetupPage onContinue={() => setReviewRowSetup(false)} />;
   }
 
-  return <ComparisonBuilderPage onBackToRowSetup={() => setRowSetupComplete(false)} />;
+  return <ComparisonBuilderPage onBackToRowSetup={() => setReviewRowSetup(true)} />;
 }
