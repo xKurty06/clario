@@ -189,7 +189,7 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
           <RotateCcw className="size-3.5" /> Invert
         </button>
         <form
-          className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-100"
+          className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-300 bg-white px-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-within:border-emerald-500 focus-within:ring-2 focus:ring-emerald-100"
           onSubmit={handleSelectRange}
           title="Select preview rows by Excel row number range. These numbers come from the Excel row column in the table."
           aria-label="Select range by Excel row numbers"
@@ -297,7 +297,7 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
                 Row {warning.rowNumber}: {warning.reason}
               </span>
             ))}
-            <span className="text-[11px] font-medium text-amber-700">Use More row actions to exclude them.</span>
+            <span className="text-[11px] font-medium text-amber-700">Warning only — you may continue if these rows are correct.</span>
           </div>
         </div>
       ) : null}
@@ -325,7 +325,7 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
                   role={locked ? undefined : "button"}
                   aria-disabled={locked || undefined}
                   aria-label={isHeaderRow ? `Excel row ${row.row_number} is the header row` : locked ? `Excel row ${row.row_number} is excluded by row setup` : `${row.selected ? "Unselect" : "Select"} Excel row ${row.row_number}`}
-                  title={isHeaderRow ? "This row is the header row and is not selectable." : locked ? "This row is excluded by the first data row setting." : needsReview ? "This selected row may not be real data. Review or exclude it before validation." : "Click to toggle this row"}
+                  title={isHeaderRow ? "This row is the header row and is not selectable." : locked ? "This row is excluded by the first data row setting." : needsReview ? "This selected row may not be real data. Review it, or continue if it is correct." : "Click to toggle this row"}
                   onClick={() => {
                     if (!locked) onToggleRow(row.row_number);
                   }}
