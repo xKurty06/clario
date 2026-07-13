@@ -108,6 +108,10 @@ export function UploadFilesPage() {
         title="Choose comparison files"
         description="Select a comparison preset and local spreadsheets. Files are processed on this device and originals remain unchanged."
       />
+      <div className="mt-6 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm leading-6 text-emerald-900 shadow-sm">
+        <p className="font-semibold">Before you continue</p>
+        <p className="mt-1">Choose the preset that best matches your comparison. You can still review rows, map fields, and edit rules before validation runs.</p>
+      </div>
       <div className="grid items-start gap-8 pt-8 xl:grid-cols-[320px_minmax(0,1fr)]">
         <section className={`${uploadCardClass} self-start space-y-5`}>
           <div>
