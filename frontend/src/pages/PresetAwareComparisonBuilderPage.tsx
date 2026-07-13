@@ -57,14 +57,6 @@ function scaffoldSources(files: UploadedFile[], preset: string) {
   }).filter((source): source is ComparisonDataSource => Boolean(source));
 }
 
-function closePresetBanner() {
-  window.setTimeout(() => {
-    const buttons = Array.from(document.querySelectorAll("button"));
-    const startManualButton = buttons.find((button) => button.textContent?.trim().includes("Start manually"));
-    startManualButton?.click();
-  }, 0);
-}
-
 export function PresetAwareComparisonBuilderPage() {
   const { files, preset, dataSources, setDataSources } = useWorkflow();
   const [reviewRowSetup, setReviewRowSetup] = useState(false);
@@ -79,12 +71,6 @@ export function PresetAwareComparisonBuilderPage() {
     if (!files.length || dataSources.length) return;
     setDataSources(scaffoldSources(files, preset));
   }, [dataSources.length, files, preset, setDataSources]);
-
-  useEffect(() => {
-    if (!rowSetupComplete) return;
-    setReviewRowSetup(false);
-    closePresetBanner();
-  }, [rowSetupComplete]);
 
   if (needsRowSetup) {
     return <RowSetupPage onContinue={() => setReviewRowSetup(false)} />;

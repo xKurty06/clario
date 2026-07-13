@@ -251,7 +251,10 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
         row_selection_mode: "auto_detected",
       });
       const preview = sanitizeAutoDetectedPreview(rawPreview);
-      updateDataSource(source.id, preview.data_source);
+      updateDataSource(source.id, {
+        ...preview.data_source,
+        row_setup_confirmed: Boolean(source.row_setup_confirmed),
+      });
       setSourcePreview(source.id, preview);
       setSelectedRowsBySource((current) => ({
         ...current,
@@ -365,9 +368,10 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
   };
 
   const applyRowSetupChange = (source: ComparisonDataSource, next: ComparisonDataSource, selectedRowNumber: number) => {
-    updateSourceSetup(source, { ...next, row_setup_confirmed: false }, false);
+    const unconfirmedNext = { ...next, row_setup_confirmed: false };
+    updateSourceSetup(source, unconfirmedNext, false);
     setSelectedRowsBySource((current) => ({ ...current, [source.id]: selectedRowNumber }));
-    void loadPreview(next, true);
+    void loadPreview(unconfirmedNext, true);
   };
 
   const changeHeaderRow = (source: ComparisonDataSource, value: number) => {
