@@ -1,5 +1,5 @@
 import { buildPreflightReview, preflightErrorMessage } from "../features/validation/preflightReview";
-import type { ComparisonDataSource, ComparisonRule, PresetType, ValidationResult } from "../types/validation.types";
+import type { ComparisonDataSource, ComparisonRule, DataSourcePreview, PresetType, ValidationResult } from "../types/validation.types";
 import { apiRequest } from "./apiClient";
 
 export interface ValidationPayload {
@@ -7,6 +7,7 @@ export interface ValidationPayload {
   preset: PresetType;
   data_sources: ComparisonDataSource[];
   rules: ComparisonRule[];
+  source_previews?: Record<string, DataSourcePreview | undefined>;
 }
 
 export const runValidation = (payload: ValidationPayload) => {
@@ -16,6 +17,7 @@ export const runValidation = (payload: ValidationPayload) => {
     fileCount: new Set(payload.data_sources.map((source) => source.file_id).filter(Boolean)).size,
     dataSources: payload.data_sources,
     rules: payload.rules,
+    sourcePreviews: payload.source_previews,
   });
 
   if (!review.canRun) {
@@ -25,7 +27,12 @@ export const runValidation = (payload: ValidationPayload) => {
   return apiRequest<ValidationResult>("/validation/run", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({
+      project_name: payload.project_name,
+      preset: payload.preset,
+      data_sources: payload.data_sources,
+      rules: payload.rules,
+    }),
   });
 };
 
