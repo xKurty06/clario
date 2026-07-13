@@ -76,6 +76,7 @@ export function PresetAwareComparisonBuilderPage() {
   const [reviewRowSetup, setReviewRowSetup] = useState(false);
   const [rowSetupContinued, setRowSetupContinued] = useState(false);
   const [chooserOpen, setChooserOpen] = useState(false);
+  const [presetRolesApplied, setPresetRolesApplied] = useState(false);
   const rowSetupComplete = dataSources.length > 0 && dataSources.every((source) => source.row_setup_confirmed);
   const roles = useMemo(() => (isConfigurablePreset(preset) ? presetRoleLabels[preset] : []), [preset]);
 
@@ -94,8 +95,16 @@ export function PresetAwareComparisonBuilderPage() {
   }, [rowSetupComplete]);
 
   useEffect(() => {
+    setPresetRolesApplied(false);
+  }, [preset]);
+
+  useEffect(() => {
+    if (presetRolesApplied && !needsRowSetup) dismissPresetBanner();
+  }, [needsRowSetup, presetRolesApplied]);
+
+  useEffect(() => {
     const interceptPresetSetup = (event: MouseEvent) => {
-      if (!roles.length || chooserOpen || needsRowSetup) return;
+      if (!roles.length || chooserOpen || needsRowSetup || presetRolesApplied) return;
       const target = event.target as Element | null;
       if (!target || target.closest("[data-preset-role-dialog]")) return;
       const button = target.closest("button");
@@ -109,7 +118,7 @@ export function PresetAwareComparisonBuilderPage() {
 
     document.addEventListener("click", interceptPresetSetup, true);
     return () => document.removeEventListener("click", interceptPresetSetup, true);
-  }, [chooserOpen, needsRowSetup, roles.length]);
+  }, [chooserOpen, needsRowSetup, presetRolesApplied, roles.length]);
 
   const applyRoleChoices = (roleFileIds: string[]) => {
     const selectedFiles = roleFileIds
@@ -149,6 +158,7 @@ export function PresetAwareComparisonBuilderPage() {
     });
 
     setDataSources([...roleSources, ...remainingSources]);
+    setPresetRolesApplied(true);
     setChooserOpen(false);
     dismissPresetBanner();
   };
