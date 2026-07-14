@@ -72,8 +72,8 @@ export function ThemeSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   }
 
   return (
-    <div className="rounded-xl bg-slate-50 p-1.5">
-      <p className="px-1.5 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Theme</p>
+    <div className="theme-switcher rounded-xl p-1.5">
+      <p className="theme-switcher-label px-1.5 pb-1 text-[10px] font-bold uppercase tracking-[0.16em]">Theme</p>
       <div className="grid grid-cols-3 gap-1">
         {themeOptions.map(({ value, label, icon: Icon }) => {
           const selected = theme === value;
@@ -82,9 +82,8 @@ export function ThemeSwitcher({ collapsed = false }: { collapsed?: boolean }) {
               key={value}
               type="button"
               onClick={() => setTheme(value)}
-              className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${
-                selected ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500 hover:bg-white/70 hover:text-slate-950"
-              }`}
+              className="theme-option inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+              data-selected={selected ? "true" : "false"}
               aria-pressed={selected}
               title={`Use ${label.toLowerCase()} theme`}
             >
