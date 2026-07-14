@@ -6,7 +6,11 @@ html[data-theme="dark"] {
 
 html[data-theme="dark"] :is(main, [role="dialog"]) :where(
   .bg-white,
-  [class*="bg-white/"],
+  [class~="bg-white/95"],
+  [class~="bg-white/90"],
+  [class~="bg-white/80"],
+  [class~="bg-white/70"],
+  [class~="bg-white/60"],
   [class*="bg-[#fff"],
   [class*="bg-\[white"],
   [class*="bg-\[#ffffff"]
@@ -16,16 +20,28 @@ html[data-theme="dark"] :is(main, [role="dialog"]) :where(
 
 html[data-theme="dark"] :is(main, [role="dialog"]) :where(
   .bg-slate-50,
-  [class*="bg-slate-50/"],
+  [class~="bg-slate-50/95"],
+  [class~="bg-slate-50/90"],
+  [class~="bg-slate-50/80"],
+  [class~="bg-slate-50/70"],
+  [class~="bg-slate-50/60"],
   .bg-slate-100,
-  [class*="bg-slate-100/"]
+  [class~="bg-slate-100/95"],
+  [class~="bg-slate-100/90"],
+  [class~="bg-slate-100/80"],
+  [class~="bg-slate-100/70"],
+  [class~="bg-slate-100/60"]
 ) {
   background-color: var(--color-panel-inset) !important;
 }
 
 html[data-theme="dark"] :is(main, [role="dialog"]) :where(
   .border-white,
-  [class*="border-white/"],
+  [class~="border-white/95"],
+  [class~="border-white/90"],
+  [class~="border-white/80"],
+  [class~="border-white/70"],
+  [class~="border-white/60"],
   .border-slate-100,
   .border-slate-200,
   .border-slate-300
@@ -35,7 +51,11 @@ html[data-theme="dark"] :is(main, [role="dialog"]) :where(
 
 html[data-theme="dark"] :is(main, [role="dialog"]) :where(
   .ring-white,
-  [class*="ring-white/"],
+  [class~="ring-white/95"],
+  [class~="ring-white/90"],
+  [class~="ring-white/80"],
+  [class~="ring-white/70"],
+  [class~="ring-white/60"],
   .ring-slate-100,
   .ring-slate-200,
   .ring-slate-300
@@ -46,7 +66,10 @@ html[data-theme="dark"] :is(main, [role="dialog"]) :where(
 html[data-theme="dark"] :is(main, [role="dialog"]) :where(
   .shadow-slate-100,
   .shadow-slate-200,
-  [class*="shadow-slate-200/"]
+  [class~="shadow-slate-200/95"],
+  [class~="shadow-slate-200/90"],
+  [class~="shadow-slate-200/80"],
+  [class~="shadow-slate-200/70"]
 ) {
   --tw-shadow-color: rgba(0, 0, 0, 0.42) !important;
 }
@@ -79,25 +102,48 @@ html[data-theme="dark"] [role="dialog"] header {
 
 html[data-theme="dark"] :is(main, [role="dialog"]) :where(
   .bg-emerald-50,
-  [class*="bg-emerald-50/"],
+  [class~="bg-emerald-50/95"],
+  [class~="bg-emerald-50/90"],
+  [class~="bg-emerald-50/80"],
+  [class~="bg-emerald-50/70"],
+  [class~="bg-emerald-50/60"],
+  [class~="bg-emerald-50/50"],
+  [class~="bg-emerald-50/40"],
+  [class~="bg-emerald-50/35"],
   .bg-emerald-100,
-  [class*="bg-emerald-100/"]
+  [class~="bg-emerald-100/95"],
+  [class~="bg-emerald-100/90"],
+  [class~="bg-emerald-100/80"],
+  [class~="bg-emerald-100/70"],
+  [class~="bg-emerald-100/60"]
 ) {
   background-color: var(--color-brand-soft) !important;
 }
 
 html[data-theme="dark"] :is(main, [role="dialog"]) :where(
   .bg-blue-50,
-  [class*="bg-blue-50/"],
+  [class~="bg-blue-50/95"],
+  [class~="bg-blue-50/90"],
+  [class~="bg-blue-50/80"],
+  [class~="bg-blue-50/70"],
+  [class~="bg-blue-50/60"],
   .bg-sky-50,
-  [class*="bg-sky-50/"]
+  [class~="bg-sky-50/95"],
+  [class~="bg-sky-50/90"],
+  [class~="bg-sky-50/80"],
+  [class~="bg-sky-50/70"],
+  [class~="bg-sky-50/60"]
 ) {
   background-color: var(--color-blue-soft) !important;
 }
 
 html[data-theme="dark"] :is(main, [role="dialog"]) :where(
   .bg-amber-50,
-  [class*="bg-amber-50/"]
+  [class~="bg-amber-50/95"],
+  [class~="bg-amber-50/90"],
+  [class~="bg-amber-50/80"],
+  [class~="bg-amber-50/70"],
+  [class~="bg-amber-50/60"]
 ) {
   background-color: var(--color-amber-soft) !important;
 }
@@ -114,6 +160,14 @@ html[data-theme="dark"] main :where(.bg-white\/95, .bg-white\/90, .bg-white\/80,
   background-color: rgba(17, 24, 39, 0.94) !important;
 }
 
-html[data-theme="dark"] :is(main, [role="dialog"]) :where(.outline-white, [class*="outline-white/"]) {
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(.hover\:bg-emerald-50\/30:not(:hover)) {
+  background-color: var(--color-panel-elevated) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(.hover\:bg-emerald-50\/30:hover) {
+  background-color: rgba(52, 211, 153, 0.12) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(.outline-white, [class~="outline-white/90"], [class~="outline-white/80"], [class~="outline-white/70"], [class~="outline-white/60"]) {
   outline-color: var(--color-dark-active-border) !important;
 }
