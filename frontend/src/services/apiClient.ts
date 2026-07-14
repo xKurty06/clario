@@ -67,7 +67,17 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
 }
 
 export async function apiBlobWithHeaders(path: string, body: unknown): Promise<ApiBlobResponse> {
-  const response = await fetchLocal(`${appConfig.apiBaseUrl}${path}`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/pdf" }, body: JSON.stringify(body) });
+  const response = await fetchLocal(`${appConfig.apiBaseUrl}${path}`, {
+    method: "POST",
+    cache: "no-store",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/pdf",
+      "Cache-Control": "no-cache",
+      Pragma: "no-cache",
+    },
+    body: JSON.stringify(body),
+  });
   if (!response.ok) {
     const body = (await response.json().catch(() => ({}))) as { code?: string; detail?: string };
     throw new ApiError(response.status, body.code ?? "REPORT_ERROR", body.detail ?? "The local PDF service could not create the report.");
