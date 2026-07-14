@@ -18,6 +18,12 @@ class OpenReportRequest(BaseModel):
     path: str | None = None
 
 
+class ReportInfoResponse(BaseModel):
+    filename: str
+    saved_path: str
+    created_at: str
+
+
 def report_headers(path: Path) -> dict[str, str]:
     resolved = path.resolve()
     return {
@@ -46,6 +52,14 @@ def open_with_default_app(path: Path) -> None:
 @router.get("/capabilities")
 async def report_capabilities() -> dict[str, str]:
     return {"status": "ready", "format": "pdf"}
+
+
+@router.get("/{session_id}/latest", response_model=ReportInfoResponse)
+async def latest_pdf_report(session_id: str) -> ReportInfoResponse:
+    info = ReportRepository().latest_info_for_session(session_id)
+    if info is None:
+        raise HTTPException(status_code=404, detail="Generated report was not found. Export the report again.")
+    return ReportInfoResponse(filename=info["filename"], saved_path=info["path"], created_at=info["created_at"])
 
 
 @router.post("/{session_id}/open")
