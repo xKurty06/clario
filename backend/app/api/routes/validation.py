@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 
 from app.models.validation_models import ValidationRequest, ValidationResult
@@ -24,7 +26,7 @@ async def validate(request: ValidationRequest) -> ValidationResult:
         )
 
     result = run_validation(request)
-    SessionRepository().save(result, result.file_names)
+    SessionRepository().save(result, result.file_names, request)
     return result
 
 
@@ -33,9 +35,9 @@ async def recent_sessions() -> list[dict[str, object]]:
     return SessionRepository().list_recent()
 
 
-@router.get("/sessions/{session_id}", response_model=ValidationResult)
-async def get_session_result(session_id: str) -> ValidationResult:
-    result = SessionRepository().get_result(session_id)
-    if result is None:
+@router.get("/sessions/{session_id}")
+async def get_session_state(session_id: str) -> dict[str, Any]:
+    state = SessionRepository().get_state(session_id)
+    if state is None:
         raise HTTPException(status_code=404, detail="This session cannot be reopened because its saved validation result is missing.")
-    return result
+    return state
