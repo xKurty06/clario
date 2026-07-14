@@ -6,11 +6,65 @@
   background: #f8fafc;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+
+  --color-app: #f8fafc;
+  --color-panel: #ffffff;
+  --color-panel-soft: #f8fafc;
+  --color-panel-muted: #f1f5f9;
+  --color-border: #e2e8f0;
+  --color-border-soft: #f1f5f9;
+  --color-text: #0f172a;
+  --color-text-soft: #334155;
+  --color-text-muted: #64748b;
+  --color-text-faint: #94a3b8;
+  --color-brand-soft: #ecfdf5;
+  --color-brand-border: #d1fae5;
+  --color-brand-text: #047857;
+  --color-brand-strong: #047857;
+  --color-brand-strong-hover: #065f46;
+  --color-blue-soft: #eff6ff;
+  --color-blue-border: #93c5fd;
+  --color-blue-text: #172554;
+  --color-amber-soft: #fffbeb;
+  --color-amber-border: #fde68a;
+  --color-amber-text: #92400e;
+  --color-red-soft: #fef2f2;
+  --color-red-border: #fecaca;
+  --color-red-text: #b91c1c;
+}
+
+html[data-theme="dark"] {
+  color: #e5edf5;
+  background: #0b1220;
+  --color-app: #0b1220;
+  --color-panel: #111827;
+  --color-panel-soft: #0f172a;
+  --color-panel-muted: #1e293b;
+  --color-border: #334155;
+  --color-border-soft: #1f2937;
+  --color-text: #f8fafc;
+  --color-text-soft: #cbd5e1;
+  --color-text-muted: #94a3b8;
+  --color-text-faint: #64748b;
+  --color-brand-soft: rgba(16, 185, 129, 0.13);
+  --color-brand-border: rgba(52, 211, 153, 0.24);
+  --color-brand-text: #6ee7b7;
+  --color-brand-strong: #059669;
+  --color-brand-strong-hover: #10b981;
+  --color-blue-soft: rgba(59, 130, 246, 0.16);
+  --color-blue-border: rgba(147, 197, 253, 0.42);
+  --color-blue-text: #bfdbfe;
+  --color-amber-soft: rgba(245, 158, 11, 0.14);
+  --color-amber-border: rgba(245, 158, 11, 0.32);
+  --color-amber-text: #fcd34d;
+  --color-red-soft: rgba(239, 68, 68, 0.14);
+  --color-red-border: rgba(248, 113, 113, 0.32);
+  --color-red-text: #fca5a5;
 }
 
 * { box-sizing: border-box; }
 html { min-width: 0; overflow-x: clip; }
-body { margin: 0; min-width: 0; min-height: 100dvh; overflow-x: clip; }
+body { margin: 0; min-width: 0; min-height: 100dvh; overflow-x: clip; background: var(--color-app); color: var(--color-text); }
 button, input, select, textarea { font: inherit; }
 
 :where(p, h1, h2, h3, h4, h5, h6, dd, dt, li, label) {
@@ -19,6 +73,51 @@ button, input, select, textarea { font: inherit; }
 
 :where(button, a, span) {
   min-width: 0;
+}
+
+html[data-theme] :where(.bg-white) { background-color: var(--color-panel); }
+html[data-theme] :where(.bg-slate-50) { background-color: var(--color-panel-soft); }
+html[data-theme] :where(.bg-slate-100) { background-color: var(--color-panel-muted); }
+html[data-theme] :where(.bg-slate-200) { background-color: var(--color-border); }
+html[data-theme] :where(.bg-emerald-50) { background-color: var(--color-brand-soft); }
+html[data-theme] :where(.bg-emerald-700) { background-color: var(--color-brand-strong); }
+html[data-theme] :where(.hover\:bg-emerald-800:hover) { background-color: var(--color-brand-strong-hover); }
+html[data-theme] :where(.hover\:bg-slate-50:hover) { background-color: var(--color-panel-soft); }
+html[data-theme] :where(.hover\:bg-slate-100:hover) { background-color: var(--color-panel-muted); }
+html[data-theme] :where(.bg-blue-50, .bg-sky-50) { background-color: var(--color-blue-soft); }
+html[data-theme] :where(.bg-amber-50) { background-color: var(--color-amber-soft); }
+html[data-theme] :where(.bg-red-50) { background-color: var(--color-red-soft); }
+
+html[data-theme] :where(.border-slate-100) { border-color: var(--color-border-soft); }
+html[data-theme] :where(.border-slate-200, .border-slate-300) { border-color: var(--color-border); }
+html[data-theme] :where(.border-emerald-100, .border-emerald-200) { border-color: var(--color-brand-border); }
+html[data-theme] :where(.border-blue-200, .border-sky-200) { border-color: var(--color-blue-border); }
+html[data-theme] :where(.border-amber-200) { border-color: var(--color-amber-border); }
+html[data-theme] :where(.border-red-200) { border-color: var(--color-red-border); }
+
+html[data-theme] :where(.text-slate-950, .text-slate-900, .text-slate-800) { color: var(--color-text); }
+html[data-theme] :where(.text-slate-700, .text-slate-600) { color: var(--color-text-soft); }
+html[data-theme] :where(.text-slate-500) { color: var(--color-text-muted); }
+html[data-theme] :where(.text-slate-400) { color: var(--color-text-faint); }
+html[data-theme] :where(.text-emerald-900, .text-emerald-800, .text-emerald-700) { color: var(--color-brand-text); }
+html[data-theme] :where(.text-sky-700, .text-blue-700, .text-blue-950) { color: var(--color-blue-text); }
+html[data-theme] :where(.text-amber-900, .text-amber-800, .text-amber-700) { color: var(--color-amber-text); }
+html[data-theme] :where(.text-red-700) { color: var(--color-red-text); }
+html[data-theme] :where(.hover\:text-slate-950:hover) { color: var(--color-text); }
+html[data-theme] :where(.hover\:text-emerald-700:hover) { color: var(--color-brand-text); }
+
+html[data-theme] :where(input, select, textarea) {
+  background-color: var(--color-panel);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+html[data-theme] :where(input::placeholder, textarea::placeholder) {
+  color: var(--color-text-faint);
+}
+
+html[data-theme="dark"] :where(.shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl) {
+  --tw-shadow-color: rgba(0, 0, 0, 0.42);
 }
 
 main :where(a, button).rounded-xl:where(.bg-emerald-700, .border-slate-300) {
@@ -39,13 +138,13 @@ body[data-row-setup-blocked="true"] button[title="Run validation with the curren
 main thead.sticky {
   top: -1px;
   z-index: 30;
-  background: #f1f5f9;
-  box-shadow: 0 -2px 0 #f1f5f9, 0 1px 0 #e2e8f0;
+  background: var(--color-panel-muted);
+  box-shadow: 0 -2px 0 var(--color-panel-muted), 0 1px 0 var(--color-border);
 }
 
 main thead.sticky th {
-  background: #f1f5f9;
-  box-shadow: 0 -1px 0 #f1f5f9, 0 1px 0 #e2e8f0;
+  background: var(--color-panel-muted);
+  box-shadow: 0 -1px 0 var(--color-panel-muted), 0 1px 0 var(--color-border);
 }
 
 main :where(div:has(> button[aria-label="Include all rows in this preview"])) {
@@ -54,7 +153,7 @@ main :where(div:has(> button[aria-label="Include all rows in this preview"])) {
   isolation: isolate;
 }
 
-main :where(div:has(> button[aria-label="Include all rows in this preview"]) + div) {
+main :where(div:has(> button[aria-label="Include all rows in this preview") + div) {
   position: relative;
   z-index: 0;
 }
@@ -72,7 +171,7 @@ main :where(.max-h-\[34rem\] table tbody tr > td:first-child) {
   z-index: auto !important;
   width: 9rem;
   min-width: 9rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--color-border-soft);
   box-shadow: none !important;
   background: inherit;
 }
@@ -94,7 +193,7 @@ main :where(.max-h-\[34rem\] table tbody tr > td:first-child span.rounded-full) 
 }
 
 main :where(.max-h-\[34rem\] table tbody tr > td) {
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--color-border-soft);
 }
 
 main :where(.max-h-\[34rem\] table tbody tr.bg-emerald-50\/40 > td) {
@@ -106,14 +205,14 @@ main :where(.max-h-\[34rem\] table tbody tr) {
 }
 
 main :where(.max-h-\[34rem\] table tbody tr[aria-selected="true"] > td) {
-  background: #eff6ff !important;
-  border-top: 1px solid #93c5fd !important;
-  border-bottom: 1px solid #93c5fd !important;
-  color: #172554;
+  background: var(--color-blue-soft) !important;
+  border-top: 1px solid var(--color-blue-border) !important;
+  border-bottom: 1px solid var(--color-blue-border) !important;
+  color: var(--color-blue-text);
 }
 
 main :where(.max-h-\[34rem\] table tbody tr[aria-selected="true"] > td:first-child span.font-semibold) {
-  color: #172554;
+  color: var(--color-blue-text);
 }
 
 main :where(.truncate) {
