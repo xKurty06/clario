@@ -21,7 +21,7 @@ def migrate() -> None:
         CREATE TABLE IF NOT EXISTS sessions (
             id TEXT PRIMARY KEY, project_name TEXT NOT NULL, mode TEXT NOT NULL,
             file_names TEXT NOT NULL, discrepancy_count INTEGER NOT NULL, created_at TEXT NOT NULL,
-            result_payload TEXT, request_payload TEXT
+            result_payload TEXT, request_payload TEXT, session_path TEXT
         );
         CREATE TABLE IF NOT EXISTS reports (
             id TEXT PRIMARY KEY, session_id TEXT NOT NULL, file_name TEXT NOT NULL,
@@ -35,3 +35,5 @@ def migrate() -> None:
             connection.execute("ALTER TABLE sessions ADD COLUMN result_payload TEXT")
         if LEGACY_SESSION_COLUMNS.issubset(columns) and "request_payload" not in columns:
             connection.execute("ALTER TABLE sessions ADD COLUMN request_payload TEXT")
+        if LEGACY_SESSION_COLUMNS.issubset(columns) and "session_path" not in columns:
+            connection.execute("ALTER TABLE sessions ADD COLUMN session_path TEXT")
