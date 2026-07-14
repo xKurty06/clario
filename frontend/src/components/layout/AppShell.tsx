@@ -16,7 +16,8 @@ import { appConfig } from "../../app/config";
 import { CommonFieldsChooser } from "../validation/CommonFieldsChooser";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
-const logoSrc = "/assets/clario-logo_light.png";
+const logoLightSrc = "/assets/clario-logo_light.png";
+const logoDarkSrc = "/assets/clario-logo_dark.png";
 
 interface NavigationSection {
   label: string;
@@ -64,10 +65,16 @@ export function AppShell() {
             >
               <span className="relative grid size-8 place-items-center overflow-hidden rounded-[10px] bg-white transition-transform duration-200 group-hover:scale-105 group-active:scale-95">
                 <img
-                  src={logoSrc}
+                  src={logoLightSrc}
                   alt=""
                   aria-hidden="true"
-                  className="size-7 object-contain transition-all duration-200 group-hover:-translate-x-2 group-hover:opacity-0 group-focus-visible:-translate-x-2 group-focus-visible:opacity-0"
+                  className="clario-logo clario-logo--light size-7 object-contain transition-all duration-200 group-hover:-translate-x-2 group-hover:opacity-0 group-focus-visible:-translate-x-2 group-focus-visible:opacity-0"
+                />
+                <img
+                  src={logoDarkSrc}
+                  alt=""
+                  aria-hidden="true"
+                  className="clario-logo clario-logo--dark size-7 object-contain transition-all duration-200 group-hover:-translate-x-2 group-hover:opacity-0 group-focus-visible:-translate-x-2 group-focus-visible:opacity-0"
                 />
                 <PanelRightOpen aria-hidden="true" className="absolute size-[17px] translate-x-2 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100" />
               </span>
@@ -75,7 +82,8 @@ export function AppShell() {
           ) : (
             <>
               <div className="sidebar-expand-enter grid size-8 shrink-0 place-items-center rounded-[10px] bg-white">
-                <img src={logoSrc} alt="" aria-hidden="true" className="size-7 object-contain" />
+                <img src={logoLightSrc} alt="" aria-hidden="true" className="clario-logo clario-logo--light size-7 object-contain" />
+                <img src={logoDarkSrc} alt="" aria-hidden="true" className="clario-logo clario-logo--dark size-7 object-contain" />
               </div>
               <div className="sidebar-expand-enter absolute left-[60px] right-[56px] min-w-0">
                 <p className="truncate text-sm font-semibold" title={appConfig.displayName}>{appConfig.displayName}</p>

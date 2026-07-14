@@ -69,6 +69,18 @@ html { min-width: 0; overflow-x: clip; }
 body { margin: 0; min-width: 0; min-height: 100dvh; overflow-x: clip; background: var(--color-app); color: var(--color-text); }
 button, input, select, textarea { font: inherit; }
 
+.clario-logo--dark {
+  display: none;
+}
+
+html[data-theme="dark"] .clario-logo--light {
+  display: none;
+}
+
+html[data-theme="dark"] .clario-logo--dark {
+  display: block;
+}
+
 .theme-switcher {
   background: color-mix(in srgb, var(--color-panel-muted) 72%, var(--color-panel-soft));
 }
