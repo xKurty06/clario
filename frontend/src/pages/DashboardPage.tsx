@@ -1,16 +1,59 @@
-import { ArrowRight, FileCheck2, LayoutTemplate, Plus, ShieldCheck } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowRight, FileCheck2, FileDown, LayoutTemplate, LoaderCircle, Plus, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { EmptyState } from "../components/common/EmptyState";
 import { StatusBadge } from "../components/common/StatusBadge";
 import { PageHeader } from "../components/layout/PageHeader";
+import { useWorkflow } from "../features/files/WorkflowContext";
 import { listTemplates } from "../services/templateApi";
-import { listRecentSessions, type RecentSession } from "../services/validationApi";
+import { getSessionState, listRecentSessions, type RecentSession } from "../services/validationApi";
+
+function fileSummary(fileNames: string[]) {
+  if (!fileNames.length) return "No file list saved";
+  if (fileNames.length === 1) return fileNames[0];
+  return `${fileNames.slice(0, 2).join(", ")}${fileNames.length > 2 ? ` +${fileNames.length - 2} more` : ""}`;
+}
+
+function formatSessionDate(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Saved session" : date.toLocaleString();
+}
 
 export function DashboardPage() {
+  const navigate = useNavigate();
+  const { setProjectName, setPreset, setDataSources, setRules, setResult } = useWorkflow();
   const [sessions, setSessions] = useState<RecentSession[]>([]);
   const [templateCount, setTemplateCount] = useState(0);
-  useEffect(() => { void Promise.all([listRecentSessions(), listTemplates()]).then(([recent, templates]) => { setSessions(recent); setTemplateCount(templates.length); }).catch(() => undefined); }, []);
+  const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState("");
+
+  useEffect(() => {
+    void Promise.all([listRecentSessions(), listTemplates()])
+      .then(([recent, templates]) => {
+        setSessions(recent);
+        setTemplateCount(templates.length);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const openSession = async (session: RecentSession, destination: "/mapping" | "/results" | "/reports") => {
+    setLoadingSessionId(session.id);
+    setSessionError("");
+    try {
+      const state = await getSessionState(session.id);
+      setResult(state.result);
+      setProjectName(state.result.project_name);
+      setPreset(state.result.preset);
+      setDataSources(state.request?.data_sources ?? state.result.data_sources);
+      setRules(state.request?.rules ?? []);
+      navigate(destination);
+    } catch (cause) {
+      setSessionError(cause instanceof Error ? cause.message : "Could not reopen this session.");
+    } finally {
+      setLoadingSessionId(null);
+    }
+  };
+
   return (
     <div>
       <PageHeader
@@ -38,10 +81,61 @@ export function DashboardPage() {
       <div className="grid grid-cols-[minmax(0,1fr)_320px] gap-8 pt-8">
         <section>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-base font-semibold">Recent sessions</h2>
-            <StatusBadge tone="success">Version 1 ready</StatusBadge>
+            <div>
+              <h2 className="text-base font-semibold">Recent sessions</h2>
+              <p className="mt-1 text-sm text-slate-500">Open a previous validation result or continue from its saved setup.</p>
+            </div>
+            <StatusBadge tone="success">Saved locally</StatusBadge>
           </div>
-          {sessions.length ? <div className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">{sessions.slice(0, 5).map((session) => <div key={session.id} className="flex items-center gap-4 p-4"><FileCheck2 className="size-5 text-emerald-700"/><div className="flex-1"><p className="text-sm font-semibold">{session.project_name}</p><p className="mt-1 text-xs text-slate-500">{new Date(session.created_at).toLocaleString()} · {session.mode.replaceAll("_", " ")}</p></div><StatusBadge tone={session.discrepancy_count ? "warning" : "success"}>{`${session.discrepancy_count} issues`}</StatusBadge></div>)}</div> : <EmptyState icon={FileCheck2} title="Start a validation session" description="Choose local procurement files, confirm their mappings, preview extracted rows, and run a traceable comparison." />}
+          {sessionError ? <p className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700" role="alert">{sessionError}</p> : null}
+          {sessions.length ? (
+            <div className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+              {sessions.slice(0, 8).map((session) => {
+                const loading = loadingSessionId === session.id;
+                return (
+                  <div key={session.id} className="grid gap-4 p-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                    <div className="flex min-w-0 gap-4">
+                      <FileCheck2 className="mt-0.5 size-5 shrink-0 text-emerald-700" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-slate-950">{session.project_name}</p>
+                        <p className="mt-1 text-xs text-slate-500">{formatSessionDate(session.created_at)} · {session.mode.replaceAll("_", " ")}</p>
+                        <p className="mt-1 truncate text-xs text-slate-500">{fileSummary(Array.isArray(session.file_names) ? session.file_names : [])}</p>
+                        {session.latest_report_filename ? <p className="mt-1 truncate text-xs text-emerald-700">Latest report: {session.latest_report_filename}</p> : null}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                      <StatusBadge tone={session.discrepancy_count ? "warning" : "success"}>{`${session.discrepancy_count} issues`}</StatusBadge>
+                      <button
+                        type="button"
+                        onClick={() => openSession(session, "/results")}
+                        disabled={loading || session.can_reopen === false}
+                        className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {loading ? <LoaderCircle className="size-4 animate-spin" /> : null}
+                        Open result
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openSession(session, session.can_continue_setup ? "/mapping" : "/results")}
+                        disabled={loading || session.can_reopen === false}
+                        className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Continue setup
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openSession(session, "/reports")}
+                        disabled={loading || session.can_reopen === false}
+                        className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        <FileDown className="size-4" /> Report
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : <EmptyState icon={FileCheck2} title="Start a validation session" description="Choose local procurement files, confirm their mappings, preview extracted rows, and run a traceable comparison." />}
         </section>
         <aside className="rounded-2xl border border-slate-200 bg-white p-5">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Workflow</p>
