@@ -2,15 +2,15 @@ import json
 from typing import Any
 
 from app.database.connection import database
-from app.models.validation_models import ValidationResult
+from app.models.validation_models import ValidationRequest, ValidationResult
 from app.repositories.report_repository import ReportRepository
 
 
 class SessionRepository:
-    def save(self, result: ValidationResult, file_names: list[str]) -> None:
+    def save(self, result: ValidationResult, file_names: list[str], request: ValidationRequest | None = None) -> None:
         with database() as connection:
             connection.execute(
-                "INSERT OR REPLACE INTO sessions(id,project_name,mode,file_names,discrepancy_count,created_at,result_payload) VALUES(?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO sessions(id,project_name,mode,file_names,discrepancy_count,created_at,result_payload,request_payload) VALUES(?,?,?,?,?,?,?,?)",
                 (
                     result.id,
                     result.project_name,
@@ -19,6 +19,7 @@ class SessionRepository:
                     len(result.discrepancies),
                     result.created_at,
                     result.model_dump_json(),
+                    request.model_dump_json() if request else None,
                 ),
             )
 
@@ -37,17 +38,23 @@ class SessionRepository:
             latest_report = report_repository.latest_info_for_session(str(item["id"]))
             item["has_report"] = latest_report is not None
             item["latest_report_filename"] = latest_report["filename"] if latest_report else None
+            item["can_reopen"] = bool(item.get("result_payload"))
+            item["can_continue_setup"] = bool(item.get("request_payload"))
             item.pop("result_payload", None)
+            item.pop("request_payload", None)
             sessions.append(item)
         return sessions
 
-    def get_result(self, session_id: str) -> ValidationResult | None:
+    def get_state(self, session_id: str) -> dict[str, Any] | None:
         with database() as connection:
             row = connection.execute(
-                "SELECT result_payload FROM sessions WHERE id = ? LIMIT 1",
+                "SELECT result_payload, request_payload FROM sessions WHERE id = ? LIMIT 1",
                 (session_id,),
             ).fetchone()
 
         if row is None or not row["result_payload"]:
             return None
-        return ValidationResult.model_validate_json(row["result_payload"])
+
+        result = ValidationResult.model_validate_json(row["result_payload"])
+        request = ValidationRequest.model_validate_json(row["request_payload"]) if row["request_payload"] else None
+        return {"result": result, "request": request}
