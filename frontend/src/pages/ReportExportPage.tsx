@@ -1,9 +1,9 @@
 import { CheckCircle2, Download, ExternalLink, FileOutput, ListChecks } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
 import { useWorkflow } from "../features/files/WorkflowContext";
-import { exportPdf, openPdfExternally } from "../services/reportApi";
+import { exportPdf, latestReportInfo, openPdfExternally } from "../services/reportApi";
 
 interface ExportedReportState {
   filename: string;
@@ -13,6 +13,29 @@ interface ExportedReportState {
 const primaryActionClass = "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none disabled:active:scale-100";
 const secondaryActionClass = "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100";
 const reportPanelClass = "mx-auto mt-8 w-full max-w-4xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm";
+
+function reportStorageKey(resultId: string) {
+  return `clario:exported-report:${resultId}`;
+}
+
+function readStoredReport(resultId: string): ExportedReportState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const value = window.sessionStorage.getItem(reportStorageKey(resultId));
+    return value ? (JSON.parse(value) as ExportedReportState) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredReport(resultId: string, report: ExportedReportState) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(reportStorageKey(resultId), JSON.stringify(report));
+  } catch {
+    // Ignore storage failures. The backend can still return the latest report while the app is open.
+  }
+}
 
 function ExportMetric({ label, value }: { label: string; value: number }) {
   return (
@@ -40,6 +63,32 @@ export function ReportExportPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [exportedReport, setExportedReport] = useState<ExportedReportState | null>(null);
+
+  useEffect(() => {
+    if (!result) {
+      setExportedReport(null);
+      return;
+    }
+
+    let active = true;
+    const storedReport = readStoredReport(result.id);
+    if (storedReport) setExportedReport(storedReport);
+
+    void latestReportInfo(result.id)
+      .then((report) => {
+        if (!active) return;
+        const next = { filename: report.filename, savedPath: report.savedPath };
+        setExportedReport(next);
+        writeStoredReport(result.id, next);
+      })
+      .catch(() => {
+        if (active && !storedReport) setExportedReport(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [result]);
 
   if (!result) {
     return (
@@ -97,10 +146,12 @@ export function ReportExportPage() {
         throw new Error("The PDF service returned an empty report. Please run validation again and retry export.");
       }
 
-      setExportedReport({
+      const nextReport = {
         filename: report.filename,
         savedPath: report.savedPath,
-      });
+      };
+      setExportedReport(nextReport);
+      writeStoredReport(result.id, nextReport);
 
       if (previousPath && report.savedPath && previousPath === report.savedPath) {
         setStatusMessage("PDF regenerated, but the backend returned the same saved path. Restart the local backend if the file name does not change after pulling the latest code.");
@@ -121,7 +172,12 @@ export function ReportExportPage() {
     setErrorMessage("");
     setStatusMessage("");
     try {
-      await openPdfExternally(result.id, exportedReport.savedPath);
+      const opened = await openPdfExternally(result.id, exportedReport.savedPath);
+      if (opened.path !== exportedReport.savedPath) {
+        const latest = { filename: opened.path.split(/[/\\]/).pop() || exportedReport.filename, savedPath: opened.path };
+        setExportedReport(latest);
+        writeStoredReport(result.id, latest);
+      }
       setStatusMessage("Opened the displayed PDF using your default PDF viewer.");
     } catch (cause) {
       setErrorMessage(cause instanceof Error ? cause.message : "Could not open the PDF in an external viewer.");
