@@ -1,4 +1,4 @@
-import { CheckCircle2, Download, ExternalLink, FileOutput } from "lucide-react";
+import { CheckCircle2, Download, ExternalLink, FileOutput, ListChecks } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState } from "../components/common/EmptyState";
@@ -34,23 +34,46 @@ export function ReportExportPage() {
   if (!result) {
     return (
       <div>
-        <PageHeader eyebrow="Step 4 of 4" title="Export local report" description="Run validation first, then return here to export the completed result." />
+        <PageHeader
+          eyebrow="Step 4 of 4"
+          title="Export local report"
+          description="A PDF report can only be generated after validation has finished."
+        />
         <div className="pt-8">
-          <EmptyState
-            icon={FileOutput}
-            title="No report data"
-            description="A completed validation result is required for PDF export. If you already ran validation in this browser session, return to Results. Otherwise, go back to Review & Run and run validation again."
-          />
-          <div className="mt-5 flex flex-wrap justify-center gap-3">
-            <Link to="/results" className={secondaryActionClass}>
-              Back to Results
-            </Link>
-            <Link to="/mapping" className={secondaryActionClass}>
-              Return to Review & Run
-            </Link>
-            <Link to="/upload" className={primaryActionClass}>
-              Start new validation
-            </Link>
+          <div className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+            <EmptyState
+              icon={FileOutput}
+              title="No completed validation yet"
+              description="There is no result available for export in this session. Run validation first, then return here to generate the PDF report."
+            />
+            <div className="mt-6 grid gap-3 text-left sm:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">1</p>
+                <p className="mt-2 text-sm font-semibold text-slate-950">Finish setup</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Check sources, rows, fields, and rules in the builder.</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">2</p>
+                <p className="mt-2 text-sm font-semibold text-slate-950">Run validation</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Use Review & Run to create the result that the report will use.</p>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">3</p>
+                <p className="mt-2 text-sm font-semibold text-slate-950">Export PDF</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Come back here after validation to generate the local report.</p>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <Link to="/mapping" className={primaryActionClass}>
+                <ListChecks className="size-4" /> Go to Review & Run
+              </Link>
+              <Link to="/results" className={secondaryActionClass}>
+                Back to Results
+              </Link>
+              <Link to="/upload" className={secondaryActionClass}>
+                Start new validation
+              </Link>
+            </div>
           </div>
         </div>
       </div>
