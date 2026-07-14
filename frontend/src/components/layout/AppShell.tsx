@@ -8,6 +8,7 @@ import {
   Menu,
   PanelRightOpen,
   Plus,
+  RefreshCw,
   Search,
   Settings2,
   SlidersHorizontal,
@@ -219,7 +220,16 @@ export function AppShell() {
 
                 <div className="mt-4 flex items-center justify-between px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
                   <span>Sessions</span>
-                  <button type="button" onClick={loadSessions} className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800">Refresh</button>
+                  <button
+                    type="button"
+                    onClick={loadSessions}
+                    disabled={loadingSessions}
+                    className="grid size-7 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    title="Refresh sessions"
+                    aria-label="Refresh sessions"
+                  >
+                    <RefreshCw aria-hidden="true" className={`size-3.5 ${loadingSessions ? "animate-spin" : ""}`} />
+                  </button>
                 </div>
                 {sessionError ? <p className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">{sessionError}</p> : null}
                 {loadingSessions ? <p className="mt-3 px-3 text-xs text-slate-500">Loading sessions...</p> : null}
