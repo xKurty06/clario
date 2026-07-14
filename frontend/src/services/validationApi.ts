@@ -45,8 +45,15 @@ export interface RecentSession {
   created_at: string;
   has_report?: boolean;
   latest_report_filename?: string | null;
+  can_reopen?: boolean;
+  can_continue_setup?: boolean;
+}
+
+export interface SessionState {
+  result: ValidationResult;
+  request: ValidationPayload | null;
 }
 
 export const listRecentSessions = () => apiRequest<RecentSession[]>("/validation/recent");
 
-export const getSessionResult = (sessionId: string) => apiRequest<ValidationResult>(`/validation/sessions/${encodeURIComponent(sessionId)}`);
+export const getSessionState = (sessionId: string) => apiRequest<SessionState>(`/validation/sessions/${encodeURIComponent(sessionId)}`);
