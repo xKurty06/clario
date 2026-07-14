@@ -27,13 +27,18 @@ function fallbackReportFileName(projectName: string) {
 
 export async function exportPdf(result: ValidationResult): Promise<ExportedPdfReport> {
   const response = await apiBlobWithHeaders("/reports/pdf", result);
+  const headerFilename = response.headers.get("X-Report-Filename");
   return {
     blob: response.blob,
-    filename: filenameFromDisposition(response.headers.get("Content-Disposition")) ?? fallbackReportFileName(result.project_name),
+    filename: headerFilename ?? filenameFromDisposition(response.headers.get("Content-Disposition")) ?? fallbackReportFileName(result.project_name),
     savedPath: response.headers.get("X-Report-Path"),
   };
 }
 
-export async function openPdfExternally(resultId: string): Promise<OpenPdfResponse> {
-  return apiRequest<OpenPdfResponse>(`/reports/${encodeURIComponent(resultId)}/open`, { method: "POST" });
+export async function openPdfExternally(resultId: string, savedPath?: string | null): Promise<OpenPdfResponse> {
+  return apiRequest<OpenPdfResponse>(`/reports/${encodeURIComponent(resultId)}/open`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: savedPath ?? null }),
+  });
 }
