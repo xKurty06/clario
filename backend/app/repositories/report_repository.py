@@ -21,3 +21,14 @@ class ReportRepository:
             return None
         path = Path(row["path"])
         return path if path.exists() else None
+
+    def find_for_session(self, session_id: str, path: str) -> Path | None:
+        with database() as connection:
+            row = connection.execute(
+                "SELECT path FROM reports WHERE session_id = ? AND path = ? ORDER BY created_at DESC LIMIT 1",
+                (session_id, path),
+            ).fetchone()
+        if row is None:
+            return None
+        report_path = Path(row["path"])
+        return report_path if report_path.exists() else None
