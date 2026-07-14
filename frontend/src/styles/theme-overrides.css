@@ -1,0 +1,119 @@
+html[data-theme="dark"] {
+  --color-panel-elevated: #111827;
+  --color-panel-inset: #0f172a;
+  --color-dark-active-border: rgba(52, 211, 153, 0.45);
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(
+  .bg-white,
+  [class*="bg-white/"],
+  [class*="bg-[#fff"],
+  [class*="bg-\[white"],
+  [class*="bg-\[#ffffff"]
+) {
+  background-color: var(--color-panel-elevated) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(
+  .bg-slate-50,
+  [class*="bg-slate-50/"],
+  .bg-slate-100,
+  [class*="bg-slate-100/"]
+) {
+  background-color: var(--color-panel-inset) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(
+  .border-white,
+  [class*="border-white/"],
+  .border-slate-100,
+  .border-slate-200,
+  .border-slate-300
+) {
+  border-color: var(--color-border) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(
+  .ring-white,
+  [class*="ring-white/"],
+  .ring-slate-100,
+  .ring-slate-200,
+  .ring-slate-300
+) {
+  --tw-ring-color: var(--color-dark-active-border) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(
+  .shadow-slate-100,
+  .shadow-slate-200,
+  [class*="shadow-slate-200/"]
+) {
+  --tw-shadow-color: rgba(0, 0, 0, 0.42) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(.via-white) {
+  --tw-gradient-via: var(--color-panel-elevated) var(--tw-gradient-via-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(.from-white) {
+  --tw-gradient-from: var(--color-panel-elevated) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(17, 24, 39, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(.to-white) {
+  --tw-gradient-to: var(--color-panel-elevated) var(--tw-gradient-to-position) !important;
+}
+
+html[data-theme="dark"] [role="dialog"] > aside,
+html[data-theme="dark"] [role="dialog"] header,
+html[data-theme="dark"] [role="dialog"] footer {
+  background-color: var(--color-panel-elevated) !important;
+  border-color: var(--color-border) !important;
+}
+
+html[data-theme="dark"] [role="dialog"] header {
+  background-image: radial-gradient(circle at top left, rgba(16, 185, 129, 0.16), transparent 48%), linear-gradient(180deg, #111827 0%, #0f172a 100%) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(
+  .bg-emerald-50,
+  [class*="bg-emerald-50/"],
+  .bg-emerald-100,
+  [class*="bg-emerald-100/"]
+) {
+  background-color: var(--color-brand-soft) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(
+  .bg-blue-50,
+  [class*="bg-blue-50/"],
+  .bg-sky-50,
+  [class*="bg-sky-50/"]
+) {
+  background-color: var(--color-blue-soft) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(
+  .bg-amber-50,
+  [class*="bg-amber-50/"]
+) {
+  background-color: var(--color-amber-soft) !important;
+}
+
+html[data-theme="dark"] main :where(table tbody tr.bg-emerald-50\/35 > td, table tbody tr.bg-emerald-50\/40 > td, table tbody tr.bg-emerald-50\/50 > td) {
+  background-color: rgba(52, 211, 153, 0.12) !important;
+}
+
+html[data-theme="dark"] main :where(table tbody tr.hover\:bg-emerald-100\/55:hover > td) {
+  background-color: rgba(52, 211, 153, 0.18) !important;
+}
+
+html[data-theme="dark"] main :where(.bg-white\/95, .bg-white\/90, .bg-white\/80, .bg-white\/70) {
+  background-color: rgba(17, 24, 39, 0.94) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) :where(.outline-white, [class*="outline-white/"]) {
+  outline-color: var(--color-dark-active-border) !important;
+}
