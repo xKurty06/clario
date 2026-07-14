@@ -31,3 +31,11 @@ async def validate(request: ValidationRequest) -> ValidationResult:
 @router.get("/recent")
 async def recent_sessions() -> list[dict[str, object]]:
     return SessionRepository().list_recent()
+
+
+@router.get("/sessions/{session_id}", response_model=ValidationResult)
+async def get_session_result(session_id: str) -> ValidationResult:
+    result = SessionRepository().get_result(session_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="This session cannot be reopened because its saved validation result is missing.")
+    return result
