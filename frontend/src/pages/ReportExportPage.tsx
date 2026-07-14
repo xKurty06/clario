@@ -1,7 +1,6 @@
 import { CheckCircle2, Download, ExternalLink, FileOutput, ListChecks } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { EmptyState } from "../components/common/EmptyState";
 import { PageHeader } from "../components/layout/PageHeader";
 import { useWorkflow } from "../features/files/WorkflowContext";
 import { exportPdf, openPdfExternally } from "../services/reportApi";
@@ -23,6 +22,16 @@ function ExportMetric({ label, value }: { label: string; value: number }) {
   );
 }
 
+function EmptyReportStep({ number, title, description }: { number: number; title: string; description: string }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">Step {number}</p>
+      <p className="mt-1 text-sm font-semibold text-slate-950">{title}</p>
+      <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+    </div>
+  );
+}
+
 export function ReportExportPage() {
   const { result } = useWorkflow();
   const [busy, setBusy] = useState(false);
@@ -39,43 +48,39 @@ export function ReportExportPage() {
           title="Export local report"
           description="A PDF report can only be generated after validation has finished."
         />
-        <div className="pt-8">
-          <div className="mx-auto max-w-3xl rounded-3xl border border-slate-200 bg-white p-6 text-center shadow-sm">
-            <EmptyState
-              icon={FileOutput}
-              title="No completed validation yet"
-              description="There is no result available for export in this session. Run validation first, then return here to generate the PDF report."
-            />
-            <div className="mt-6 grid gap-3 text-left sm:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">1</p>
-                <p className="mt-2 text-sm font-semibold text-slate-950">Finish setup</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Check sources, rows, fields, and rules in the builder.</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">2</p>
-                <p className="mt-2 text-sm font-semibold text-slate-950">Run validation</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Use Review & Run to create the result that the report will use.</p>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">3</p>
-                <p className="mt-2 text-sm font-semibold text-slate-950">Export PDF</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Come back here after validation to generate the local report.</p>
-              </div>
-            </div>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <Link to="/mapping" className={primaryActionClass}>
-                <ListChecks className="size-4" /> Go to Review & Run
-              </Link>
-              <Link to="/results" className={secondaryActionClass}>
-                Back to Results
-              </Link>
-              <Link to="/upload" className={secondaryActionClass}>
-                Start new validation
-              </Link>
+
+        <section className="mt-8 max-w-4xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex min-w-0 items-start gap-4">
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-500">
+              <FileOutput className="size-5" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Waiting for validation</p>
+              <h2 className="mt-1 text-xl font-semibold text-slate-950">No completed validation yet</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                There is no result available for export in this session. Finish the builder setup, run validation, then return here to generate the local PDF report.
+              </p>
             </div>
           </div>
-        </div>
+
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            <EmptyReportStep number={1} title="Finish setup" description="Check sources, rows, fields, and rules in the builder." />
+            <EmptyReportStep number={2} title="Run validation" description="Use Review & Run to create the result that the report will use." />
+            <EmptyReportStep number={3} title="Export PDF" description="Come back here after validation to generate the local report." />
+          </div>
+
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link to="/mapping" className={primaryActionClass}>
+              <ListChecks className="size-4" /> Go to Review & Run
+            </Link>
+            <Link to="/results" className={secondaryActionClass}>
+              Back to Results
+            </Link>
+            <Link to="/upload" className={secondaryActionClass}>
+              Start new validation
+            </Link>
+          </div>
+        </section>
       </div>
     );
   }
