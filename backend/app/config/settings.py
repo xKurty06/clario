@@ -46,6 +46,10 @@ class Settings(BaseSettings):
         return self.data_directory / CLARIO_DATABASE_NAME
 
     @property
+    def sessions_directory(self) -> Path:
+        return self.data_directory / "sessions"
+
+    @property
     def upload_directory(self) -> Path:
         return self.data_directory / "working-files"
 
