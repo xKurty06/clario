@@ -51,7 +51,8 @@ async def report_capabilities() -> dict[str, str]:
 @router.post("/{session_id}/open")
 async def open_pdf_external(session_id: str, request: OpenReportRequest | None = None) -> dict[str, str]:
     repository = ReportRepository()
-    path = repository.find_for_session(session_id, request.path) if request?.path else repository.latest_for_session(session_id)
+    requested_path = request.path if request and request.path else None
+    path = repository.find_for_session(session_id, requested_path) if requested_path else repository.latest_for_session(session_id)
     if path is None:
         raise HTTPException(status_code=404, detail="Generated report was not found. Export the report again.")
     try:
