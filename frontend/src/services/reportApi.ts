@@ -7,6 +7,12 @@ export interface ExportedPdfReport {
   savedPath: string | null;
 }
 
+export interface ReportInfo {
+  filename: string;
+  savedPath: string;
+  createdAt: string;
+}
+
 export interface OpenPdfResponse {
   status: "opened";
   path: string;
@@ -26,12 +32,21 @@ function fallbackReportFileName(projectName: string) {
 }
 
 export async function exportPdf(result: ValidationResult): Promise<ExportedPdfReport> {
-  const response = await apiBlobWithHeaders("/reports/pdf", result);
+  const response = await apiBlobWithHeaders(`/reports/pdf?ts=${Date.now()}`, result);
   const headerFilename = response.headers.get("X-Report-Filename");
   return {
     blob: response.blob,
     filename: headerFilename ?? filenameFromDisposition(response.headers.get("Content-Disposition")) ?? fallbackReportFileName(result.project_name),
     savedPath: response.headers.get("X-Report-Path"),
+  };
+}
+
+export async function latestReportInfo(resultId: string): Promise<ReportInfo> {
+  const response = await apiRequest<{ filename: string; saved_path: string; created_at: string }>(`/reports/${encodeURIComponent(resultId)}/latest`);
+  return {
+    filename: response.filename,
+    savedPath: response.saved_path,
+    createdAt: response.created_at,
   };
 }
 
