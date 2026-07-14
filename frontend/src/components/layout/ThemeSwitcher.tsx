@@ -1,4 +1,4 @@
-import { Monitor, Moon, Sun } from "lucide-react";
+import { Laptop, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
 type ThemePreference = "light" | "dark" | "system";
@@ -9,7 +9,7 @@ const THEME_STORAGE_KEY = "clario:theme";
 const themeOptions: Array<{ value: ThemePreference; label: string; icon: typeof Sun }> = [
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "System", icon: Monitor },
+  { value: "system", label: "System", icon: Laptop },
 ];
 
 function readStoredTheme(): ThemePreference {
@@ -64,7 +64,7 @@ export function ThemeSwitcher({ collapsed = false }: { collapsed?: boolean }) {
         onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
         title={`Theme: ${theme === "system" ? `System (${resolvedTheme})` : theme}. Click to toggle light/dark.`}
         aria-label={`Theme: ${theme === "system" ? `System ${resolvedTheme}` : theme}. Click to toggle light or dark.`}
-        className="mx-auto grid size-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-100 hover:text-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+        className="mx-auto grid size-10 place-items-center rounded-xl bg-white text-slate-600 transition hover:bg-slate-100 hover:text-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
       >
         <Icon aria-hidden="true" className="size-4" />
       </button>
@@ -72,7 +72,7 @@ export function ThemeSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-1.5">
+    <div className="rounded-xl bg-slate-50 p-1.5">
       <p className="px-1.5 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">Theme</p>
       <div className="grid grid-cols-3 gap-1">
         {themeOptions.map(({ value, label, icon: Icon }) => {
@@ -83,12 +83,12 @@ export function ThemeSwitcher({ collapsed = false }: { collapsed?: boolean }) {
               type="button"
               onClick={() => setTheme(value)}
               className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${
-                selected ? "bg-white text-emerald-800 shadow-sm ring-1 ring-slate-200" : "text-slate-500 hover:bg-white/70 hover:text-slate-950"
+                selected ? "bg-white text-emerald-800 shadow-sm" : "text-slate-500 hover:bg-white/70 hover:text-slate-950"
               }`}
               aria-pressed={selected}
               title={`Use ${label.toLowerCase()} theme`}
             >
-              <Icon aria-hidden="true" className="size-3.5" />
+              <Icon aria-hidden="true" className="size-4" />
               {label}
             </button>
           );
