@@ -1,4 +1,4 @@
-import { Laptop, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 
 type ThemePreference = "light" | "dark" | "system";
@@ -9,7 +9,7 @@ const THEME_STORAGE_KEY = "clario:theme";
 const themeOptions: Array<{ value: ThemePreference; label: string; icon: typeof Sun }> = [
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "System", icon: Laptop },
+  { value: "system", label: "System", icon: Monitor },
 ];
 
 function readStoredTheme(): ThemePreference {
@@ -66,7 +66,7 @@ export function ThemeSwitcher({ collapsed = false }: { collapsed?: boolean }) {
         aria-label={`Theme: ${theme === "system" ? `System ${resolvedTheme}` : theme}. Click to toggle light or dark.`}
         className="mx-auto grid size-10 place-items-center rounded-xl bg-white text-slate-600 transition hover:bg-slate-100 hover:text-emerald-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
       >
-        <Icon aria-hidden="true" className="size-4" />
+        <Icon aria-hidden="true" className="size-4 shrink-0" strokeWidth={1.8} />
       </button>
     );
   }
@@ -88,7 +88,7 @@ export function ThemeSwitcher({ collapsed = false }: { collapsed?: boolean }) {
               aria-pressed={selected}
               title={`Use ${label.toLowerCase()} theme`}
             >
-              <Icon aria-hidden="true" className="size-4" />
+              <Icon aria-hidden="true" className="size-4 shrink-0" strokeWidth={1.8} />
               {label}
             </button>
           );
