@@ -5,12 +5,26 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from app.models.validation_models import ValidationResult
 from app.repositories.report_repository import ReportRepository
 from app.services.report_service import create_pdf
 
 router = APIRouter(prefix="/reports", tags=["reports"])
+
+
+class OpenReportRequest(BaseModel):
+    path: str | None = None
+
+
+def report_headers(path: Path) -> dict[str, str]:
+    resolved = path.resolve()
+    return {
+        "Cache-Control": "no-store",
+        "X-Report-Path": str(resolved),
+        "X-Report-Filename": path.name,
+    }
 
 
 def open_with_default_app(path: Path) -> None:
@@ -35,8 +49,9 @@ async def report_capabilities() -> dict[str, str]:
 
 
 @router.post("/{session_id}/open")
-async def open_pdf_external(session_id: str) -> dict[str, str]:
-    path = ReportRepository().latest_for_session(session_id)
+async def open_pdf_external(session_id: str, request: OpenReportRequest | None = None) -> dict[str, str]:
+    repository = ReportRepository()
+    path = repository.find_for_session(session_id, request.path) if request?.path else repository.latest_for_session(session_id)
     if path is None:
         raise HTTPException(status_code=404, detail="Generated report was not found. Export the report again.")
     try:
@@ -56,7 +71,7 @@ async def open_pdf(session_id: str, download: bool = Query(default=False)) -> Fi
         media_type="application/pdf",
         filename=path.name,
         content_disposition_type="attachment" if download else "inline",
-        headers={"X-Report-Path": str(path.resolve())},
+        headers=report_headers(path),
     )
 
 
@@ -67,5 +82,5 @@ async def export_pdf(result: ValidationResult) -> FileResponse:
         path,
         media_type="application/pdf",
         filename=path.name,
-        headers={"X-Report-Path": str(path.resolve())},
+        headers=report_headers(path),
     )
