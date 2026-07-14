@@ -1,4 +1,5 @@
 import {
+  ArrowLeft,
   FileOutput,
   FileSearch,
   Files,
@@ -6,13 +7,17 @@ import {
   LockKeyhole,
   Menu,
   PanelRightOpen,
+  Plus,
+  Search,
   Settings2,
   SlidersHorizontal,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useState, type CSSProperties } from "react";
-import { NavLink, Outlet, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { appConfig } from "../../app/config";
+import { useWorkflow } from "../../features/files/WorkflowContext";
+import { getSessionState, listRecentSessions, type RecentSession } from "../../services/validationApi";
 import { CommonFieldsChooser } from "../validation/CommonFieldsChooser";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
@@ -44,10 +49,103 @@ const navigation: NavigationSection[] = [
   },
 ];
 
+function formatSessionMeta(session: RecentSession) {
+  const issues = `${session.discrepancy_count} issue${session.discrepancy_count === 1 ? "" : "s"}`;
+  return session.has_report ? `${issues} · Report ready` : issues;
+}
+
+function ActiveSessionCard({ name, issueCount, collapsed }: { name: string; issueCount?: number; collapsed: boolean }) {
+  if (collapsed) return null;
+  return (
+    <div className="mx-3 mb-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-emerald-800">
+      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700">Active session</p>
+      <p className="mt-1 truncate text-sm font-semibold" title={name}>{name}</p>
+      <p className="mt-1 text-xs leading-5 text-emerald-700">
+        {typeof issueCount === "number" ? `${issueCount} issue${issueCount === 1 ? "" : "s"}` : "Setup in progress"}
+      </p>
+    </div>
+  );
+}
+
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
+  const [sidebarView, setSidebarView] = useState<"sessions" | "workflow">("sessions");
+  const [sessions, setSessions] = useState<RecentSession[]>([]);
+  const [sessionQuery, setSessionQuery] = useState("");
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [sessionError, setSessionError] = useState("");
+  const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
   const location = useLocation();
+  const navigate = useNavigate();
+  const {
+    projectName,
+    setProjectName,
+    setPreset,
+    setFiles,
+    setDataSources,
+    setRules,
+    setResult,
+    result,
+  } = useWorkflow();
   const shellStyle = { "--app-sidebar-offset": collapsed ? "72px" : "272px" } as CSSProperties;
+
+  const activeSessionName = result?.project_name || projectName || "No active session";
+  const activeIssueCount = result?.discrepancies.length;
+  const filteredSessions = useMemo(() => {
+    const normalized = sessionQuery.trim().toLowerCase();
+    if (!normalized) return sessions;
+    return sessions.filter((session) => session.project_name.toLowerCase().includes(normalized));
+  }, [sessionQuery, sessions]);
+
+  const loadSessions = () => {
+    setLoadingSessions(true);
+    setSessionError("");
+    void listRecentSessions()
+      .then(setSessions)
+      .catch((cause) => setSessionError(cause instanceof Error ? cause.message : "Could not load sessions."))
+      .finally(() => setLoadingSessions(false));
+  };
+
+  useEffect(() => {
+    loadSessions();
+  }, []);
+
+  const startNewValidation = () => {
+    setProjectName("");
+    setPreset("");
+    setFiles([]);
+    setDataSources([]);
+    setRules([]);
+    setResult(null);
+    setSidebarView("workflow");
+    navigate("/upload");
+  };
+
+  const openSession = async (session: RecentSession) => {
+    setOpeningSessionId(session.id);
+    setSessionError("");
+    try {
+      const state = await getSessionState(session.id);
+      setProjectName(state.request?.project_name || state.result.project_name);
+      setPreset(state.request?.preset || state.result.preset);
+      setDataSources(state.request?.data_sources || state.result.data_sources);
+      setRules(state.request?.rules || []);
+      setResult(state.result);
+      setSidebarView("workflow");
+      navigate("/results");
+    } catch (cause) {
+      setSessionError(cause instanceof Error ? cause.message : "Could not open this session.");
+    } finally {
+      setOpeningSessionId(null);
+    }
+  };
+
+  const renderLogo = (className = "size-7 object-contain") => (
+    <>
+      <img src={logoLightSrc} alt="" aria-hidden="true" className={`clario-logo clario-logo--light ${className}`} />
+      <img src={logoDarkSrc} alt="" aria-hidden="true" className={`clario-logo clario-logo--dark ${className}`} />
+    </>
+  );
 
   return (
     <div className="min-h-[100dvh] overflow-x-clip bg-slate-50 text-slate-950" style={shellStyle}>
@@ -64,30 +162,18 @@ export function AppShell() {
               className="group relative grid size-10 place-items-center rounded-xl focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
             >
               <span className="relative grid size-8 place-items-center overflow-hidden rounded-[10px] bg-white transition-transform duration-200 group-hover:scale-105 group-active:scale-95">
-                <img
-                  src={logoLightSrc}
-                  alt=""
-                  aria-hidden="true"
-                  className="clario-logo clario-logo--light size-7 object-contain transition-all duration-200 group-hover:-translate-x-2 group-hover:opacity-0 group-focus-visible:-translate-x-2 group-focus-visible:opacity-0"
-                />
-                <img
-                  src={logoDarkSrc}
-                  alt=""
-                  aria-hidden="true"
-                  className="clario-logo clario-logo--dark size-7 object-contain transition-all duration-200 group-hover:-translate-x-2 group-hover:opacity-0 group-focus-visible:-translate-x-2 group-focus-visible:opacity-0"
-                />
+                {renderLogo("size-7 object-contain transition-all duration-200 group-hover:-translate-x-2 group-hover:opacity-0 group-focus-visible:-translate-x-2 group-focus-visible:opacity-0")}
                 <PanelRightOpen aria-hidden="true" className="absolute size-[17px] translate-x-2 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100" />
               </span>
             </button>
           ) : (
             <>
               <div className="sidebar-expand-enter grid size-8 shrink-0 place-items-center rounded-[10px] bg-white">
-                <img src={logoLightSrc} alt="" aria-hidden="true" className="clario-logo clario-logo--light size-7 object-contain" />
-                <img src={logoDarkSrc} alt="" aria-hidden="true" className="clario-logo clario-logo--dark size-7 object-contain" />
+                {renderLogo()}
               </div>
               <div className="sidebar-expand-enter absolute left-[60px] right-[56px] min-w-0">
                 <p className="truncate text-sm font-semibold" title={appConfig.displayName}>{appConfig.displayName}</p>
-                <p className="truncate text-xs text-slate-500" title="Local validation workspace">Local validation workspace</p>
+                <p className="truncate text-xs text-slate-500" title={sidebarView === "sessions" ? "Sessions workspace" : "Active workflow"}>{sidebarView === "sessions" ? "Sessions workspace" : "Active workflow"}</p>
               </div>
               <button
                 type="button"
@@ -102,34 +188,111 @@ export function AppShell() {
           )}
         </div>
 
-        <nav aria-label="Primary navigation" className={`flex-1 overflow-y-auto overflow-x-hidden ${collapsed ? "px-2 py-3" : "px-3 py-4"}`}>
-          {navigation.map((section, sectionIndex) => (
-            <section className={sectionIndex ? `border-t transition-[margin,padding,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${collapsed ? "mt-1 border-transparent pt-0" : "mt-3 border-slate-100 pt-3"}` : ""} key={section.label}>
-              <div className={`overflow-hidden whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 transition-all duration-200 ${collapsed ? "mb-0 h-0 px-0 opacity-0" : "mb-1.5 h-4 px-3 opacity-100"}`}>
-                {section.label}
-              </div>
-              <div className="space-y-1">
-                {section.items.map(({ to, label, icon: Icon, end }) => (
-                  <NavLink
-                    aria-label={label}
-                    className={({ isActive }) =>
-                      `group flex h-10 items-center rounded-xl text-sm font-medium transition-colors duration-200 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${collapsed ? "mx-auto w-10 justify-center p-0" : "w-full gap-3 px-3"} ${
-                        isActive ? "bg-emerald-50 text-emerald-800" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
-                      }`
-                    }
-                    end={end}
-                    key={to}
-                    title={collapsed ? label : undefined}
-                    to={to}
-                  >
-                    <Icon aria-hidden="true" className="size-[18px] shrink-0" />
-                    <span className={`min-w-0 overflow-hidden truncate transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${collapsed ? "w-0 -translate-x-2 opacity-0" : "w-[150px] translate-x-0 opacity-100 delay-75"}`}>{label}</span>
-                  </NavLink>
-                ))}
-              </div>
-            </section>
-          ))}
-        </nav>
+        {sidebarView === "sessions" ? (
+          <div className={`flex-1 overflow-y-auto overflow-x-hidden ${collapsed ? "px-2 py-3" : "px-3 py-4"}`}>
+            <button
+              type="button"
+              onClick={startNewValidation}
+              className={`flex h-10 items-center rounded-xl bg-emerald-700 text-sm font-semibold text-white transition hover:bg-emerald-800 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${collapsed ? "mx-auto w-10 justify-center" : "w-full gap-3 px-3"}`}
+              title="Start a new validation session"
+              aria-label="Start a new validation session"
+            >
+              <Plus className="size-[18px] shrink-0" />
+              <span className={`min-w-0 overflow-hidden truncate transition-all duration-300 ${collapsed ? "w-0 opacity-0" : "w-[150px] opacity-100"}`}>New validation</span>
+            </button>
+
+            {!collapsed ? (
+              <>
+                <div className="mt-4 px-1">
+                  <label className="sr-only" htmlFor="session-search">Search sessions</label>
+                  <div className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-slate-500">
+                    <Search className="size-4 shrink-0" />
+                    <input
+                      id="session-search"
+                      value={sessionQuery}
+                      onChange={(event) => setSessionQuery(event.target.value)}
+                      placeholder="Search sessions"
+                      className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-slate-950 outline-none placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                  <span>Sessions</span>
+                  <button type="button" onClick={loadSessions} className="text-[10px] font-bold text-emerald-700 hover:text-emerald-800">Refresh</button>
+                </div>
+                {sessionError ? <p className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">{sessionError}</p> : null}
+                {loadingSessions ? <p className="mt-3 px-3 text-xs text-slate-500">Loading sessions...</p> : null}
+                <div className="mt-2 space-y-1.5">
+                  {filteredSessions.map((session) => {
+                    const active = result?.id === session.id;
+                    return (
+                      <button
+                        key={session.id}
+                        type="button"
+                        onClick={() => openSession(session)}
+                        disabled={openingSessionId === session.id}
+                        className={`w-full rounded-2xl px-3 py-2.5 text-left transition active:scale-[0.99] disabled:opacity-60 ${active ? "bg-emerald-50 text-emerald-800" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"}`}
+                        title={`Open ${session.project_name}`}
+                      >
+                        <span className="block truncate text-sm font-semibold">{session.project_name}</span>
+                        <span className="mt-1 block truncate text-xs text-slate-500">{formatSessionMeta(session)}</span>
+                        {session.latest_report_filename ? <span className="mt-1 block truncate text-[11px] text-emerald-700">{session.latest_report_filename}</span> : null}
+                      </button>
+                    );
+                  })}
+                  {!loadingSessions && !filteredSessions.length ? (
+                    <p className="px-3 py-4 text-xs leading-5 text-slate-500">No sessions found. Start a new validation to create one.</p>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
+          </div>
+        ) : (
+          <>
+            <div className={`shrink-0 ${collapsed ? "px-2 py-3" : "px-3 py-4"}`}>
+              <button
+                type="button"
+                onClick={() => setSidebarView("sessions")}
+                className={`flex h-10 items-center rounded-xl text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${collapsed ? "mx-auto w-10 justify-center" : "w-full gap-3 px-3"}`}
+                title="Back to sessions"
+                aria-label="Back to sessions"
+              >
+                <ArrowLeft className="size-[18px] shrink-0" />
+                <span className={`min-w-0 overflow-hidden truncate transition-all duration-300 ${collapsed ? "w-0 opacity-0" : "w-[150px] opacity-100"}`}>Sessions</span>
+              </button>
+            </div>
+            <ActiveSessionCard name={activeSessionName} issueCount={activeIssueCount} collapsed={collapsed} />
+            <nav aria-label="Workflow navigation" className={`flex-1 overflow-y-auto overflow-x-hidden ${collapsed ? "px-2 py-1" : "px-3 py-1"}`}>
+              {navigation.map((section, sectionIndex) => (
+                <section className={sectionIndex ? `border-t transition-[margin,padding,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${collapsed ? "mt-1 border-transparent pt-0" : "mt-3 border-slate-100 pt-3"}` : ""} key={section.label}>
+                  <div className={`overflow-hidden whitespace-nowrap text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 transition-all duration-200 ${collapsed ? "mb-0 h-0 px-0 opacity-0" : "mb-1.5 h-4 px-3 opacity-100"}`}>
+                    {section.label}
+                  </div>
+                  <div className="space-y-1">
+                    {section.items.map(({ to, label, icon: Icon, end }) => (
+                      <NavLink
+                        aria-label={label}
+                        className={({ isActive }) =>
+                          `group flex h-10 items-center rounded-xl text-sm font-medium transition-colors duration-200 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${collapsed ? "mx-auto w-10 justify-center p-0" : "w-full gap-3 px-3"} ${
+                            isActive ? "bg-emerald-50 text-emerald-800" : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                          }`
+                        }
+                        end={end}
+                        key={to}
+                        title={collapsed ? label : undefined}
+                        to={to}
+                      >
+                        <Icon aria-hidden="true" className="size-[18px] shrink-0" />
+                        <span className={`min-w-0 overflow-hidden truncate transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${collapsed ? "w-0 -translate-x-2 opacity-0" : "w-[150px] translate-x-0 opacity-100 delay-75"}`}>{label}</span>
+                      </NavLink>
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </nav>
+          </>
+        )}
 
         <div className={`shrink-0 space-y-2 ${collapsed ? "p-2" : "p-3"}`}>
           <ThemeSwitcher collapsed={collapsed} />
