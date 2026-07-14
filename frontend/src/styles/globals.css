@@ -97,6 +97,10 @@ main :where(.max-h-\[34rem\] table tbody tr > td) {
   border-bottom: 1px solid #f1f5f9;
 }
 
+main :where(.max-h-\[34rem\] table tbody tr.bg-emerald-50\/40 > td) {
+  background: inherit;
+}
+
 main :where(.max-h-\[34rem\] table tbody tr) {
   border-left-width: 0 !important;
 }

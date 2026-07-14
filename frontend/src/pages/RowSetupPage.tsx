@@ -679,6 +679,37 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                   <div className="overflow-hidden">
                     <div className="grid gap-5 p-5 xl:grid-cols-[340px_minmax(0,1fr)]">
                       <div className="space-y-4">
+                        <div className="rounded-2xl border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-sm">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`font-semibold ${confidence.labelClassName}`}>{confidence.label}</span>
+                            <span className="font-semibold text-slate-700">{confidence.score}%</span>
+                          </div>
+                          <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-100">
+                            <div className={`h-full rounded-full transition-all ${confidence.barClassName}`} style={{ width: `${confidence.score}%` }} />
+                          </div>
+                          <p className="mt-2 text-slate-500">{confidence.detail}</p>
+                          <button
+                            type="button"
+                            onClick={() => toggleConfidenceDetails(source.id)}
+                            aria-expanded={confidenceExpanded}
+                            aria-controls={confidenceDetailsId}
+                            className="mt-1 text-[11px] font-semibold text-emerald-700 transition hover:text-emerald-800"
+                          >
+                            {confidenceExpanded ? "Hide details" : "View details"}
+                          </button>
+                          <div
+                            id={confidenceDetailsId}
+                            aria-hidden={!confidenceExpanded}
+                            className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${confidenceExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
+                          >
+                            <div className="overflow-hidden">
+                              <ul className="mt-2 space-y-1 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
+                                {confidence.checks.map((check) => <li key={check}>- {check}</li>)}
+                              </ul>
+                            </div>
+                          </div>
+                        </div>
+
                         <label className="block">
                           <span className="text-xs font-semibold text-slate-600">Workbook file</span>
                           <SelectField
@@ -735,37 +766,6 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                           </label>
                         </div>
 
-                        <div className="rounded-2xl border border-slate-200 bg-white p-3 text-xs leading-5 text-slate-600 shadow-sm">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className={`font-semibold ${confidence.labelClassName}`}>{confidence.label}</span>
-                            <span className="font-semibold text-slate-700">{confidence.score}%</span>
-                          </div>
-                          <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-100">
-                            <div className={`h-full rounded-full transition-all ${confidence.barClassName}`} style={{ width: `${confidence.score}%` }} />
-                          </div>
-                          <p className="mt-2 text-slate-500">{confidence.detail}</p>
-                          <button
-                            type="button"
-                            onClick={() => toggleConfidenceDetails(source.id)}
-                            aria-expanded={confidenceExpanded}
-                            aria-controls={confidenceDetailsId}
-                            className="mt-1 text-[11px] font-semibold text-emerald-700 transition hover:text-emerald-800"
-                          >
-                            {confidenceExpanded ? "Hide details" : "View details"}
-                          </button>
-                          <div
-                            id={confidenceDetailsId}
-                            aria-hidden={!confidenceExpanded}
-                            className={`grid transition-[grid-template-rows,opacity] duration-200 ease-out ${confidenceExpanded ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"}`}
-                          >
-                            <div className="overflow-hidden">
-                              <ul className="mt-2 space-y-1 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
-                                {confidence.checks.map((check) => <li key={check}>• {check}</li>)}
-                              </ul>
-                            </div>
-                          </div>
-                        </div>
-
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
                           Header row should contain column names. First data row should be the first real item row, not a title, lot header, blank row, or total row.
                         </div>
@@ -800,34 +800,34 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
 
                         {preview ? (
                           <>
-                            <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-                                <span className="font-semibold text-slate-900">Selected row</span>
-                                <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-sm">
-                                  {selectedRowNumberValue ? `Row ${selectedRowNumberValue}` : "Choose a row"}
-                                </span>
-                                {selectedRow ? rowBadge(selectedRow, source) : null}
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                <button
-                                  type="button"
-                                  disabled={!selectedRowNumberValue}
-                                  onClick={() => selectedRowNumberValue && setHeaderFromRow(source, selectedRowNumberValue)}
-                                  className={`${setupActionButtonClass} border-sky-200 text-sky-700 hover:bg-sky-50 focus-visible:outline-sky-500`}
-                                >
-                                  Set selected as header
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={!selectedRowNumberValue || selectedRowNumberValue <= source.header_row}
-                                  onClick={() => selectedRowNumberValue && setFirstDataFromRow(source, selectedRowNumberValue)}
-                                  className={`${setupActionButtonClass} border-amber-200 text-amber-800 hover:bg-amber-50 focus-visible:outline-amber-500`}
-                                >
-                                  Set selected as first data
-                                </button>
-                              </div>
-                            </div>
                             <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-3 py-3">
+                                <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                                  <span className="font-semibold text-slate-900">Selected row</span>
+                                  <span className="rounded-full bg-white px-2.5 py-1 font-semibold text-slate-700 shadow-sm">
+                                    {selectedRowNumberValue ? `Row ${selectedRowNumberValue}` : "Choose a row"}
+                                  </span>
+                                  {selectedRow ? rowBadge(selectedRow, source) : null}
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    disabled={!selectedRowNumberValue}
+                                    onClick={() => selectedRowNumberValue && setHeaderFromRow(source, selectedRowNumberValue)}
+                                    className={`${setupActionButtonClass} border-sky-200 text-sky-700 hover:bg-sky-50 focus-visible:outline-sky-500`}
+                                  >
+                                    Set selected as header
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={!selectedRowNumberValue || selectedRowNumberValue <= source.header_row}
+                                    onClick={() => selectedRowNumberValue && setFirstDataFromRow(source, selectedRowNumberValue)}
+                                    className={`${setupActionButtonClass} border-amber-200 text-amber-800 hover:bg-amber-50 focus-visible:outline-amber-500`}
+                                  >
+                                    Set selected as first data
+                                  </button>
+                                </div>
+                              </div>
                               <div className={`max-h-[34rem] overflow-auto transition duration-300 ${reloadState === "loading" ? "scale-[0.998] opacity-65 blur-[0.7px] saturate-[0.96]" : reloadState === "reloaded" ? "shadow-[inset_0_0_0_1px_rgba(16,185,129,0.28),0_16px_40px_rgba(16,185,129,0.08)]" : ""}`}>
                                 <table className="min-w-full border-separate border-spacing-0 text-left text-xs">
                                   <tbody>
