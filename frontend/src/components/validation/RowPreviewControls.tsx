@@ -383,8 +383,8 @@ export function RowPreviewControls() {
               target.mount,
             )}
             {target.feedbackMount && reloadState ? createPortal(
-              <div className={`absolute inset-0 flex items-center justify-center rounded-2xl transition duration-300 ${reloadState === "loading" ? "bg-white/60 backdrop-blur-[2px]" : "bg-emerald-50/45"}`}>
-                <div className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold shadow-lg shadow-slate-200/60 animate-[app-section-fade-in_180ms_cubic-bezier(0.16,1,0.3,1)_both] ${reloadState === "loading" ? "border-slate-200 bg-white text-slate-700" : "border-emerald-100 bg-white text-emerald-700"}`}>
+              <div className={`reload-feedback-overlay absolute inset-0 flex items-center justify-center rounded-2xl transition duration-300 ${reloadState === "loading" ? "reload-feedback-overlay--loading backdrop-blur-[2px]" : "reload-feedback-overlay--success"}`}>
+                <div className={`reload-feedback-message inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold shadow-lg animate-[app-section-fade-in_180ms_cubic-bezier(0.16,1,0.3,1)_both] ${reloadState === "loading" ? "reload-feedback-message--loading" : "reload-feedback-message--success"}`}>
                   {reloadState === "loading" ? <LoaderCircle className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                   {reloadState === "loading" ? "Reloading preview..." : "Preview reloaded"}
                 </div>

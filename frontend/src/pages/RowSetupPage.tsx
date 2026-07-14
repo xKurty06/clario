@@ -143,12 +143,12 @@ function isVisualAutoExcludedRow(row: PreviewRow, source: ComparisonDataSource) 
 }
 
 function rowTone(row: PreviewRow, source: ComparisonDataSource, selected: boolean) {
-  if (selected) return "!bg-blue-50 shadow-[inset_0_1px_0_#93c5fd,inset_0_-1px_0_#93c5fd]";
-  if (row.row_number === source.header_row) return "bg-sky-50/90";
-  if (row.row_number === source.first_data_row) return "bg-amber-50/90";
-  if (isVisualAutoExcludedRow(row, source)) return "bg-white";
-  if (row.selected) return "bg-emerald-50/40";
-  return "bg-white";
+  if (selected) return "row-preview-row row-preview-row--selected";
+  if (row.row_number === source.header_row) return "row-preview-row row-preview-row--header";
+  if (row.row_number === source.first_data_row) return "row-preview-row row-preview-row--first-data";
+  if (isVisualAutoExcludedRow(row, source)) return "row-preview-row row-preview-row--excluded";
+  if (row.selected) return "row-preview-row row-preview-row--included";
+  return "row-preview-row";
 }
 
 function rowBadge(row: PreviewRow, source: ComparisonDataSource) {
@@ -161,7 +161,7 @@ function rowBadge(row: PreviewRow, source: ComparisonDataSource) {
 }
 
 function rowAccentClass(row: PreviewRow, source: ComparisonDataSource, selected: boolean) {
-  if (selected) return "!border-l-transparent";
+  if (selected) return "row-preview-accent--selected";
   if (row.row_number === source.header_row) return "border-l-sky-500";
   if (row.row_number === source.first_data_row) return "border-l-amber-500";
   if (isVisualAutoExcludedRow(row, source)) return "border-l-transparent";
@@ -170,7 +170,7 @@ function rowAccentClass(row: PreviewRow, source: ComparisonDataSource, selected:
 }
 
 function rowCellClass(selected: boolean) {
-  return selected ? "border-y !border-blue-300 !bg-blue-50" : "border-b border-slate-100";
+  return selected ? "row-preview-cell row-preview-cell--selected" : "row-preview-cell border-b border-slate-100";
 }
 
 function confidenceStyle(tone: SetupConfidenceTone) {
@@ -839,7 +839,7 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                                           key={row.row_number}
                                           aria-selected={selected}
                                           onClick={() => selectPreviewRow(source.id, row.row_number)}
-                                          className={`cursor-pointer align-top transition hover:bg-blue-50/70 ${rowTone(row, source, selected)}`}
+                                          className={`cursor-pointer align-top transition ${rowTone(row, source, selected)}`}
                                         >
                                           <td className={`w-40 min-w-40 border-l-4 px-3 py-2.5 ${cellClass} ${rowAccentClass(row, source, selected)}`}>
                                             <div className="flex flex-wrap items-center gap-2">
@@ -859,8 +859,8 @@ export function RowSetupPage({ onContinue }: RowSetupPageProps) {
                                 </table>
                               </div>
                               {reloadState ? (
-                                <div className={`pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl transition duration-300 ${reloadState === "loading" ? "bg-white/60 backdrop-blur-[2px]" : "bg-emerald-50/45"}`}>
-                                  <div className={`inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold shadow-lg shadow-slate-200/60 animate-[app-section-fade-in_180ms_cubic-bezier(0.16,1,0.3,1)_both] ${reloadState === "loading" ? "border-slate-200 bg-white text-slate-700" : "border-emerald-100 bg-white text-emerald-700"}`}>
+                                <div className={`reload-feedback-overlay pointer-events-none absolute inset-0 flex items-center justify-center rounded-2xl transition duration-300 ${reloadState === "loading" ? "reload-feedback-overlay--loading backdrop-blur-[2px]" : "reload-feedback-overlay--success"}`}>
+                                  <div className={`reload-feedback-message inline-flex items-center gap-2 rounded-2xl border px-3 py-2 text-xs font-semibold shadow-lg animate-[app-section-fade-in_180ms_cubic-bezier(0.16,1,0.3,1)_both] ${reloadState === "loading" ? "reload-feedback-message--loading" : "reload-feedback-message--success"}`}>
                                     {reloadState === "loading" ? <LoaderCircle className="size-4 animate-spin" /> : <CheckCircle2 className="size-4" />}
                                     {reloadState === "loading" ? "Reloading preview..." : "Preview reloaded"}
                                   </div>
