@@ -40,9 +40,13 @@ export interface RecentSession {
   id: string;
   project_name: string;
   mode: PresetType;
-  file_names: string;
+  file_names: string[];
   discrepancy_count: number;
   created_at: string;
+  has_report?: boolean;
+  latest_report_filename?: string | null;
 }
 
 export const listRecentSessions = () => apiRequest<RecentSession[]>("/validation/recent");
+
+export const getSessionResult = (sessionId: string) => apiRequest<ValidationResult>(`/validation/sessions/${encodeURIComponent(sessionId)}`);
