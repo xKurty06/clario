@@ -14,6 +14,7 @@ import { useState, type CSSProperties } from "react";
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { appConfig } from "../../app/config";
 import { CommonFieldsChooser } from "../validation/CommonFieldsChooser";
+import { ThemeSwitcher } from "./ThemeSwitcher";
 
 const logoSrc = "/assets/clario-logo_light.png";
 
@@ -122,7 +123,8 @@ export function AppShell() {
           ))}
         </nav>
 
-        <div className={`shrink-0 ${collapsed ? "p-2" : "p-3"}`}>
+        <div className={`shrink-0 space-y-2 ${collapsed ? "p-2" : "p-3"}`}>
+          <ThemeSwitcher collapsed={collapsed} />
           <div title={collapsed ? "Files stay on this Windows device" : undefined} className={`overflow-hidden border border-emerald-100 bg-emerald-50 text-emerald-800 transition-all duration-300 ${collapsed ? "mx-auto grid size-10 place-items-center rounded-xl p-0" : "rounded-xl p-3"}`}>
             {collapsed ? (
               <LockKeyhole aria-hidden="true" className="size-4" />
