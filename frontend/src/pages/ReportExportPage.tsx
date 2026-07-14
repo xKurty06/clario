@@ -12,6 +12,7 @@ interface ExportedReportState {
 
 const primaryActionClass = "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none disabled:active:scale-100";
 const secondaryActionClass = "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100";
+const reportPanelClass = "mx-auto mt-8 w-full max-w-5xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm";
 
 function ExportMetric({ label, value }: { label: string; value: number }) {
   return (
@@ -49,17 +50,24 @@ export function ReportExportPage() {
           description="A PDF report can only be generated after validation has finished."
         />
 
-        <section className="mt-8 max-w-4xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="flex min-w-0 items-start gap-4">
-            <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-500">
-              <FileOutput className="size-5" />
-            </span>
-            <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Waiting for validation</p>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">No completed validation yet</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-                There is no result available for export in this session. Finish the builder setup, run validation, then return here to generate the local PDF report.
-              </p>
+        <section className={reportPanelClass}>
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+            <div className="flex min-w-0 items-start gap-4">
+              <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-slate-200 bg-slate-50 text-slate-500">
+                <FileOutput className="size-5" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500">Waiting for validation</p>
+                <h2 className="mt-1 text-xl font-semibold text-slate-950">No completed validation yet</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
+                  There is no result available for export in this session. Finish the builder setup, run validation, then return here to generate the local PDF report.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm leading-6 text-emerald-900">
+              <p className="font-semibold">Next step</p>
+              <p className="mt-1 text-xs leading-5 text-emerald-800">Go to Review & Run, check the setup, then run validation before exporting.</p>
             </div>
           </div>
 
@@ -69,7 +77,7 @@ export function ReportExportPage() {
             <EmptyReportStep number={3} title="Export PDF" description="Come back here after validation to generate the local report." />
           </div>
 
-          <div className="mt-6 flex flex-wrap gap-3">
+          <div className="mt-6 flex flex-wrap justify-end gap-3">
             <Link to="/mapping" className={primaryActionClass}>
               <ListChecks className="size-4" /> Go to Review & Run
             </Link>
@@ -130,8 +138,8 @@ export function ReportExportPage() {
         description="Create a PDF summary from the completed validation result. The report is generated locally and validation will not be re-run."
       />
 
-      <section className="mt-8 max-w-4xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+      <section className={reportPanelClass}>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
           <div className="flex min-w-0 items-start gap-4">
             <span className="grid size-11 shrink-0 place-items-center rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-700">
               <FileOutput className="size-5" />
@@ -144,7 +152,7 @@ export function ReportExportPage() {
               </p>
             </div>
           </div>
-          <button disabled={busy} onClick={generateReport} className={`${primaryActionClass} lg:mt-1`}>
+          <button disabled={busy} onClick={generateReport} className={primaryActionClass}>
             <Download className="size-4" />
             {busy ? "Creating report..." : exportedReport ? "Regenerate PDF" : "Generate PDF report"}
           </button>
@@ -171,7 +179,7 @@ export function ReportExportPage() {
 
         {exportedReport ? (
           <div className="mt-6 rounded-3xl border border-emerald-200 bg-emerald-50/60 p-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-emerald-800">
                   <CheckCircle2 className="size-5 shrink-0" />
