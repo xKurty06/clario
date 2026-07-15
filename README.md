@@ -1,145 +1,403 @@
+<div align="center">
+
+<img src="./frontend/public/assets/clario-logo_dark.png" width="120" alt="Clario Logo">
+
 # Clario
 
-Clario is a local-first Windows application that compares flexible procurement spreadsheets.
+### The Modern Workspace for Spreadsheet Validation
 
-## Version 1 status
+**Validate Smarter. Compare Faster. Trust Every Decision.**
 
-- React 19 + TypeScript + Vite frontend with Tailwind CSS 4
-- Tauri 2 desktop shell with a minimal capability set and content security policy
-- FastAPI backend bound to loopback by default
-- Centralized display/package naming
-- Connected upload, mapping, preview, validation, template, and report pages
-- Comparison Builder workflow with flexible data sources, row selection, custom fields, and rule-based validation
-- `.xlsx`, `.xls`, and `.csv` extraction
-- Strict description, quantity, unit-cost, total-cost, duplicate, missing, and extra-item checks
-- SQLite template persistence and local PDF reports
-- Base contracts for validators, extractors, report generators, and optional AI providers
-- Layered services, repositories, validators, extractors, and report adapters
-- Health endpoint and backend unit tests
-- Architecture and extension documentation
+<p>
+A desktop application for comparing, validating, and auditing spreadsheet data through configurable workflows, reusable templates, and automated reporting.
+</p>
 
-## Windows prerequisites
+<br>
 
-- Windows 10 or 11 with Microsoft Edge WebView2
-- [Node.js 20 or 22 LTS](https://nodejs.org/)
-- Python 3.12 (recommended)
-- Rust stable with the MSVC toolchain
-- Microsoft C++ Build Tools with the Desktop development with C++ workload
+<p align="center">
+<a href="https://www.microsoft.com/en-us/windows"><img src="https://img.shields.io/badge/Platform-Windows-blue?style=for-the-badge" alt="Platform: Windows"></a>
+<a href="https://www.electronjs.org/"><img src="https://img.shields.io/badge/Desktop-Electron-47848F?style=for-the-badge&logo=electron&logoColor=white" alt="Desktop: Electron"></a>
+<a href="https://react.dev/"><img src="https://img.shields.io/badge/Frontend-React-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="Frontend: React"></a>
+<a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/Language-TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="Language: TypeScript"></a>
+<a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="Backend: FastAPI"></a>
+<a href="https://www.sqlite.org/"><img src="https://img.shields.io/badge/Database-SQLite-003B57?style=for-the-badge&logo=sqlite&logoColor=white" alt="Database: SQLite"></a>
+</p>
 
-The current machine may run newer tool versions, but the project targets the versions above for repeatable Windows development.
+</div>
 
-## Install dependencies
+---
 
-```powershell
-cd clario
+# Table of Contents
 
-cd frontend
-npm install
+- [Clario](#clario)
+    - [The Modern Workspace for Spreadsheet Validation](#the-modern-workspace-for-spreadsheet-validation)
+- [Table of Contents](#table-of-contents)
+- [Why Clario](#why-clario)
+- [Features](#features)
+- [Screenshots](#screenshots)
+  - [Application Overview](#application-overview)
+  - [Comparison Builder](#comparison-builder)
+  - [Validation Results](#validation-results)
+- [Use Cases](#use-cases)
+- [Technology Stack](#technology-stack)
+- [Architecture](#architecture)
 
-cd ..\backend
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+---
+
+# Why Clario
+
+Manual spreadsheet validation is repetitive, time-consuming, and prone to human error.
+
+Clario provides a structured workspace for comparing, validating, and auditing spreadsheet data through reusable templates, configurable validation rules, persistent sessions, and automated reports.
+
+Built for workflows where accuracy matters, Clario helps teams identify inconsistencies faster and maintain reliable data validation processes.
+
+---
+
+# Features
+
+<table>
+
+<tr>
+
+<td width="50%" valign="top">
+
+<h3>
+<img src="https://cdn.simpleicons.org/googlesheets/34A853" width="22">
+Spreadsheet Validation
+</h3>
+
+Compare and validate spreadsheet files with support for:
+
+- Item descriptions
+- Quantities
+- Units
+- Pricing data
+- Missing records
+- Data inconsistencies
+
+</td>
+
+<td width="50%" valign="top">
+
+<h3>
+<img src="https://cdn.simpleicons.org/figma/F24E1E" width="22">
+Comparison Builder
+</h3>
+
+Create configurable validation workflows using:
+
+- Field mapping
+- Comparison rules
+- Custom validation logic
+- Reusable templates
+
+</td>
+
+</tr>
+
+<tr>
+
+<td width="50%" valign="top">
+
+<h3>
+<img src="https://cdn.simpleicons.org/googledocs/4285F4" width="22">
+Automated Reports
+</h3>
+
+Generate professional validation reports containing:
+
+- Comparison summaries
+- Detected discrepancies
+- Audit information
+- Exportable documentation
+
+</td>
+
+<td width="50%" valign="top">
+
+<h3>
+<img src="https://cdn.simpleicons.org/github/FFFFFF" width="22">
+Persistent Sessions
+</h3>
+
+Continue previous validation projects with:
+
+- Saved configurations
+- Previous comparisons
+- Historical records
+
+</td>
+
+</tr>
+
+<tr>
+
+<td width="50%" valign="top">
+
+<h3>
+<img src="https://cdn.simpleicons.org/tailwindcss/06B6D4" width="22">
+Modern Interface
+</h3>
+
+Designed with:
+
+- Clean workspace layout
+- Light and dark themes
+- User-focused experience
+
+</td>
+
+<td width="50%" valign="top">
+
+<h3>
+<img src="https://cdn.simpleicons.org/electron/47848F" width="22">
+Desktop Application
+</h3>
+
+A native desktop experience powered by Electron.
+
+</td>
+
+</tr>
+
+</table>
+
+---
+
+# Screenshots
+
+## Application Overview
+
+<img src="./frontend/public/assets/screenshots/dashboard.png" width="900">
+
+## Comparison Builder
+
+<img src="./frontend/public/assets/screenshots/comparison-builder.png" width="900">
+
+## Validation Results
+
+<img src="./frontend/public/assets/screenshots/results.png" width="900">
+
+---
+
+# Use Cases
+
+<table>
+
+<tr>
+<th>Area</th>
+<th>Description</th>
+</tr>
+
+<tr>
+
+<td>
+Procurement
+</td>
+
+<td>
+Validate supplier quotations, bidding documents, and purchase records.
+</td>
+
+</tr>
+
+<tr>
+
+<td>
+Finance
+</td>
+
+<td>
+Compare financial spreadsheets and identify inconsistencies.
+</td>
+
+</tr>
+
+<tr>
+
+<td>
+Inventory
+</td>
+
+<td>
+Audit product lists, quantities, and stock information.
+</td>
+
+</tr>
+
+<tr>
+
+<td>
+Operations
+</td>
+
+<td>
+Standardize spreadsheet validation workflows across teams.
+</td>
+
+</tr>
+
+</table>
+
+---
+
+# Technology Stack
+
+<details open>
+
+<summary><strong>Frontend</strong></summary>
+
+<br>
+
+<table>
+
+<tr>
+
+<td align="center">
+
+<a href="https://react.dev/">
+<img src="https://cdn.simpleicons.org/react/61DAFB" width="45" alt="React">
+</a>
+
+<br>
+
+React
+
+</td>
+
+<td align="center">
+
+<a href="https://www.typescriptlang.org/">
+<img src="https://cdn.simpleicons.org/typescript/3178C6" width="45" alt="TypeScript">
+</a>
+
+<br>
+
+TypeScript
+
+</td>
+
+<td align="center">
+
+<a href="https://vite.dev/">
+<img src="https://cdn.simpleicons.org/vite/646CFF" width="45" alt="Vite">
+</a>
+
+<br>
+
+Vite
+
+</td>
+
+<td align="center">
+
+<a href="https://tailwindcss.com/">
+<img src="https://cdn.simpleicons.org/tailwindcss/06B6D4" width="45" alt="Tailwind CSS">
+</a>
+
+<br>
+
+Tailwind CSS
+
+</td>
+
+</tr>
+
+</table>
+
+</details>
+
+<details open>
+
+<summary><strong>Backend</strong></summary>
+
+<br>
+
+<table>
+
+<tr>
+
+<td align="center">
+
+<a href="https://fastapi.tiangolo.com/">
+<img src="https://cdn.simpleicons.org/fastapi/009688" width="45" alt="FastAPI">
+</a>
+
+<br>
+
+FastAPI
+
+</td>
+
+<td align="center">
+
+<a href="https://www.sqlite.org/">
+<img src="https://cdn.simpleicons.org/sqlite/003B57" width="45" alt="SQLite">
+</a>
+
+<br>
+
+SQLite
+
+</td>
+
+</tr>
+
+</table>
+
+</details>
+
+<details open>
+
+<summary><strong>Desktop Runtime</strong></summary>
+
+<br>
+
+<a href="https://www.electronjs.org/">
+<img src="https://cdn.simpleicons.org/electron/47848F" width="45" alt="Electron">
+</a>
+
+<br>
+
+Electron
+
+</details>
+
+---
+
+# Architecture
+
+```text
+Spreadsheet Files
+
+        │
+
+        ▼
+
+File Processing Layer
+
+        │
+
+        ▼
+
+Comparison Configuration
+
+        │
+
+        ▼
+
+Validation Engine
+
+        │
+
+        ▼
+
+Results Processing
+
+        │
+
+        ▼
+
+Report Generation
 ```
-
-Copy `.env.example` to `.env` only when overriding local defaults. Never commit `.env`.
-
-## Run the frontend
-
-```powershell
-cd frontend
-npm run dev
-```
-
-Open `http://127.0.0.1:1420` for browser-based UI development.
-
-## Run the backend
-
-```powershell
-cd backend
-.\.venv\Scripts\Activate.ps1
-uvicorn app.main:app --host 127.0.0.1 --port 8765 --reload
-```
-
-Health check: `http://127.0.0.1:8765/health`.
-
-## Run the desktop UI (recommended)
-
-From the project root:
-
-```powershell
-.\run-dev.ps1
-```
-
-This starts the loopback backend, opens the Tauri window, and stops the backend when the desktop process exits.
-
-## Run Tauri development mode manually
-
-Start the backend in one terminal, then:
-
-```powershell
-cd desktop\tauri
-..\..\frontend\node_modules\.bin\tauri.cmd dev
-```
-
-Keeping the Python process separate in development makes backend errors visible in its terminal.
-
-## Build for Windows
-
-The frontend and Rust shell can be checked now:
-
-```powershell
-cd frontend
-npm run build
-cd ..\desktop\tauri
-..\..\frontend\node_modules\.bin\tauri.cmd build
-```
-
-`bundle.active` remains `false`: creating a redistributable installer requires freezing and signing the Python backend as a sidecar. Development and local use are supported now.
-
-## Tests
-
-```powershell
-cd backend
-pytest
-
-cd ..\frontend
-npm run typecheck
-npm run build
-```
-
-## Intended application workflow
-
-1. Select local `.xlsx`, `.xls`, or `.csv` files.
-2. Create one or more data sources from those files and sheets.
-3. Review and adjust selected rows.
-4. Add custom fields and comparison rules.
-5. Run transparent backend validation.
-6. Review discrepancies and export a local PDF report.
-
-None of the core workflows require login, cloud storage, or internet access. Version 1 will not modify source files.
-
-## Templates
-
-Templates describe file roles, sheet selection, header/data row behavior, column mappings, lot rules, and ignored-row markers. They are stored locally in SQLite. See [Template design](docs/templates.md).
-
-## Version 1 scope
-
-Version 1 supports flexible upload/mapping, reusable templates, extracted-row preview, strict description matching, quantity/unit-cost/total checks, discrepancy review, and PDF export. Fuzzy matching, corrected copies, and local AI assistance remain optional future extensions.
-
-AI will never be the source of truth. The reserved provider interface is advisory and the application works with the disabled provider.
-
-## Architecture
-
-- [Architecture overview](docs/architecture.md)
-- [Extension guide](docs/extending.md)
-- [Flexible Comparison Builder](docs/flexible-comparison-builder.md)
-- [Comparison Builder UI](docs/comparison-builder-ui.md)
-- [Development troubleshooting](docs/dev-troubleshooting.md)
-- [Template design](docs/templates.md)
-- [Phase roadmap](docs/roadmap.md)
-
-## App identity
-
-The primary naming constants are in `frontend/src/app/config.ts` and `backend/app/config/constants.py`. Tauri metadata also contains the user-visible name because Windows packaging consumes static configuration.
