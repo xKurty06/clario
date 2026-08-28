@@ -141,11 +141,11 @@ export function DashboardPage() {
         <aside className="rounded-2xl border border-slate-200 bg-white p-5">
           <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Workflow</p>
           <ol className="mt-4 space-y-4 text-sm">
-            {["Choose local files", "Map sheets and columns", "Confirm extracted rows", "Review discrepancies", "Export a PDF report"].map((step, index) => (
+            {["Choose local files", "Confirm row setup", "Map sources and fields", "Build validation rules", "Review and run validation", "Review discrepancies", "Export a PDF report"].map((step, index) => (
               <li className="flex gap-3" key={step}><span className="grid size-6 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">{index + 1}</span><span className="pt-0.5 text-slate-700">{step}</span></li>
             ))}
           </ol>
-          <Link className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800" to="/upload">Open file setup <ArrowRight aria-hidden="true" className="size-4" /></Link>
+          <Link className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800" to="/upload">Start new validation <ArrowRight aria-hidden="true" className="size-4" /></Link>
         </aside>
       </div>
     </div>

@@ -5,12 +5,15 @@ import {
   Files,
   LockKeyhole,
   Menu,
+  MoreVertical,
   PanelRightOpen,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
   Settings2,
   SlidersHorizontal,
+  Trash2,
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -18,7 +21,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { appConfig } from "../../app/config";
 import { useWorkflow } from "../../features/files/WorkflowContext";
-import { getSessionState, listRecentSessions, type RecentSession } from "../../services/validationApi";
+import { deleteSession, getSessionState, listRecentSessions, renameSession, type RecentSession } from "../../services/validationApi";
 import { CommonFieldsChooser } from "../validation/CommonFieldsChooser";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
@@ -59,6 +62,11 @@ export function AppShell() {
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [sessionError, setSessionError] = useState("");
   const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
+  const [sessionMenuId, setSessionMenuId] = useState<string | null>(null);
+  const [mutatingSessionId, setMutatingSessionId] = useState<string | null>(null);
+  const [pendingDeleteSession, setPendingDeleteSession] = useState<RecentSession | null>(null);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
   const location = useLocation();
   const navigate = useNavigate();
   const {
@@ -93,6 +101,27 @@ export function AppShell() {
     loadSessions();
   }, []);
 
+  useEffect(() => {
+    if (!sessionMenuId) return;
+
+    const closeMenuOnOutsideClick = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Element && !target.closest(`[data-session-menu="${sessionMenuId}"]`)) {
+        setSessionMenuId(null);
+      }
+    };
+    const closeMenuOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSessionMenuId(null);
+    };
+
+    document.addEventListener("pointerdown", closeMenuOnOutsideClick);
+    document.addEventListener("keydown", closeMenuOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeMenuOnOutsideClick);
+      document.removeEventListener("keydown", closeMenuOnEscape);
+    };
+  }, [sessionMenuId]);
+
   const startNewValidation = () => {
     setProjectName("");
     setPreset("");
@@ -116,6 +145,7 @@ export function AppShell() {
   };
 
   const openSession = async (session: RecentSession) => {
+    setSessionMenuId(null);
     setOpeningSessionId(session.id);
     setSessionError("");
     try {
@@ -132,6 +162,52 @@ export function AppShell() {
       setSessionError(cause instanceof Error ? cause.message : "Could not open this session.");
     } finally {
       setOpeningSessionId(null);
+    }
+  };
+
+  const handleRenameSession = (session: RecentSession) => {
+    setRenameValue(session.project_name);
+    setEditingSessionId(session.id);
+  };
+
+  const confirmRenameSession = async (session: RecentSession) => {
+    const projectName = renameValue.trim();
+    if (!projectName || projectName === session.project_name) {
+      setEditingSessionId(null);
+      return;
+    }
+    setEditingSessionId(null);
+    setMutatingSessionId(session.id);
+    setSessionError("");
+    try {
+      await renameSession(session.id, projectName);
+      setSessions((current) => current.map((item) => item.id === session.id ? { ...item, project_name: projectName } : item));
+      if (result?.id === session.id) setProjectName(projectName);
+    } catch (cause) {
+      setSessionError(cause instanceof Error ? cause.message : "Could not rename this session.");
+    } finally {
+      setMutatingSessionId(null);
+    }
+  };
+
+  const handleDeleteSession = (session: RecentSession) => {
+    setPendingDeleteSession(session);
+  };
+
+  const confirmDeleteSession = async () => {
+    if (!pendingDeleteSession) return;
+    const session = pendingDeleteSession;
+    setPendingDeleteSession(null);
+    setMutatingSessionId(session.id);
+    setSessionError("");
+    try {
+      await deleteSession(session.id);
+      setSessions((current) => current.filter((item) => item.id !== session.id));
+      if (result?.id === session.id) closeSession();
+    } catch (cause) {
+      setSessionError(cause instanceof Error ? cause.message : "Could not delete this session.");
+    } finally {
+      setMutatingSessionId(null);
     }
   };
 
@@ -242,18 +318,69 @@ export function AppShell() {
                   {filteredSessions.map((session) => {
                     const active = result?.id === session.id;
                     return (
-                      <button
-                        key={session.id}
-                        type="button"
-                        onClick={() => openSession(session)}
-                        disabled={openingSessionId === session.id}
-                        className={`w-full rounded-2xl px-3 py-2.5 text-left transition active:scale-[0.99] disabled:opacity-60 ${active ? "bg-emerald-50 text-emerald-800" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"}`}
-                        title={`Open ${session.project_name}`}
-                      >
-                        <span className="block truncate text-sm font-semibold">{session.project_name}</span>
-                        <span className="mt-1 block truncate text-xs text-slate-500">{formatSessionMeta(session)}</span>
-                        {session.latest_report_filename ? <span className="mt-1 block truncate text-[11px] text-emerald-700">{session.latest_report_filename}</span> : null}
-                      </button>
+                      <div data-session-menu={session.id} className={`relative flex items-stretch rounded-2xl transition ${active ? "bg-emerald-50 text-emerald-800" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"}`}>
+                        <div className="min-w-0 flex-1">
+                          {editingSessionId === session.id ? (
+                            <>
+                              <div className="px-3 py-2.5">
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={renameValue}
+                                  onChange={(event) => setRenameValue(event.target.value)}
+                                  onFocus={(event) => event.currentTarget.select()}
+                                  onBlur={() => void confirmRenameSession(session)}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Enter") {
+                                      event.preventDefault();
+                                      event.currentTarget.blur();
+                                    }
+                                  }}
+                                  maxLength={160}
+                                  aria-label={`Rename ${session.project_name}`}
+                                  className="session-rename-input block w-full bg-transparent p-0 text-sm font-semibold leading-5 text-slate-950 outline-none"
+                                />
+                                <span className="mt-1 block truncate text-xs text-slate-500">{formatSessionMeta(session)}</span>
+                                {session.latest_report_filename ? <span className="mt-1 block truncate text-[11px] text-emerald-700">{session.latest_report_filename}</span> : null}
+                              </div>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openSession(session)}
+                              disabled={openingSessionId === session.id || mutatingSessionId === session.id}
+                              className="w-full rounded-2xl px-3 py-2.5 text-left transition active:scale-[0.99] disabled:opacity-60"
+                              title={`Open ${session.project_name}`}
+                            >
+                              <span className="block truncate text-sm font-semibold">{session.project_name}</span>
+                              <span className="mt-1 block truncate text-xs text-slate-500">{formatSessionMeta(session)}</span>
+                              {session.latest_report_filename ? <span className="mt-1 block truncate text-[11px] text-emerald-700">{session.latest_report_filename}</span> : null}
+                            </button>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSessionMenuId((current) => current === session.id ? null : session.id)}
+                          disabled={mutatingSessionId === session.id}
+                          aria-label={`More options for ${session.project_name}`}
+                          aria-haspopup="menu"
+                          aria-expanded={sessionMenuId === session.id}
+                          className="group mr-1.5 grid size-10 shrink-0 place-items-center self-center rounded-xl text-slate-400 transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-700 disabled:opacity-60"
+                          title={`More options for ${session.project_name}`}
+                        >
+                          <MoreVertical aria-hidden="true" className="size-4 transition-transform duration-150 group-hover:scale-110 group-hover:text-slate-700" />
+                        </button>
+                        {sessionMenuId === session.id ? (
+                          <div role="menu" className="absolute right-1.5 top-11 z-40 w-44 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-200/70">
+                            <button role="menuitem" type="button" onClick={() => { setSessionMenuId(null); handleRenameSession(session); }} className="flex min-h-10 w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus:bg-slate-50 focus:outline-none">
+                              <Pencil aria-hidden="true" className="size-3.5" /> Rename
+                            </button>
+                            <button role="menuitem" type="button" onClick={() => { setSessionMenuId(null); void handleDeleteSession(session); }} className="flex min-h-10 w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-red-700 transition hover:bg-red-50 focus:bg-red-50 focus:outline-none">
+                              <Trash2 aria-hidden="true" className="size-3.5" /> Delete
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                     );
                   })}
                   {!loadingSessions && !filteredSessions.length ? (
@@ -341,6 +468,19 @@ export function AppShell() {
           </div>
         </div>
       </main>
+      {pendingDeleteSession ? (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center px-4">
+          <button type="button" aria-label="Cancel delete session" className="absolute inset-0 bg-slate-950/35 backdrop-blur-[2px]" onClick={() => setPendingDeleteSession(null)} />
+          <div role="dialog" aria-modal="true" aria-labelledby="delete-session-title" className="relative w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <h2 id="delete-session-title" className="text-lg font-semibold text-slate-950">Delete session?</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">This will permanently remove <strong>{pendingDeleteSession.project_name}</strong> and its saved files.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setPendingDeleteSession(null)} className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700">Cancel</button>
+              <button type="button" onClick={() => void confirmDeleteSession()} className="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600">Delete session</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <CommonFieldsChooser />
     </div>
   );

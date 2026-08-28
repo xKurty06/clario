@@ -59,3 +59,13 @@ export interface SessionState {
 export const listRecentSessions = () => apiRequest<RecentSession[]>("/validation/recent");
 
 export const getSessionState = (sessionId: string) => apiRequest<SessionState>(`/validation/sessions/${encodeURIComponent(sessionId)}`);
+
+export const renameSession = (sessionId: string, projectName: string) =>
+  apiRequest<{ status: string; project_name: string }>(`/validation/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project_name: projectName }),
+  });
+
+export const deleteSession = (sessionId: string) =>
+  apiRequest<void>(`/validation/sessions/${encodeURIComponent(sessionId)}`, { method: "DELETE" });

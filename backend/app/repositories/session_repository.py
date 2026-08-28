@@ -1,7 +1,9 @@
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
+from app.config.settings import get_settings
 from app.database.connection import database
 from app.models.validation_models import ValidationRequest, ValidationResult
 from app.repositories.report_repository import ReportRepository
@@ -58,6 +60,66 @@ class SessionRepository:
             item.pop("request_payload", None)
             sessions.append(item)
         return sessions
+
+    def rename(self, session_id: str, project_name: str) -> bool:
+        with database() as connection:
+            row = connection.execute(
+                "SELECT result_payload, request_payload, session_path FROM sessions WHERE id = ? LIMIT 1",
+                (session_id,),
+            ).fetchone()
+            if row is None:
+                return False
+
+            result_payload = json.loads(row["result_payload"]) if row["result_payload"] else None
+            request_payload = json.loads(row["request_payload"]) if row["request_payload"] else None
+            if result_payload:
+                result_payload["project_name"] = project_name
+            if request_payload:
+                request_payload["project_name"] = project_name
+
+            connection.execute(
+                "UPDATE sessions SET project_name = ?, result_payload = ?, request_payload = ? WHERE id = ?",
+                (
+                    project_name,
+                    json.dumps(result_payload) if result_payload else None,
+                    json.dumps(request_payload) if request_payload else None,
+                    session_id,
+                ),
+            )
+
+            session_path = Path(str(row["session_path"])) if row["session_path"] else None
+            if session_path and session_path.exists() and session_path.is_dir():
+                metadata_path = session_path / "session.json"
+                result_path = session_path / "result.json"
+                setup_path = session_path / "setup.json"
+                if metadata_path.exists():
+                    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                    metadata["project_name"] = project_name
+                    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+                if result_path.exists() and result_payload:
+                    result_path.write_text(json.dumps(result_payload, indent=2), encoding="utf-8")
+                if setup_path.exists() and request_payload:
+                    setup_path.write_text(json.dumps(request_payload, indent=2), encoding="utf-8")
+            return True
+
+    def delete(self, session_id: str) -> bool:
+        with database() as connection:
+            row = connection.execute("SELECT session_path FROM sessions WHERE id = ? LIMIT 1", (session_id,)).fetchone()
+            if row is None:
+                return False
+
+            session_path = Path(str(row["session_path"])) if row["session_path"] else None
+            if session_path:
+                sessions_root = get_settings().sessions_directory.resolve()
+                resolved_path = session_path.resolve()
+                if resolved_path != sessions_root and sessions_root not in resolved_path.parents:
+                    raise ValueError("The saved session path is outside the sessions directory.")
+                if resolved_path.exists():
+                    shutil.rmtree(resolved_path)
+
+            connection.execute("DELETE FROM reports WHERE session_id = ?", (session_id,))
+            cursor = connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            return cursor.rowcount > 0
 
     def get_session_directory(self, session_id: str) -> Path | None:
         with database() as connection:

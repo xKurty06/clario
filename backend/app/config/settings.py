@@ -27,7 +27,7 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("CLARIO_HOST", "PROCUREMENT_VALIDATOR_HOST"),
     )
     port: int = Field(
-        default=8765,
+        default=8766,
         ge=1024,
         le=65535,
         validation_alias=AliasChoices("CLARIO_PORT", "PROCUREMENT_VALIDATOR_PORT"),

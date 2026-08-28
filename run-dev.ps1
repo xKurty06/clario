@@ -6,7 +6,7 @@ $python = Join-Path $backendDir ".venv\Scripts\python.exe"
 $logDir = Join-Path $backendDir "logs"
 $logFile = Join-Path $logDir "dev-backend.log"
 $errorLogFile = Join-Path $logDir "dev-backend-error.log"
-$healthUrl = "http://127.0.0.1:8765/health"
+$healthUrl = "http://127.0.0.1:8766/health"
 
 if (-not (Test-Path -LiteralPath $python)) {
     throw "Backend virtual environment not found. Follow the README installation steps first."
@@ -48,9 +48,9 @@ else {
         }
     }
 
-    Write-Host "Starting backend on 127.0.0.1:8765..."
+    Write-Host "Starting backend on 127.0.0.1:8766..."
     $backend = Start-Process -FilePath $python `
-        -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8765", "--reload" `
+        -ArgumentList "-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8766", "--reload" `
         -WorkingDirectory $backendDir `
         -WindowStyle Hidden `
         -RedirectStandardOutput $logFile `

@@ -162,6 +162,10 @@ html[data-theme] .session-search-input {
   background-color: transparent !important;
 }
 
+html[data-theme] .session-rename-input {
+  background-color: transparent !important;
+}
+
 html[data-theme] :where(input::placeholder, textarea::placeholder) {
   color: var(--color-text-faint) !important;
 }

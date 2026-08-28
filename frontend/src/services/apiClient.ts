@@ -1,6 +1,6 @@
 import { appConfig } from "../app/config";
 
-const BACKEND_UNREACHABLE_MESSAGE = "The local backend service is not reachable. Please make sure the backend is running on 127.0.0.1:8765.";
+const BACKEND_UNREACHABLE_MESSAGE = "The local backend service is not reachable. Please make sure the backend is running on 127.0.0.1:8766.";
 
 export class ApiError extends Error {
   constructor(
@@ -22,8 +22,8 @@ function backendRootUrl() {
 }
 
 function alternateLoopbackUrl(input: string) {
-  if (input.includes("http://127.0.0.1:8765")) return input.replace("http://127.0.0.1:8765", "http://localhost:8765");
-  if (input.includes("http://localhost:8765")) return input.replace("http://localhost:8765", "http://127.0.0.1:8765");
+  if (input.includes("http://127.0.0.1:8766")) return input.replace("http://127.0.0.1:8766", "http://localhost:8766");
+  if (input.includes("http://localhost:8766")) return input.replace("http://localhost:8766", "http://127.0.0.1:8766");
   return null;
 }
 
@@ -63,6 +63,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     const body = (await response.json().catch(() => ({}))) as { code?: string; detail?: string };
     throw new ApiError(response.status, body.code ?? "API_ERROR", body.detail ?? "The local service could not complete the request.");
   }
+  if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
 }
 
