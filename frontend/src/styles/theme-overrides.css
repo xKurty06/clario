@@ -135,6 +135,11 @@ html[data-theme="dark"] :is(main, [role="dialog"]) :where(
   --tw-ring-color: var(--color-dark-focus-ring) !important;
 }
 
+html[data-theme="dark"] .session-search-field:focus-within {
+  border-color: var(--color-dark-focus-border) !important;
+  --tw-ring-color: var(--color-dark-focus-ring) !important;
+}
+
 html[data-theme="dark"] :is(main, [role="dialog"]) :where(
   .outline-emerald-600,
   .focus\:outline-emerald-600:focus,

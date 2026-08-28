@@ -200,7 +200,7 @@ export function AppShell() {
               <>
                 <div className="mt-4">
                   <label className="sr-only" htmlFor="session-search">Search sessions</label>
-                  <div className="flex h-10 w-full items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-left text-slate-800 outline-none transition duration-200 hover:border-slate-400 hover:bg-slate-50 focus-within:border-emerald-600 focus-within:ring-3 focus-within:ring-emerald-100">
+                  <div className="session-search-field flex h-10 w-full items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-left text-slate-800 outline-none transition duration-200 hover:border-slate-400 hover:bg-slate-50 focus-within:border-emerald-600 focus-within:ring-3 focus-within:ring-emerald-100">
                     <Search className="size-4 shrink-0" />
                     <input
                       id="session-search"
