@@ -107,6 +107,10 @@ export function AppShell() {
   }, []);
 
   useEffect(() => {
+    if (location.pathname === "/upload") setSidebarView("workflow");
+  }, [location.pathname]);
+
+  useEffect(() => {
     if (!sessionMenuId) return;
 
     const closeMenuOnOutsideClick = (event: PointerEvent) => {
