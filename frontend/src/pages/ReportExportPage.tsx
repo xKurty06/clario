@@ -1,11 +1,11 @@
-import { CheckCircle2, Download, ExternalLink, FileOutput, ListChecks } from "lucide-react";
+import { CheckCircle2, Download, ExternalLink, FileOutput, FolderOpen, ListChecks } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Button } from "../components/ui/Button";
 import { useWorkflow } from "../features/files/WorkflowContext";
 import { checkBackendHealth } from "../services/apiClient";
-import { exportPdf, latestReportInfo, openPdfExternally } from "../services/reportApi";
+import { exportPdf, openPdfExternally, openReportFolderExternally, savedReportInfo } from "../services/reportApi";
 
 interface ExportedReportState {
   filename: string;
@@ -15,29 +15,6 @@ interface ExportedReportState {
 const primaryActionClass = "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none disabled:active:scale-100";
 const secondaryActionClass = "inline-flex min-h-11 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100";
 const reportPanelClass = "mx-auto mt-8 w-full max-w-4xl rounded-3xl border border-slate-200 bg-white p-6 shadow-sm";
-
-function reportStorageKey(resultId: string) {
-  return `clario:exported-report:${resultId}`;
-}
-
-function readStoredReport(resultId: string): ExportedReportState | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const value = window.sessionStorage.getItem(reportStorageKey(resultId));
-    return value ? (JSON.parse(value) as ExportedReportState) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredReport(resultId: string, report: ExportedReportState) {
-  if (typeof window === "undefined") return;
-  try {
-    window.sessionStorage.setItem(reportStorageKey(resultId), JSON.stringify(report));
-  } catch {
-    // Ignore storage failures. The backend can still return the latest report while the app is open.
-  }
-}
 
 function ExportMetric({ label, value }: { label: string; value: number }) {
   return (
@@ -62,29 +39,30 @@ export function ReportExportPage() {
   const { result } = useWorkflow();
   const [busy, setBusy] = useState(false);
   const [openBusy, setOpenBusy] = useState(false);
+  const [folderBusy, setFolderBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
-  const [exportedReport, setExportedReport] = useState<ExportedReportState | null>(null);
+  const [exportedReports, setExportedReports] = useState<ExportedReportState[]>([]);
+
+  useEffect(() => {
+    if (!statusMessage) return;
+    const timeout = window.setTimeout(() => setStatusMessage(""), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [statusMessage]);
 
   useEffect(() => {
     if (!result) {
-      setExportedReport(null);
+      setExportedReports([]);
       return;
     }
 
     let active = true;
-    const storedReport = readStoredReport(result.id);
-    if (storedReport) setExportedReport(storedReport);
-
-    void latestReportInfo(result.id)
-      .then((report) => {
-        if (!active) return;
-        const next = { filename: report.filename, savedPath: report.savedPath };
-        setExportedReport(next);
-        writeStoredReport(result.id, next);
+    void savedReportInfo(result.id)
+      .then((reports) => {
+        if (active) setExportedReports(reports.map((report) => ({ filename: report.filename, savedPath: report.savedPath })));
       })
       .catch(() => {
-        if (active && !storedReport) setExportedReport(null);
+        if (active) setExportedReports([]);
       });
 
     return () => {
@@ -148,14 +126,12 @@ export function ReportExportPage() {
         throw new Error("The PDF service returned an empty report. Please run validation again and retry export.");
       }
 
-      const nextReport = {
+      const nextReport: ExportedReportState = {
         filename: report.filename,
         savedPath: report.savedPath,
       };
-      const wasRegenerate = Boolean(exportedReport);
-      setExportedReport(nextReport);
-      writeStoredReport(result.id, nextReport);
-      setStatusMessage(wasRegenerate ? "PDF regenerated locally. Open in PDF viewer will use this latest file." : "PDF generated locally. Use Open in PDF viewer to view it with your default PDF app.");
+      setExportedReports((current) => [nextReport, ...current.filter((item) => item.savedPath !== nextReport.savedPath)]);
+      setStatusMessage("PDF generated.");
     } catch (cause) {
       setErrorMessage(cause instanceof Error ? cause.message : "Could not create report.");
     } finally {
@@ -163,23 +139,31 @@ export function ReportExportPage() {
     }
   };
 
-  const openReport = async () => {
-    if (!exportedReport) return;
+  const openReport = async (report: ExportedReportState) => {
     setOpenBusy(true);
     setErrorMessage("");
     setStatusMessage("");
     try {
-      const opened = await openPdfExternally(result.id, exportedReport.savedPath);
-      if (opened.path !== exportedReport.savedPath) {
-        const latest = { filename: opened.path.split(/[/\\]/).pop() || exportedReport.filename, savedPath: opened.path };
-        setExportedReport(latest);
-        writeStoredReport(result.id, latest);
-      }
-      setStatusMessage("Opened the displayed PDF using your default PDF viewer.");
+      await openPdfExternally(result.id, report.savedPath);
+      setStatusMessage("Opened the PDF using your default PDF viewer.");
     } catch (cause) {
       setErrorMessage(cause instanceof Error ? cause.message : "Could not open the PDF in an external viewer.");
     } finally {
       setOpenBusy(false);
+    }
+  };
+
+  const openReportFolder = async (report: ExportedReportState) => {
+    setFolderBusy(true);
+    setErrorMessage("");
+    setStatusMessage("");
+    try {
+      await openReportFolderExternally(result.id, report.savedPath);
+      setStatusMessage("Opened the report folder.");
+    } catch (cause) {
+      setErrorMessage(cause instanceof Error ? cause.message : "Could not open the report folder.");
+    } finally {
+      setFolderBusy(false);
     }
   };
 
@@ -207,7 +191,7 @@ export function ReportExportPage() {
           </div>
           <Button type="button" loading={busy} disabled={busy} onClick={generateReport} className={`${primaryActionClass} sm:mt-1`}>
             <Download className="size-4" />
-            {busy ? "Creating report..." : exportedReport ? "Regenerate PDF" : "Generate PDF report"}
+            {busy ? "Creating report..." : exportedReports.length ? "Generate another PDF" : "Generate PDF report"}
           </Button>
         </div>
 
@@ -224,31 +208,24 @@ export function ReportExportPage() {
           </p>
         ) : null}
 
-        {statusMessage ? (
-          <p className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800" role="status">
-            {statusMessage}
-          </p>
-        ) : null}
-
-        {exportedReport ? (
-          <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-emerald-700">
-                  <CheckCircle2 className="size-5 shrink-0" />
-                  <p className="text-sm font-bold uppercase tracking-[0.14em]">Report ready</p>
+        {exportedReports.length ? (
+          <div className="mt-6 space-y-3">
+            {exportedReports.map((report) => (
+              <div key={`${report.filename}-${report.savedPath}`} className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-center gap-2">
+                  <CheckCircle2 className="size-5 shrink-0 text-emerald-700" />
+                  <p className="min-w-0 break-all text-sm font-semibold text-slate-950">{report.filename}</p>
                 </div>
-                <p className="mt-2 break-all text-sm font-semibold text-slate-950">{exportedReport.filename}</p>
-                {exportedReport.savedPath ? (
-                  <p className="mt-2 break-all font-mono text-xs leading-5 text-slate-600">
-                    {exportedReport.savedPath}
-                  </p>
-                ) : null}
+                <div className="flex shrink-0 items-center gap-2">
+                  <Button type="button" loading={folderBusy} onClick={() => void openReportFolder(report)} disabled={folderBusy || openBusy} variant="outline" className="grid size-11 place-items-center rounded-xl border border-slate-300 bg-white p-0 text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600" aria-label={`Open folder containing ${report.filename}`} title="Open report folder">
+                    <FolderOpen className="size-5" />
+                  </Button>
+                  <Button type="button" loading={openBusy} onClick={() => void openReport(report)} disabled={openBusy || folderBusy} variant="outline" className={secondaryActionClass}>
+                  <ExternalLink className="size-4" /> {openBusy ? "Opening..." : "Open"}
+                  </Button>
+                </div>
               </div>
-              <Button type="button" loading={openBusy} onClick={openReport} disabled={openBusy} variant="outline" className={secondaryActionClass}>
-                <ExternalLink className="size-4" /> {openBusy ? "Opening..." : "Open in PDF viewer"}
-              </Button>
-            </div>
+            ))}
           </div>
         ) : (
           <div className="mt-6 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-500">
@@ -256,6 +233,12 @@ export function ReportExportPage() {
           </div>
         )}
       </section>
+      {statusMessage ? (
+        <div className="fixed bottom-5 right-5 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-medium text-emerald-800 shadow-lg shadow-slate-900/10" role="status" aria-live="polite">
+          {statusMessage}
+          <span aria-hidden="true" className="report-toast-progress absolute inset-x-0 bottom-0 h-px bg-emerald-500" />
+        </div>
+      ) : null}
     </div>
   );
 }

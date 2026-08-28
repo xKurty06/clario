@@ -50,8 +50,25 @@ export async function latestReportInfo(resultId: string): Promise<ReportInfo> {
   };
 }
 
+export async function savedReportInfo(resultId: string): Promise<ReportInfo[]> {
+  const response = await apiRequest<Array<{ filename: string; saved_path: string; created_at: string }>>(`/reports/${encodeURIComponent(resultId)}/saved`);
+  return response.map((report) => ({
+    filename: report.filename,
+    savedPath: report.saved_path,
+    createdAt: report.created_at,
+  }));
+}
+
 export async function openPdfExternally(resultId: string, savedPath?: string | null): Promise<OpenPdfResponse> {
   return apiRequest<OpenPdfResponse>(`/reports/${encodeURIComponent(resultId)}/open`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ path: savedPath ?? null }),
+  });
+}
+
+export async function openReportFolderExternally(resultId: string, savedPath?: string | null): Promise<OpenPdfResponse> {
+  return apiRequest<OpenPdfResponse>(`/reports/${encodeURIComponent(resultId)}/folder`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ path: savedPath ?? null }),

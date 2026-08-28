@@ -62,6 +62,14 @@ async def latest_pdf_report(session_id: str) -> ReportInfoResponse:
     return ReportInfoResponse(filename=info["filename"], saved_path=info["path"], created_at=info["created_at"])
 
 
+@router.get("/{session_id}/saved", response_model=list[ReportInfoResponse])
+async def saved_pdf_reports(session_id: str) -> list[ReportInfoResponse]:
+    return [
+        ReportInfoResponse(filename=info["filename"], saved_path=info["path"], created_at=info["created_at"])
+        for info in ReportRepository().info_for_session(session_id)
+    ]
+
+
 @router.post("/{session_id}/open")
 async def open_pdf_external(session_id: str, request: OpenReportRequest | None = None) -> dict[str, str]:
     repository = ReportRepository()
@@ -74,6 +82,20 @@ async def open_pdf_external(session_id: str, request: OpenReportRequest | None =
     except OSError as exc:
         raise HTTPException(status_code=500, detail="The report was created, but the operating system could not open it automatically.") from exc
     return {"status": "opened", "path": str(path.resolve())}
+
+
+@router.post("/{session_id}/folder")
+async def open_report_folder(session_id: str, request: OpenReportRequest | None = None) -> dict[str, str]:
+    repository = ReportRepository()
+    requested_path = request.path if request and request.path else None
+    path = repository.find_for_session(session_id, requested_path) if requested_path else repository.latest_for_session(session_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Generated report was not found. Export the report again.")
+    try:
+        open_with_default_app(path.parent)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail="The report folder could not be opened automatically.") from exc
+    return {"status": "opened", "path": str(path.parent.resolve())}
 
 
 @router.get("/{session_id}/pdf", response_class=FileResponse)

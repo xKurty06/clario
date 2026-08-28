@@ -98,14 +98,16 @@ export function DashboardPage() {
                     <div className="flex min-w-0 gap-4">
                       <FileCheck2 className="mt-0.5 size-5 shrink-0 text-emerald-700" />
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold text-slate-950">{session.project_name}</p>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <p className="min-w-0 truncate text-sm font-semibold text-slate-950">{session.project_name}</p>
+                          <StatusBadge tone={session.discrepancy_count ? "warning" : "success"}>{`${session.discrepancy_count} issues`}</StatusBadge>
+                        </div>
                         <p className="mt-1 text-xs text-slate-500">{formatSessionDate(session.created_at)} · {session.mode.replaceAll("_", " ")}</p>
                         <p className="mt-1 truncate text-xs text-slate-500">{fileSummary(Array.isArray(session.file_names) ? session.file_names : [])}</p>
                         {session.latest_report_filename ? <p className="mt-1 truncate text-xs text-emerald-700">Latest report: {session.latest_report_filename}</p> : null}
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                      <StatusBadge tone={session.discrepancy_count ? "warning" : "success"}>{`${session.discrepancy_count} issues`}</StatusBadge>
                       <button
                         type="button"
                         onClick={() => openSession(session, "/results")}
