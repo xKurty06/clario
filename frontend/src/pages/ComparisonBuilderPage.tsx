@@ -1220,7 +1220,7 @@ export function ComparisonBuilderPage({ onBackToRowSetup, onRequestPresetSetup, 
               <div className="mt-4 space-y-2">
                 {warnings.length ? warnings.map((warning) => <p key={warning} className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-800">{warning}</p>) : <p className="rounded-2xl bg-emerald-50 p-3 text-sm text-emerald-800">Setup is ready to validate.</p>}
               </div>
-              <button title={`${result ? "Re-run" : "Run"} validation with the current sources, rows, fields, and rules`} disabled={!canRun || busy === "validation"} onClick={run} className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300">
+              <button title={`${result ? "Re-run" : "Run"} validation with the current sources, rows, fields, and rules`} disabled={!canRun || busy === "validation"} onClick={run} className="mt-5 inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-300">
                 {busy === "validation" ? <LoaderCircle className="size-4 animate-spin" /> : result ? <RefreshCw className="size-4" /> : <Play className="size-4" />}
                 {busy === "validation" ? (result ? "Re-running validation..." : "Running validation...") : result ? "Re-run validation" : "Run validation"}
               </button>

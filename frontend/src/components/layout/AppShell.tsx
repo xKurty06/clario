@@ -3,7 +3,6 @@ import {
   FileOutput,
   FileSearch,
   Files,
-  LayoutDashboard,
   LockKeyhole,
   Menu,
   PanelRightOpen,
@@ -12,6 +11,7 @@ import {
   Search,
   Settings2,
   SlidersHorizontal,
+  X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
@@ -32,10 +32,6 @@ interface NavigationSection {
 
 const navigation: NavigationSection[] = [
   {
-    label: "Overview",
-    items: [{ to: "/", label: "Dashboard", icon: LayoutDashboard, end: true }],
-  },
-  {
     label: "Validation workflow",
     items: [
       { to: "/upload", label: "Upload files", icon: Files },
@@ -53,19 +49,6 @@ const navigation: NavigationSection[] = [
 function formatSessionMeta(session: RecentSession) {
   const issues = `${session.discrepancy_count} issue${session.discrepancy_count === 1 ? "" : "s"}`;
   return session.has_report ? `${issues} · Report ready` : issues;
-}
-
-function ActiveSessionCard({ name, issueCount, collapsed }: { name: string; issueCount?: number; collapsed: boolean }) {
-  if (collapsed) return null;
-  return (
-    <div className="mx-3 mb-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3 text-emerald-800">
-      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-700">Active session</p>
-      <p className="mt-1 truncate text-sm font-semibold" title={name}>{name}</p>
-      <p className="mt-1 text-xs leading-5 text-emerald-700">
-        {typeof issueCount === "number" ? `${issueCount} issue${issueCount === 1 ? "" : "s"}` : "Setup in progress"}
-      </p>
-    </div>
-  );
 }
 
 export function AppShell() {
@@ -91,7 +74,6 @@ export function AppShell() {
   const shellStyle = { "--app-sidebar-offset": collapsed ? "72px" : "272px" } as CSSProperties;
 
   const activeSessionName = result?.project_name || projectName || "No active session";
-  const activeIssueCount = result?.discrepancies.length;
   const filteredSessions = useMemo(() => {
     const normalized = sessionQuery.trim().toLowerCase();
     if (!normalized) return sessions;
@@ -122,6 +104,17 @@ export function AppShell() {
     navigate("/upload");
   };
 
+  const closeSession = () => {
+    setProjectName("");
+    setPreset("");
+    setFiles([]);
+    setDataSources([]);
+    setRules([]);
+    setResult(null);
+    setSidebarView("sessions");
+    navigate("/");
+  };
+
   const openSession = async (session: RecentSession) => {
     setOpeningSessionId(session.id);
     setSessionError("");
@@ -129,6 +122,7 @@ export function AppShell() {
       const state = await getSessionState(session.id);
       setProjectName(state.request?.project_name || state.result.project_name);
       setPreset(state.request?.preset || state.result.preset);
+      setFiles(state.files ?? []);
       setDataSources(state.request?.data_sources || state.result.data_sources);
       setRules(state.request?.rules || []);
       setResult(state.result);
@@ -204,9 +198,9 @@ export function AppShell() {
 
             {!collapsed ? (
               <>
-                <div className="mt-4 px-1">
+                <div className="mt-4">
                   <label className="sr-only" htmlFor="session-search">Search sessions</label>
-                  <div className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-slate-500">
+                  <div className="flex h-10 w-full items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-left text-slate-800 outline-none transition duration-200 hover:border-slate-400 hover:bg-slate-50 focus-within:border-emerald-600 focus-within:ring-3 focus-within:ring-emerald-100">
                     <Search className="size-4 shrink-0" />
                     <input
                       id="session-search"
@@ -215,6 +209,17 @@ export function AppShell() {
                       placeholder="Search sessions"
                       className="session-search-input min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-slate-950 outline-none placeholder:text-slate-400"
                     />
+                    {sessionQuery ? (
+                      <button
+                        type="button"
+                        onClick={() => setSessionQuery("")}
+                        className="grid size-5 shrink-0 place-items-center rounded text-slate-400 hover:filter-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-700"
+                        aria-label="Clear session search"
+                        title="Clear session search"
+                      >
+                        <X className="search-clear-icon size-3.5 text-slate-400 hover:text-red-600" />
+                      </button>
+                    ) : null}
                   </div>
                 </div>
 
@@ -261,18 +266,19 @@ export function AppShell() {
         ) : (
           <>
             <div className={`shrink-0 ${collapsed ? "px-2 py-3" : "px-3 py-4"}`}>
-              <button
-                type="button"
-                onClick={() => setSidebarView("sessions")}
-                className={`flex h-10 items-center rounded-xl text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${collapsed ? "mx-auto w-10 justify-center" : "w-full gap-3 px-3"}`}
-                title="Back to sessions"
-                aria-label="Back to sessions"
-              >
-                <ArrowLeft className="size-[18px] shrink-0" />
-                <span className={`min-w-0 overflow-hidden truncate transition-all duration-300 ${collapsed ? "w-0 opacity-0" : "w-[150px] opacity-100"}`}>Sessions</span>
-              </button>
+              <div className={`flex h-10 items-center ${collapsed ? "justify-center" : "gap-3 px-3"}`}>
+                <button
+                  type="button"
+                  onClick={closeSession}
+                  className="grid size-8 shrink-0 place-items-center rounded-lg text-slate-600 transition hover:bg-slate-100 hover:text-slate-950 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"
+                  title={`Return to sessions from ${activeSessionName}`}
+                  aria-label={`Return to sessions from ${activeSessionName}`}
+                >
+                  <ArrowLeft className="size-[18px]" />
+                </button>
+                <span className={`min-w-0 overflow-hidden truncate text-sm font-semibold text-slate-600 transition-all duration-300 ${collapsed ? "w-0 opacity-0" : "w-[150px] opacity-100"}`}>{activeSessionName}</span>
+              </div>
             </div>
-            <ActiveSessionCard name={activeSessionName} issueCount={activeIssueCount} collapsed={collapsed} />
             <nav aria-label="Workflow navigation" className={`flex-1 overflow-y-auto overflow-x-hidden ${collapsed ? "px-2 py-1" : "px-3 py-1"}`}>
               {navigation.map((section, sectionIndex) => (
                 <section className={sectionIndex ? `border-t transition-[margin,padding,border-color] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${collapsed ? "mt-1 border-transparent pt-0" : "mt-3 border-slate-100 pt-3"}` : ""} key={section.label}>
@@ -321,6 +327,15 @@ export function AppShell() {
 
       <main className={`min-w-0 px-3 py-10 pb-8 transition-[margin-left] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] sm:px-4 lg:px-6 lg:py-12 lg:pb-10 ${collapsed ? "ml-[72px]" : "ml-[272px]"}`}>
         <div className="mx-auto min-w-0 max-w-[1500px]">
+          {sidebarView === "workflow" && result ? (
+            <div className="mb-6 flex items-center gap-3 border-b border-slate-200 pb-4">
+              <div className="min-w-0">
+                <p className="truncate text-lg font-semibold text-slate-950">{result.project_name}</p>
+                <p className="text-xs text-slate-500">Last modified {new Date(result.created_at).toLocaleDateString()}</p>
+              </div>
+              <span className="ml-auto text-xs font-medium text-emerald-700">Active session</span>
+            </div>
+          ) : null}
           <div key={location.pathname} className="app-route-fade">
             <Outlet />
           </div>

@@ -1,5 +1,5 @@
 import { AlertTriangle, Ban, CheckSquare, ChevronDown, MoreHorizontal, RotateCcw, Square } from "lucide-react";
-import { useId, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
 import type { PreviewRow } from "../../types/validation.types";
 
 interface RowSelectionTableProps {
@@ -16,6 +16,14 @@ interface RowSelectionTableProps {
 interface RowWarning {
   rowNumber: number;
   reason: string;
+}
+
+interface DragSelection {
+  originRowNumber: number;
+  startY: number;
+  baseSelectedRows: number[];
+  mode: "include" | "exclude";
+  moved: boolean;
 }
 
 const toolbarButtonClass = "inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50";
@@ -143,6 +151,7 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
   const [rangeEnd, setRangeEnd] = useState("");
   const [rangeError, setRangeError] = useState("");
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const dragSelection = useRef<DragSelection | null>(null);
 
   const handleSelectRange = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -178,6 +187,65 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
   const runMoreAction = (action: () => void) => {
     action();
     setMoreActionsOpen(false);
+  };
+
+  useEffect(() => {
+    const findRowNumber = (clientX: number, clientY: number) => {
+      const target = document.elementFromPoint(clientX, clientY);
+      const row = target instanceof Element ? target.closest<HTMLElement>("[data-row-number]") : null;
+      const value = row?.dataset.rowNumber;
+      return value ? Number(value) : null;
+    };
+
+    const handleMouseMove = (event: globalThis.MouseEvent) => {
+      const current = dragSelection.current;
+      if (!current) return;
+      if (!current.moved && Math.abs(event.clientY - current.startY) < 4) return;
+      current.moved = true;
+      const rowNumber = findRowNumber(event.clientX, event.clientY);
+      if (rowNumber === null || lockedRows.has(rowNumber)) return;
+      const startIndex = selectableRowNumbers.indexOf(current.originRowNumber);
+      const endIndex = selectableRowNumbers.indexOf(rowNumber);
+      if (startIndex < 0 || endIndex < 0) return;
+      const nextSelectedRows = new Set(current.baseSelectedRows);
+      const lower = Math.min(startIndex, endIndex);
+      const upper = Math.max(startIndex, endIndex);
+      for (let index = lower; index <= upper; index += 1) {
+        const selectedRowNumber = selectableRowNumbers[index];
+        if (selectedRowNumber === undefined) continue;
+        if (current.mode === "include") nextSelectedRows.add(selectedRowNumber);
+        else nextSelectedRows.delete(selectedRowNumber);
+      }
+      onSelectRows([...nextSelectedRows]);
+    };
+
+    const handleMouseUp = () => {
+      const current = dragSelection.current;
+      dragSelection.current = null;
+      if (current && !current.moved) onToggleRow(current.originRowNumber);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("blur", handleMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("blur", handleMouseUp);
+    };
+  }, [lockedRows, onSelectRows, onToggleRow, selectableRowNumbers]);
+
+  const handleRowMouseDown = (event: MouseEvent<HTMLTableRowElement>, rowNumber: number) => {
+    if (event.button !== 0 || lockedRows.has(rowNumber)) return;
+    if ((event.target as HTMLElement).closest("button, input, a")) return;
+    event.preventDefault();
+    dragSelection.current = {
+      originRowNumber: rowNumber,
+      startY: event.clientY,
+      baseSelectedRows: selectedRows,
+      mode: rows.find((row) => row.row_number === rowNumber)?.selected ? "exclude" : "include",
+      moved: false,
+    };
   };
 
   return (
@@ -330,10 +398,12 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
                   aria-label={isHeaderRow ? `Excel row ${row.row_number} is the header row` : locked ? `Excel row ${row.row_number} is excluded by row setup` : `${row.selected ? "Unselect" : "Select"} Excel row ${row.row_number}`}
                   title={isHeaderRow ? "This row is the header row and is not selectable." : locked ? "This row is excluded by the first data row setting." : needsReview ? "This selected row may not be real data. Review it, or continue if it is correct." : "Click to toggle this row"}
                   onClick={() => {
-                    if (!locked) onToggleRow(row.row_number);
+                    // Selection is handled on mouse-up so a click can become a drag.
                   }}
+                  onMouseDown={(event) => handleRowMouseDown(event, row.row_number)}
                   onKeyDown={(event) => handleRowKeyDown(event, row.row_number)}
-                  className={`group border-t border-slate-100 align-middle transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${locked ? "cursor-not-allowed" : "cursor-pointer hover:bg-emerald-100/55"} ${needsReview ? "bg-amber-50/70" : isHeaderRow ? "bg-sky-50/80" : row.selected ? "bg-emerald-50/35" : ""} ${locked && !isHeaderRow ? "opacity-90" : ""} ${row.ignored && !row.selected && !locked ? "opacity-90" : ""}`}
+                  data-row-number={row.row_number}
+                  className={`group border-t border-slate-100 align-middle select-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${locked ? "cursor-not-allowed" : "cursor-pointer hover:bg-emerald-100/55"} ${needsReview ? "bg-amber-50/70" : isHeaderRow ? "bg-sky-50/80" : row.selected ? "bg-emerald-50/35" : ""} ${locked && !isHeaderRow ? "opacity-90" : ""} ${row.ignored && !row.selected && !locked ? "opacity-90" : ""}`}
                 >
                   <td className="border-b border-slate-100 p-0 align-middle">
                     <div className="flex min-h-11 items-center justify-center px-2.5 py-2">

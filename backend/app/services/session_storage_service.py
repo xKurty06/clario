@@ -66,7 +66,12 @@ def _ensure_children(directory: Path) -> None:
         (directory / child).mkdir(parents=True, exist_ok=True)
 
 
-def write_session_files(directory: Path, result: ValidationResult, request: ValidationRequest | None = None) -> None:
+def write_session_files(
+    directory: Path,
+    result: ValidationResult,
+    request: ValidationRequest | None = None,
+    files: list[dict[str, Any]] | None = None,
+) -> None:
     _ensure_children(directory)
     metadata: dict[str, Any] = {
         "id": result.id,
@@ -75,6 +80,7 @@ def write_session_files(directory: Path, result: ValidationResult, request: Vali
         "created_at": result.created_at,
         "discrepancy_count": len(result.discrepancies),
         "file_names": result.file_names,
+        "files": files or [],
     }
     (_metadata_path(directory)).write_text(json.dumps(metadata, indent=2), encoding="utf-8")
     (directory / "result.json").write_text(result.model_dump_json(indent=2), encoding="utf-8")
@@ -100,3 +106,15 @@ def read_setup_file(directory: Path) -> ValidationRequest | None:
         return ValidationRequest.model_validate_json(setup_file.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
+
+
+def read_session_files(directory: Path) -> list[dict[str, Any]]:
+    metadata_file = _metadata_path(directory)
+    if not metadata_file.exists():
+        return []
+    try:
+        metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    files = metadata.get("files")
+    return files if isinstance(files, list) else []

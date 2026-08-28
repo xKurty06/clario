@@ -5,7 +5,9 @@ from typing import Any
 from app.database.connection import database
 from app.models.validation_models import ValidationRequest, ValidationResult
 from app.repositories.report_repository import ReportRepository
-from app.services.session_storage_service import ensure_session_directory, read_result_file, read_setup_file, write_session_files
+from app.services.file_service import persist_file, restore_persisted_file
+from app.services.session_storage_service import ensure_session_directory, read_result_file, read_session_files, read_setup_file, write_session_files
+from app.services.sheet_service import inspect_sheets
 
 
 class SessionRepository:
@@ -14,7 +16,12 @@ class SessionRepository:
             existing = connection.execute("SELECT session_path FROM sessions WHERE id = ? LIMIT 1", (result.id,)).fetchone()
             existing_path = str(existing["session_path"]) if existing and existing["session_path"] else None
             session_directory = ensure_session_directory(result.project_name, result.id, existing_path)
-            write_session_files(session_directory, result, request)
+            persisted_files = []
+            for source in request.data_sources if request else []:
+                if any(item["id"] == source.file_id for item in persisted_files):
+                    continue
+                persisted_files.append(persist_file(source.file_id, session_directory / "uploads"))
+            write_session_files(session_directory, result, request, persisted_files)
             connection.execute(
                 "INSERT OR REPLACE INTO sessions(id,project_name,mode,file_names,discrepancy_count,created_at,result_payload,request_payload,session_path) VALUES(?,?,?,?,?,?,?,?,?)",
                 (
@@ -81,4 +88,16 @@ class SessionRepository:
 
         if result is None:
             return None
-        return {"result": result, "request": request}
+        files = []
+        for item in read_session_files(directory) if directory else []:
+            try:
+                file_id = str(item["id"])
+                name = str(item["name"])
+                path = str(item["path"])
+                size = int(item["size"])
+                restore_persisted_file(file_id, name, path, size)
+                file_path = Path(path)
+                files.append({"id": file_id, "name": name, "extension": file_path.suffix.lower(), "size": size, "sheets": inspect_sheets(file_path)})
+            except (KeyError, TypeError, ValueError, OSError):
+                continue
+        return {"result": result, "request": request, "files": files}

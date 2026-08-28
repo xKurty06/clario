@@ -1,5 +1,6 @@
 import json
 import re
+import shutil
 from pathlib import Path
 from uuid import uuid4
 
@@ -91,3 +92,18 @@ def get_file(file_id: str) -> tuple[str, Path, int]:
     if not result:
         raise AppError("The working file is unavailable. Upload it again.", "FILE_NOT_FOUND", 404)
     return result
+
+
+def persist_file(file_id: str, destination_directory: Path) -> dict[str, str | int]:
+    original_name, source, size = get_file(file_id)
+    destination_directory.mkdir(parents=True, exist_ok=True)
+    destination = destination_directory / f"{file_id}{source.suffix.lower()}"
+    if source.resolve() != destination.resolve():
+        shutil.copy2(source, destination)
+    return {"id": file_id, "name": original_name, "path": str(destination), "size": size}
+
+
+def restore_persisted_file(file_id: str, original_name: str, path: str, size: int) -> tuple[str, Path, int]:
+    restored = (original_name, Path(path), size)
+    _files[file_id] = restored
+    return restored

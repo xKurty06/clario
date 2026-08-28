@@ -1,5 +1,6 @@
 import { buildPreflightReview, preflightErrorMessage } from "../features/validation/preflightReview";
 import type { ComparisonDataSource, ComparisonRule, DataSourcePreview, PresetType, ValidationResult } from "../types/validation.types";
+import type { UploadedFile } from "../types/file.types";
 import { apiRequest } from "./apiClient";
 
 export interface ValidationPayload {
@@ -52,6 +53,7 @@ export interface RecentSession {
 export interface SessionState {
   result: ValidationResult;
   request: ValidationPayload | null;
+  files: UploadedFile[];
 }
 
 export const listRecentSessions = () => apiRequest<RecentSession[]>("/validation/recent");

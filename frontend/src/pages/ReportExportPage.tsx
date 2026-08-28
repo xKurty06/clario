@@ -2,7 +2,9 @@ import { CheckCircle2, Download, ExternalLink, FileOutput, ListChecks } from "lu
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { PageHeader } from "../components/layout/PageHeader";
+import { Button } from "../components/ui/Button";
 import { useWorkflow } from "../features/files/WorkflowContext";
+import { checkBackendHealth } from "../services/apiClient";
 import { exportPdf, latestReportInfo, openPdfExternally } from "../services/reportApi";
 
 interface ExportedReportState {
@@ -140,6 +142,7 @@ export function ReportExportPage() {
     setErrorMessage("");
     setStatusMessage("");
     try {
+      await checkBackendHealth();
       const report = await exportPdf(result);
       if (!report.blob.size) {
         throw new Error("The PDF service returned an empty report. Please run validation again and retry export.");
@@ -202,10 +205,10 @@ export function ReportExportPage() {
               </p>
             </div>
           </div>
-          <button disabled={busy} onClick={generateReport} className={`${primaryActionClass} sm:mt-1`}>
+          <Button type="button" loading={busy} disabled={busy} onClick={generateReport} className={`${primaryActionClass} sm:mt-1`}>
             <Download className="size-4" />
             {busy ? "Creating report..." : exportedReport ? "Regenerate PDF" : "Generate PDF report"}
-          </button>
+          </Button>
         </div>
 
         <dl className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -242,9 +245,9 @@ export function ReportExportPage() {
                   </p>
                 ) : null}
               </div>
-              <button type="button" onClick={openReport} disabled={openBusy} className={secondaryActionClass}>
+              <Button type="button" loading={openBusy} onClick={openReport} disabled={openBusy} variant="outline" className={secondaryActionClass}>
                 <ExternalLink className="size-4" /> {openBusy ? "Opening..." : "Open in PDF viewer"}
-              </button>
+              </Button>
             </div>
           </div>
         ) : (
