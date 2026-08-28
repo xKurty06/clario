@@ -50,13 +50,10 @@ const navigation: NavigationSection[] = [
 ];
 
 function formatSessionMeta(session: RecentSession) {
-  const issues = `${session.discrepancy_count} issue${session.discrepancy_count === 1 ? "" : "s"}`;
   const date = new Date(session.created_at);
-  const createdAt = Number.isNaN(date.getTime())
+  return Number.isNaN(date.getTime())
     ? "Date unavailable"
     : `${date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} · ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
-  const reportStatus = session.has_report ? " · Report ready" : "";
-  return `${issues} · ${createdAt}${reportStatus}`;
 }
 
 export function AppShell() {
@@ -351,7 +348,6 @@ export function AppShell() {
                                   className="session-rename-input block w-full bg-transparent p-0 text-sm font-semibold leading-5 text-slate-950 outline-none"
                                 />
                                 <span className="mt-1 block text-xs leading-4 text-slate-500">{formatSessionMeta(session)}</span>
-                                {session.latest_report_filename ? <span className="mt-1 block truncate text-[11px] text-emerald-700">{session.latest_report_filename}</span> : null}
                               </div>
                             </>
                           ) : (
@@ -364,7 +360,6 @@ export function AppShell() {
                             >
                               <span className="block truncate text-sm font-semibold">{session.project_name}</span>
                               <span className="mt-1 block text-xs leading-4 text-slate-500">{formatSessionMeta(session)}</span>
-                              {session.latest_report_filename ? <span className="mt-1 block truncate text-[11px] text-emerald-700">{session.latest_report_filename}</span> : null}
                             </button>
                           )}
                         </div>
@@ -494,13 +489,13 @@ export function AppShell() {
         )}
 
         <div className={`flex shrink-0 items-center gap-2 ${collapsed ? "flex-col p-2" : "p-3"}`}>
-          <div title="Files stays local" className={`min-w-0 overflow-hidden border border-emerald-100 bg-emerald-50 text-emerald-800 transition-all duration-300 ${collapsed ? "grid size-10 shrink-0 place-items-center rounded-xl p-0" : "flex min-h-10 flex-1 items-center rounded-xl px-3"}`}>
+          <div title="Your data stays local" className={`min-w-0 overflow-hidden border border-emerald-100 bg-emerald-50 text-emerald-800 transition-all duration-300 ${collapsed ? "grid size-10 shrink-0 place-items-center rounded-xl p-0" : "flex min-h-10 flex-1 items-center rounded-xl px-3"}`}>
             {collapsed ? (
               <LockKeyhole aria-hidden="true" className="size-4" />
             ) : (
               <div className="flex min-w-0 items-center gap-2">
                 <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
-                <span className="min-w-0 truncate text-xs font-semibold">Files stays local</span>
+                <span className="min-w-0 truncate text-xs font-semibold">Your data stays local</span>
               </div>
             )}
           </div>
