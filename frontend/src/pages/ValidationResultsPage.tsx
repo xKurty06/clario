@@ -473,7 +473,7 @@ export function ValidationResultsPage() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Search rule names, expected values, or notes"
-                className="min-h-11 w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100"
+                className="validation-results-search min-h-11 w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm outline-none transition focus:border-emerald-600 focus:ring-3 focus:ring-emerald-100"
               />
             </label>
             <SelectField

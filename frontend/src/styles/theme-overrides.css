@@ -140,6 +140,19 @@ html[data-theme="dark"] .session-search-field:focus-within {
   --tw-ring-color: var(--color-dark-focus-ring) !important;
 }
 
+html[data-theme="dark"] .validation-results-search:focus {
+  border-color: var(--color-dark-focus-border) !important;
+  --tw-ring-color: var(--color-dark-focus-ring) !important;
+}
+
+html[data-theme="light"] .session-search-field:focus-within {
+  border-color: #059669 !important;
+}
+
+html[data-theme="light"] .validation-results-search:focus {
+  border-color: #059669 !important;
+}
+
 html[data-theme="dark"] :is(main, [role="dialog"]) :where(
   .outline-emerald-600,
   .focus\:outline-emerald-600:focus,

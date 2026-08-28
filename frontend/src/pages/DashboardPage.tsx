@@ -90,7 +90,7 @@ export function DashboardPage() {
           </div>
           {sessionError ? <p className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700" role="alert">{sessionError}</p> : null}
           {sessions.length ? (
-            <div className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+            <div className="divide-y divide-[var(--color-border)] rounded-2xl border border-slate-200 bg-white">
               {sessions.slice(0, 8).map((session) => {
                 const loading = loadingSessionId === session.id;
                 return (
