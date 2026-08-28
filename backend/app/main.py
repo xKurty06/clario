@@ -34,8 +34,8 @@ app.add_middleware(
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1):\d+$",
     allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type", "Accept"],
-    expose_headers=["Content-Disposition", "X-Report-Path"],
+    allow_headers=["Content-Type", "Accept", "Cache-Control", "Pragma"],
+    expose_headers=["Content-Disposition", "X-Report-Filename", "X-Report-Path"],
 )
 
 
