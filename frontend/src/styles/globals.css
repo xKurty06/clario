@@ -73,47 +73,16 @@ button, input, select, textarea { font: inherit; }
   display: none;
 }
 
+html[data-theme="dark"] .theme-toggle {
+  outline-color: var(--color-border);
+}
+
 html[data-theme="dark"] .clario-logo--light {
   display: none;
 }
 
 html[data-theme="dark"] .clario-logo--dark {
   display: block;
-}
-
-.theme-switcher {
-  background: color-mix(in srgb, var(--color-panel-muted) 72%, var(--color-panel-soft));
-}
-
-.theme-switcher-label {
-  color: var(--color-text-faint);
-}
-
-.theme-option {
-  color: var(--color-text-muted);
-}
-
-.theme-option:hover {
-  background: var(--color-panel);
-  color: var(--color-text);
-  box-shadow: inset 0 0 0 1px var(--color-border), 0 1px 2px rgba(15, 23, 42, 0.08);
-}
-
-.theme-option[data-selected="true"] {
-  background: color-mix(in srgb, var(--color-brand-soft) 72%, var(--color-panel));
-  color: #047857;
-  box-shadow: inset 0 0 0 1px rgba(16, 185, 129, 0.32), 0 1px 3px rgba(15, 23, 42, 0.12);
-}
-
-html[data-theme="dark"] .theme-option:hover {
-  background: rgba(52, 211, 153, 0.14);
-  color: var(--color-brand-text);
-}
-
-html[data-theme="dark"] .theme-option[data-selected="true"] {
-  background: rgba(52, 211, 153, 0.2);
-  color: #d1fae5;
-  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.18), 0 1px 4px rgba(0, 0, 0, 0.3);
 }
 
 :where(p, h1, h2, h3, h4, h5, h6, dd, dt, li, label) {
@@ -183,6 +152,10 @@ html[data-theme] :where(input, select, textarea) {
   background-color: var(--color-panel) !important;
   border-color: var(--color-border) !important;
   color: var(--color-text) !important;
+}
+
+html[data-theme] .session-search-input {
+  background-color: transparent !important;
 }
 
 html[data-theme] :where(input::placeholder, textarea::placeholder) {

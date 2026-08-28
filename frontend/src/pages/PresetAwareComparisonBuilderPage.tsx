@@ -59,21 +59,6 @@ function sourcesMatchPresetRoles(dataSources: ComparisonDataSource[], roles: str
   return roles.every((role, index) => dataSources[index]?.name.startsWith(`${role} - `));
 }
 
-function dismissPresetBanner() {
-  let attempts = 0;
-  const clickStartManual = () => {
-    attempts += 1;
-    const buttons = Array.from(document.querySelectorAll("button"));
-    const startManualButton = buttons.find((button) => button.textContent?.trim().includes("Start manually"));
-    if (startManualButton) {
-      startManualButton.click();
-      return;
-    }
-    if (attempts < 20) window.setTimeout(clickStartManual, 50);
-  };
-  window.setTimeout(clickStartManual, 0);
-}
-
 export function PresetAwareComparisonBuilderPage() {
   const { files, preset, dataSources, setDataSources, removeSourcePreview } = useWorkflow();
   const [reviewRowSetup, setReviewRowSetup] = useState(false);
@@ -103,27 +88,7 @@ export function PresetAwareComparisonBuilderPage() {
     setPresetRolesApplied(false);
   }, [preset]);
 
-  useEffect(() => {
-    if (presetSetupApplied && !needsRowSetup) dismissPresetBanner();
-  }, [needsRowSetup, presetSetupApplied]);
-
-  useEffect(() => {
-    const interceptPresetSetup = (event: MouseEvent) => {
-      if (!roles.length || chooserOpen || needsRowSetup || presetSetupApplied) return;
-      const target = event.target as Element | null;
-      if (!target || target.closest("[data-preset-role-dialog]")) return;
-      const button = target.closest("button");
-      if (!button?.textContent?.includes("Apply preset setup")) return;
-
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
-      setChooserOpen(true);
-    };
-
-    document.addEventListener("click", interceptPresetSetup, true);
-    return () => document.removeEventListener("click", interceptPresetSetup, true);
-  }, [chooserOpen, needsRowSetup, presetSetupApplied, roles.length]);
+  const openPresetChooser = () => setChooserOpen(true);
 
   const applyRoleChoices = (roleFileIds: string[]) => {
     const selectedFiles = roleFileIds
@@ -165,7 +130,6 @@ export function PresetAwareComparisonBuilderPage() {
     setDataSources([...roleSources, ...remainingSources]);
     setPresetRolesApplied(true);
     setChooserOpen(false);
-    dismissPresetBanner();
   };
 
   if (needsRowSetup) {
@@ -177,10 +141,14 @@ export function PresetAwareComparisonBuilderPage() {
 
   return (
     <>
-      <ComparisonBuilderPage onBackToRowSetup={() => {
-        setReviewRowSetup(true);
-        setRowSetupContinued(false);
-      }} />
+      <ComparisonBuilderPage
+        onBackToRowSetup={() => {
+          setReviewRowSetup(true);
+          setRowSetupContinued(false);
+        }}
+        onRequestPresetSetup={roles.length ? openPresetChooser : undefined}
+        presetSetupResolved={roles.length ? presetSetupApplied : undefined}
+      />
       <PresetRoleChooser
         files={files}
         roles={roles}
@@ -229,7 +197,7 @@ function PresetRoleChooser({
   ];
 
   const dialog = (
-    <div data-preset-role-dialog className="fixed inset-0 z-[100] flex items-center justify-center px-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center px-4">
       <button aria-label="Close preset setup chooser" className="absolute inset-0 bg-slate-950/45 backdrop-blur-[3px]" onClick={onClose} />
       <div
         role="dialog"

@@ -213,7 +213,7 @@ export function AppShell() {
                       value={sessionQuery}
                       onChange={(event) => setSessionQuery(event.target.value)}
                       placeholder="Search sessions"
-                      className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-slate-950 outline-none placeholder:text-slate-400"
+                      className="session-search-input min-w-0 flex-1 border-0 bg-transparent p-0 text-sm text-slate-950 outline-none placeholder:text-slate-400"
                     />
                   </div>
                 </div>
@@ -304,21 +304,18 @@ export function AppShell() {
           </>
         )}
 
-        <div className={`shrink-0 space-y-2 ${collapsed ? "p-2" : "p-3"}`}>
-          <ThemeSwitcher collapsed={collapsed} />
-          <div title={collapsed ? "Files stay on this Windows device" : undefined} className={`overflow-hidden border border-emerald-100 bg-emerald-50 text-emerald-800 transition-all duration-300 ${collapsed ? "mx-auto grid size-10 place-items-center rounded-xl p-0" : "rounded-xl p-3"}`}>
+        <div className={`flex shrink-0 items-center gap-2 ${collapsed ? "p-2" : "p-3"}`}>
+          <div title="Files stays local" className={`min-w-0 overflow-hidden border border-emerald-100 bg-emerald-50 text-emerald-800 transition-all duration-300 ${collapsed ? "grid size-10 shrink-0 place-items-center rounded-xl p-0" : "flex min-h-10 flex-1 items-center rounded-xl px-3"}`}>
             {collapsed ? (
               <LockKeyhole aria-hidden="true" className="size-4" />
             ) : (
-              <>
-                <div className="flex min-w-0 items-center gap-2">
-                  <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
-                  <span className="min-w-0 truncate text-xs font-semibold" title="Local-only by design">Local-only by design</span>
-                </div>
-                <p className="mt-2 truncate text-xs leading-5 text-emerald-700" title="Files stay on this Windows device.">Files stay on this Windows device.</p>
-              </>
+              <div className="flex min-w-0 items-center gap-2">
+                <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
+                <span className="min-w-0 truncate text-xs font-semibold">Files stays local</span>
+              </div>
             )}
           </div>
+          <ThemeSwitcher collapsed={collapsed} />
         </div>
       </aside>
 

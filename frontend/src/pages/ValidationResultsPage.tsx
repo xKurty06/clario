@@ -184,7 +184,11 @@ function ValueCell({ value }: { value?: string | null }) {
   if (!text || text === "Blank") {
     return <BlankValueBadge />;
   }
-  return <>{value}</>;
+  return (
+    <span className="block max-w-full truncate" title={text}>
+      {text}
+    </span>
+  );
 }
 
 function firstDiscrepancyRow(item: RuleDiscrepancy) {
@@ -559,17 +563,17 @@ export function ValidationResultsPage() {
                       <td className="p-3">
                         <span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.severity === "high" ? "bg-red-50 text-red-700" : item.severity === "medium" ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-700"}`}>{item.severity}</span>
                       </td>
-                      <td className="break-words p-3 text-xs text-slate-600">
+                      <td className="p-3 text-xs text-slate-600">
                         <LocationCell fileName={item.left_file_name} rowNumber={item.left_row_number} sheetName={item.left_sheet_name} />
                       </td>
-                      <td className="break-words p-3 text-xs text-slate-600">
+                      <td className="p-3 text-xs text-slate-600">
                         <LocationCell fileName={item.right_file_name} rowNumber={item.right_row_number} sheetName={item.right_sheet_name} />
                       </td>
-                      <td className="break-words p-3"><ValueCell value={item.expected_value} /></td>
-                      <td className="break-words p-3"><ValueCell value={item.actual_value} /></td>
+                      <td className="max-w-0 p-3"><ValueCell value={item.expected_value} /></td>
+                      <td className="max-w-0 p-3"><ValueCell value={item.actual_value} /></td>
                       <td className="break-words p-3 text-slate-600">
                         <p className="font-semibold text-slate-900">{note.title}</p>
-                        <p className="mt-1 text-xs leading-5 text-slate-500">{note.detail}</p>
+                        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500" title={note.detail}>{note.detail}</p>
                       </td>
                     </tr>
                   ))}

@@ -134,7 +134,7 @@ const formulaOperatorLabels: Record<FormulaSettings["operator"], string> = {
 
 const primaryButtonClass = "inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:bg-slate-300";
 const secondaryButtonClass = "inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50";
-const iconButtonClass = "grid size-9 place-items-center rounded-xl border border-transparent text-slate-500 transition hover:border-slate-200 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600";
+const iconButtonClass = "grid size-9 place-items-center rounded-xl border border-transparent text-slate-500 transition hover:border-[var(--color-border)] hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600";
 const rowPreviewButtonClass = "inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-60";
 
 function isValidPreset(value: string): value is PresetType {
@@ -257,6 +257,24 @@ function ruleLabel(rule: ComparisonRule, sources: ComparisonDataSource[]) {
   if (rule.rule_type === "required_field_check") return `${fieldLabel(leftField)} is required`;
   if (rule.rule_type === "duplicate_check") return `${fieldLabel(leftField)} is unique`;
   return `${fieldLabel(leftField)} vs ${fieldLabel(rightField)}`;
+}
+
+function ruleFlowLabel(rule: ComparisonRule) {
+  return rule.rule_type === "compare_values" ? matchLabels[rule.match_strategy] : ruleTypeLabels[rule.rule_type];
+}
+
+function RuleCompactSourceLine({ left, right }: { left?: ComparisonDataSource; right?: ComparisonDataSource }) {
+  return (
+    <p className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-slate-500">
+      <span className="min-w-0 truncate" title={left?.name ?? "Source"}>{left?.name ?? "Source"}</span>
+      {right ? (
+        <>
+          <ArrowRight className="size-3 shrink-0" aria-hidden="true" />
+          <span className="min-w-0 truncate" title={right.name}>{right.name}</span>
+        </>
+      ) : null}
+    </p>
+  );
 }
 
 function RuleMetaChips({ rule }: { rule: ComparisonRule }) {
@@ -550,9 +568,24 @@ function titleCaseStrictness(strictness: RuleStrictness) {
 
 interface ComparisonBuilderPageProps {
   onBackToRowSetup?: () => void;
+  /**
+   * When a preset defines more than one file role, the parent owns the
+   * "apply preset setup" flow (it opens a role-assignment chooser dialog).
+   * Passing this callback puts the built-in preset banner in "delegated"
+   * mode: clicking "Apply preset setup" calls this instead of running the
+   * page's own simple auto-label logic.
+   */
+  onRequestPresetSetup?: () => void;
+  /**
+   * True once the parent has finished (or the user skipped) preset setup.
+   * While true, the built-in preset banner stays hidden - including across
+   * remounts - so re-visiting this page never re-shows a chooser for a
+   * preset that is already configured.
+   */
+  presetSetupResolved?: boolean;
 }
 
-export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPageProps) {
+export function ComparisonBuilderPage({ onBackToRowSetup, onRequestPresetSetup, presetSetupResolved }: ComparisonBuilderPageProps) {
   const navigate = useNavigate();
   const {
     files,
@@ -582,6 +615,16 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
   const [ruleSuggestions, setRuleSuggestions] = useState<ComparisonRule[] | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<ConfirmDialogState | null>(null);
   const [collapsedRowPreviews, setCollapsedRowPreviews] = useState<Record<string, boolean>>({});
+  const [expandedRuleReasons, setExpandedRuleReasons] = useState<Set<string>>(() => new Set());
+
+  const toggleRuleReason = (ruleId: string) => {
+    setExpandedRuleReasons((current) => {
+      const next = new Set(current);
+      if (next.has(ruleId)) next.delete(ruleId);
+      else next.add(ruleId);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!files.length || dataSources.length) return;
@@ -814,7 +857,7 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
         <BuilderStepper steps={steps} activeStep={activeStep} onStepChange={(step) => setActiveStep(step as BuilderStepId)} />
         {error ? <p className="rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</p> : null}
 
-        {presetDecision === "pending" && isValidPreset(preset) && preset !== "custom_comparison_builder" ? (
+        {presetDecision === "pending" && isValidPreset(preset) && preset !== "custom_comparison_builder" && !presetSetupResolved ? (
           <section className="rounded-3xl border border-emerald-100 bg-[linear-gradient(135deg,_rgba(16,185,129,0.12),_rgba(255,255,255,0.95)_55%)] p-5 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
@@ -822,7 +865,11 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
                 <p className="mt-1 text-sm text-emerald-800">This preset can suggest source labels and starter checks. Uploaded files keep neutral names until you apply it.</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button title="Apply preset setup to suggest source labels and starter checks" onClick={applyPresetSetup} className={primaryButtonClass}>
+                <button
+                  title="Apply preset setup to suggest source labels and starter checks"
+                  onClick={onRequestPresetSetup ?? applyPresetSetup}
+                  className={primaryButtonClass}
+                >
                   <Wand2 className="size-4" /> Apply preset setup
                 </button>
                 <button title="Skip preset suggestions and continue setting up the builder manually" onClick={() => setPresetDecision("manual")} className={secondaryButtonClass}>
@@ -884,7 +931,7 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
                               },
                             });
                           }}
-                          className={`${iconButtonClass} text-red-700 hover:border-red-100 hover:bg-red-50`}
+                          className={`${iconButtonClass} text-red-700 hover:border-[var(--color-red-border)] hover:bg-red-50`}
                         >
                           <Trash2 className="size-4" />
                         </button>
@@ -1042,7 +1089,7 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
                                     onConfirm: () => updateDataSource(source.id, { ...source, fields: source.fields.filter((item) => item.id !== field.id) }),
                                   });
                                 }}
-                                className={`${iconButtonClass} size-8 text-red-700 hover:border-red-100 hover:bg-red-50`}
+                                className={`${iconButtonClass} size-8 text-red-700 hover:border-[var(--color-red-border)] hover:bg-red-50`}
                               >
                                 <Trash2 className="size-4" />
                               </button>
@@ -1085,6 +1132,7 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
                 const right = dataSources.find((source) => source.id === rule.right_data_source_id);
                 const leftField = left?.fields.find((field) => field.id === rule.left_field_id);
                 const rightField = right?.fields.find((field) => field.id === rule.right_field_id);
+                const reasonOpen = expandedRuleReasons.has(rule.id);
                 return (
                   <article key={rule.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
                     <div className="flex items-start justify-between gap-3">
@@ -1092,10 +1140,25 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
                         <div className="flex flex-wrap items-center gap-2 gap-y-1">
                           <h3 className="truncate text-sm font-semibold">{rule.rule_name || ruleLabel(rule, dataSources)}</h3>
                           <StatusBadge tone={rule.enabled ? "success" : "neutral"}>{rule.enabled ? "Enabled" : "Disabled"}</StatusBadge>
-                          <StatusBadge tone={rule.severity === "high" ? "warning" : "neutral"}>{severityLabels[rule.severity]}</StatusBadge>
+                          {rule.severity === "high" ? <StatusBadge tone="warning">{severityLabels[rule.severity]}</StatusBadge> : null}
                         </div>
-                        <RuleMetaChips rule={rule} />
-                        <RuleSourceMap left={left} right={right} leftField={leftField} rightField={rightField} />
+                        <RuleCompactSourceLine left={left} right={right} />
+                        <p className="mt-1 text-xs font-medium text-slate-500">{ruleFlowLabel(rule)}</p>
+                        <button
+                          type="button"
+                          onClick={() => toggleRuleReason(rule.id)}
+                          aria-expanded={reasonOpen}
+                          className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-800"
+                        >
+                          <ChevronDown className={`size-3.5 transition-transform ${reasonOpen ? "rotate-180" : ""}`} />
+                          {reasonOpen ? "Hide reason" : "View reason"}
+                        </button>
+                        {reasonOpen ? (
+                          <div className="mt-2 rounded-xl border border-slate-200 bg-white p-2.5">
+                            <RuleMetaChips rule={rule} />
+                            <RuleSourceMap left={left} right={right} leftField={leftField} rightField={rightField} />
+                          </div>
+                        ) : null}
                       </div>
                       <div className="flex shrink-0 gap-1">
                         <button title="Edit rule settings in a draft drawer before saving" aria-label={`Edit rule ${rule.rule_name}`} onClick={() => openEditRule(rule)} className={iconButtonClass}>
@@ -1113,7 +1176,7 @@ export function ComparisonBuilderPage({ onBackToRowSetup }: ComparisonBuilderPag
                               onConfirm: () => removeRule(rule.id),
                             });
                           }}
-                          className={`${iconButtonClass} text-red-700 hover:border-red-100 hover:bg-red-50`}
+                          className={`${iconButtonClass} text-red-700 hover:border-[var(--color-red-border)] hover:bg-red-50`}
                         >
                           <Trash2 className="size-4" />
                         </button>
@@ -1501,7 +1564,6 @@ function FieldDrawer({
   if (!editor || !source || !draft) return null;
   const preview = editor.preview;
   const errors = validateField(draft, preview);
-  const selectedColumn = preview?.columns.find((item) => item.letter === draft.column_letter);
   const footerMessage = errors[0] ?? (dirty ? "Save changes to update the field mapping used by rules and reports." : undefined);
 
   const handleCancel = () => {
@@ -1588,7 +1650,6 @@ function FieldDrawer({
             ) : (
               <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">Preview rows for this source before choosing a column.</p>
             )}
-            {selectedColumn ? <p className="mt-2 text-sm text-slate-500">Selected column: <span className="font-semibold text-slate-900">{selectedColumn.letter}</span> / {selectedColumn.header_label || "Blank header"}</p> : null}
           </div>
         </EditorSection>
 

@@ -140,7 +140,6 @@ export function ReportExportPage() {
     setErrorMessage("");
     setStatusMessage("");
     try {
-      const previousPath = exportedReport?.savedPath;
       const report = await exportPdf(result);
       if (!report.blob.size) {
         throw new Error("The PDF service returned an empty report. Please run validation again and retry export.");
@@ -150,15 +149,10 @@ export function ReportExportPage() {
         filename: report.filename,
         savedPath: report.savedPath,
       };
+      const wasRegenerate = Boolean(exportedReport);
       setExportedReport(nextReport);
       writeStoredReport(result.id, nextReport);
-
-      if (previousPath && report.savedPath && previousPath === report.savedPath) {
-        setStatusMessage("PDF regenerated, but the backend returned the same saved path. Restart the local backend if the file name does not change after pulling the latest code.");
-        return;
-      }
-
-      setStatusMessage(exportedReport ? "PDF regenerated locally. Open in PDF viewer will use this latest file." : "PDF generated locally. Use Open in PDF viewer to view it with your default PDF app.");
+      setStatusMessage(wasRegenerate ? "PDF regenerated locally. Open in PDF viewer will use this latest file." : "PDF generated locally. Use Open in PDF viewer to view it with your default PDF app.");
     } catch (cause) {
       setErrorMessage(cause instanceof Error ? cause.message : "Could not create report.");
     } finally {
