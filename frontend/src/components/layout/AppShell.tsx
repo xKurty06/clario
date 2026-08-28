@@ -23,6 +23,7 @@ import { appConfig } from "../../app/config";
 import { useWorkflow } from "../../features/files/WorkflowContext";
 import { deleteSession, getSessionState, listRecentSessions, renameSession, type RecentSession } from "../../services/validationApi";
 import { CommonFieldsChooser } from "../validation/CommonFieldsChooser";
+import { ToastProvider, useToast } from "../common/Toast";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 
 const logoLightSrc = "/assets/clario-logo_light.png";
@@ -56,13 +57,12 @@ function formatSessionMeta(session: RecentSession) {
     : `${date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} · ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
 }
 
-export function AppShell() {
+function AppShellContent() {
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarView, setSidebarView] = useState<"sessions" | "workflow">("sessions");
   const [sessions, setSessions] = useState<RecentSession[]>([]);
   const [sessionQuery, setSessionQuery] = useState("");
   const [loadingSessions, setLoadingSessions] = useState(false);
-  const [sessionError, setSessionError] = useState("");
   const [openingSessionId, setOpeningSessionId] = useState<string | null>(null);
   const [sessionMenuId, setSessionMenuId] = useState<string | null>(null);
   const [mutatingSessionId, setMutatingSessionId] = useState<string | null>(null);
@@ -81,6 +81,7 @@ export function AppShell() {
     setResult,
     result,
   } = useWorkflow();
+  const { showToast } = useToast();
   const shellStyle = { "--app-sidebar-offset": collapsed ? "72px" : "272px" } as CSSProperties;
 
   const activeSessionName = result?.project_name || projectName || "No active session";
@@ -93,10 +94,9 @@ export function AppShell() {
 
   const loadSessions = () => {
     setLoadingSessions(true);
-    setSessionError("");
     void listRecentSessions()
       .then(setSessions)
-      .catch((cause) => setSessionError(cause instanceof Error ? cause.message : "Could not load sessions."))
+      .catch((cause) => showToast(cause instanceof Error ? cause.message : "Could not load sessions.", "error"))
       .finally(() => setLoadingSessions(false));
   };
 
@@ -154,7 +154,6 @@ export function AppShell() {
   const openSession = async (session: RecentSession) => {
     setSessionMenuId(null);
     setOpeningSessionId(session.id);
-    setSessionError("");
     try {
       const state = await getSessionState(session.id);
       setProjectName(state.request?.project_name || state.result.project_name);
@@ -166,7 +165,7 @@ export function AppShell() {
       setSidebarView("workflow");
       navigate("/results");
     } catch (cause) {
-      setSessionError(cause instanceof Error ? cause.message : "Could not open this session.");
+      showToast(cause instanceof Error ? cause.message : "Could not open this session.", "error");
     } finally {
       setOpeningSessionId(null);
     }
@@ -185,13 +184,21 @@ export function AppShell() {
     }
     setEditingSessionId(null);
     setMutatingSessionId(session.id);
-    setSessionError("");
+    setSessions((current) => current.map((item) => item.id === session.id ? { ...item, project_name: projectName } : item));
+    if (result?.id === session.id) {
+      setProjectName(projectName);
+      setResult({ ...result, project_name: projectName });
+    }
     try {
       await renameSession(session.id, projectName);
-      setSessions((current) => current.map((item) => item.id === session.id ? { ...item, project_name: projectName } : item));
-      if (result?.id === session.id) setProjectName(projectName);
+      showToast("Session renamed.", "success");
     } catch (cause) {
-      setSessionError(cause instanceof Error ? cause.message : "Could not rename this session.");
+      setSessions((current) => current.map((item) => item.id === session.id ? { ...item, project_name: session.project_name } : item));
+      if (result?.id === session.id) {
+        setProjectName(session.project_name);
+        setResult({ ...result, project_name: session.project_name });
+      }
+      showToast(cause instanceof Error ? cause.message : "Could not rename this session.", "error");
     } finally {
       setMutatingSessionId(null);
     }
@@ -206,13 +213,13 @@ export function AppShell() {
     const session = pendingDeleteSession;
     setPendingDeleteSession(null);
     setMutatingSessionId(session.id);
-    setSessionError("");
     try {
       await deleteSession(session.id);
       setSessions((current) => current.filter((item) => item.id !== session.id));
       if (result?.id === session.id) closeSession();
+      showToast("Session deleted.", "success");
     } catch (cause) {
-      setSessionError(cause instanceof Error ? cause.message : "Could not delete this session.");
+      showToast(cause instanceof Error ? cause.message : "Could not delete this session.", "error");
     } finally {
       setMutatingSessionId(null);
     }
@@ -319,7 +326,6 @@ export function AppShell() {
                     <RefreshCw aria-hidden="true" className={`size-3.5 ${loadingSessions ? "animate-spin" : ""}`} />
                   </button>
                 </div>
-                {sessionError ? <p className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">{sessionError}</p> : null}
                 {loadingSessions ? <p className="mt-3 px-3 text-xs text-slate-500">Loading sessions...</p> : null}
                 <div className="mt-2 space-y-1.5">
                   {filteredSessions.map((session) => {
@@ -398,7 +404,7 @@ export function AppShell() {
         ) : (
           <>
             <div className={`shrink-0 ${collapsed ? "px-2 py-3" : "px-3 py-4"}`}>
-              <div data-session-menu={activeSession?.id} className={`relative flex h-10 items-center ${collapsed ? "justify-center" : "gap-3 px-3"}`}>
+              <div data-session-menu={activeSession?.id} className={`relative flex h-10 items-center ${collapsed ? "justify-center" : "gap-3"}`}>
                 <button
                   type="button"
                   onClick={closeSession}
@@ -534,5 +540,13 @@ export function AppShell() {
       ) : null}
       <CommonFieldsChooser />
     </div>
+  );
+}
+
+export function AppShell() {
+  return (
+    <ToastProvider>
+      <AppShellContent />
+    </ToastProvider>
   );
 }

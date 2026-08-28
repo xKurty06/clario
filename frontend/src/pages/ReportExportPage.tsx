@@ -1,6 +1,7 @@
 import { CheckCircle2, Download, ExternalLink, FileOutput, FolderOpen, ListChecks } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useToast } from "../components/common/Toast";
 import { PageHeader } from "../components/layout/PageHeader";
 import { Button } from "../components/ui/Button";
 import { useWorkflow } from "../features/files/WorkflowContext";
@@ -40,15 +41,8 @@ export function ReportExportPage() {
   const [busy, setBusy] = useState(false);
   const [openBusy, setOpenBusy] = useState(false);
   const [folderBusy, setFolderBusy] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [statusMessage, setStatusMessage] = useState("");
   const [exportedReports, setExportedReports] = useState<ExportedReportState[]>([]);
-
-  useEffect(() => {
-    if (!statusMessage) return;
-    const timeout = window.setTimeout(() => setStatusMessage(""), 4000);
-    return () => window.clearTimeout(timeout);
-  }, [statusMessage]);
+  const { showToast } = useToast();
 
   useEffect(() => {
     if (!result) {
@@ -117,8 +111,6 @@ export function ReportExportPage() {
 
   const generateReport = async () => {
     setBusy(true);
-    setErrorMessage("");
-    setStatusMessage("");
     try {
       await checkBackendHealth();
       const report = await exportPdf(result);
@@ -131,9 +123,9 @@ export function ReportExportPage() {
         savedPath: report.savedPath,
       };
       setExportedReports((current) => [nextReport, ...current.filter((item) => item.savedPath !== nextReport.savedPath)]);
-      setStatusMessage("PDF generated.");
+      showToast("PDF generated.", "success");
     } catch (cause) {
-      setErrorMessage(cause instanceof Error ? cause.message : "Could not create report.");
+      showToast(cause instanceof Error ? cause.message : "Could not create report.", "error");
     } finally {
       setBusy(false);
     }
@@ -141,13 +133,11 @@ export function ReportExportPage() {
 
   const openReport = async (report: ExportedReportState) => {
     setOpenBusy(true);
-    setErrorMessage("");
-    setStatusMessage("");
     try {
       await openPdfExternally(result.id, report.savedPath);
-      setStatusMessage("Opened the PDF using your default PDF viewer.");
+      showToast("Opened the PDF using your default PDF viewer.", "success");
     } catch (cause) {
-      setErrorMessage(cause instanceof Error ? cause.message : "Could not open the PDF in an external viewer.");
+      showToast(cause instanceof Error ? cause.message : "Could not open the PDF in an external viewer.", "error");
     } finally {
       setOpenBusy(false);
     }
@@ -155,13 +145,11 @@ export function ReportExportPage() {
 
   const openReportFolder = async (report: ExportedReportState) => {
     setFolderBusy(true);
-    setErrorMessage("");
-    setStatusMessage("");
     try {
       await openReportFolderExternally(result.id, report.savedPath);
-      setStatusMessage("Opened the report folder.");
+      showToast("Opened the report folder.", "success");
     } catch (cause) {
-      setErrorMessage(cause instanceof Error ? cause.message : "Could not open the report folder.");
+      showToast(cause instanceof Error ? cause.message : "Could not open the report folder.", "error");
     } finally {
       setFolderBusy(false);
     }
@@ -202,12 +190,6 @@ export function ReportExportPage() {
           <ExportMetric label="Discrepancies" value={result.discrepancies.length} />
         </dl>
 
-        {errorMessage ? (
-          <p className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700" role="status">
-            {errorMessage}
-          </p>
-        ) : null}
-
         {exportedReports.length ? (
           <div className="mt-6 space-y-3">
             {exportedReports.map((report) => (
@@ -233,12 +215,6 @@ export function ReportExportPage() {
           </div>
         )}
       </section>
-      {statusMessage ? (
-        <div className="fixed bottom-5 right-5 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-emerald-200 bg-white px-4 py-3 text-sm font-medium text-emerald-800 shadow-lg shadow-slate-900/10" role="status" aria-live="polite">
-          {statusMessage}
-          <span aria-hidden="true" className="report-toast-progress absolute inset-x-0 bottom-0 h-px bg-emerald-500" />
-        </div>
-      ) : null}
     </div>
   );
 }

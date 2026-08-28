@@ -310,9 +310,14 @@ main :where(div:has(> h2.truncate + span.inline-flex) > span.inline-flex) {
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes report-toast-progress {
+@keyframes toast-progress {
   from { transform: scaleX(1); transform-origin: right; }
   to { transform: scaleX(0); transform-origin: right; }
+}
+
+@keyframes toast-fade-out {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(18px); }
 }
 
 @keyframes builder-backdrop-in {
@@ -348,8 +353,12 @@ main :where(div:has(> h2.truncate + span.inline-flex) > span.inline-flex) {
   isolation: auto;
 }
 
-.report-toast-progress {
-  animation: report-toast-progress 4000ms linear both;
+.toast-progress {
+  animation: toast-progress 4000ms linear both;
+}
+
+.toast-exit {
+  animation: toast-fade-out 220ms ease-in both;
 }
 
 .app-route-fade > :where(:not(.fixed)) {
