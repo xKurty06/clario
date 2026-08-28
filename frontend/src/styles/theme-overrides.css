@@ -11,6 +11,11 @@ html[data-theme="dark"] {
   --color-dark-row-success: rgba(16, 185, 129, 0.14);
 }
 
+html[data-theme] .session-options-item:hover,
+html[data-theme] .session-options-item:focus-visible {
+  background-color: var(--color-panel-muted) !important;
+}
+
 html[data-theme="dark"] :is(main, [role="dialog"]) :where(
   .bg-white,
   [class~="bg-white/95"],

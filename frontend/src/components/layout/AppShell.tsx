@@ -51,7 +51,12 @@ const navigation: NavigationSection[] = [
 
 function formatSessionMeta(session: RecentSession) {
   const issues = `${session.discrepancy_count} issue${session.discrepancy_count === 1 ? "" : "s"}`;
-  return session.has_report ? `${issues} · Report ready` : issues;
+  const date = new Date(session.created_at);
+  const createdAt = Number.isNaN(date.getTime())
+    ? "Date unavailable"
+    : `${date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} · ${date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}`;
+  const reportStatus = session.has_report ? " · Report ready" : "";
+  return `${issues} · ${createdAt}${reportStatus}`;
 }
 
 export function AppShell() {
@@ -340,7 +345,7 @@ export function AppShell() {
                                   aria-label={`Rename ${session.project_name}`}
                                   className="session-rename-input block w-full bg-transparent p-0 text-sm font-semibold leading-5 text-slate-950 outline-none"
                                 />
-                                <span className="mt-1 block truncate text-xs text-slate-500">{formatSessionMeta(session)}</span>
+                                <span className="mt-1 block text-xs leading-4 text-slate-500">{formatSessionMeta(session)}</span>
                                 {session.latest_report_filename ? <span className="mt-1 block truncate text-[11px] text-emerald-700">{session.latest_report_filename}</span> : null}
                               </div>
                             </>
@@ -353,7 +358,7 @@ export function AppShell() {
                               title={`Open ${session.project_name}`}
                             >
                               <span className="block truncate text-sm font-semibold">{session.project_name}</span>
-                              <span className="mt-1 block truncate text-xs text-slate-500">{formatSessionMeta(session)}</span>
+                              <span className="mt-1 block text-xs leading-4 text-slate-500">{formatSessionMeta(session)}</span>
                               {session.latest_report_filename ? <span className="mt-1 block truncate text-[11px] text-emerald-700">{session.latest_report_filename}</span> : null}
                             </button>
                           )}
@@ -365,17 +370,17 @@ export function AppShell() {
                           aria-label={`More options for ${session.project_name}`}
                           aria-haspopup="menu"
                           aria-expanded={sessionMenuId === session.id}
-                          className="group mr-1.5 grid size-10 shrink-0 place-items-center self-center rounded-xl text-slate-400 transition hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-700 disabled:opacity-60"
+                          className="group mr-1.5 grid size-10 shrink-0 place-items-center self-center rounded-xl text-slate-400 transition hover:bg-transparent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-700 disabled:opacity-60"
                           title={`More options for ${session.project_name}`}
                         >
                           <MoreVertical aria-hidden="true" className="size-4 transition-transform duration-150 group-hover:scale-110 group-hover:text-slate-700" />
                         </button>
                         {sessionMenuId === session.id ? (
                           <div role="menu" className="absolute right-1.5 top-11 z-40 w-44 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-200/70">
-                            <button role="menuitem" type="button" onClick={() => { setSessionMenuId(null); handleRenameSession(session); }} className="flex min-h-10 w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus:bg-slate-50 focus:outline-none">
+                            <button role="menuitem" type="button" onClick={() => { setSessionMenuId(null); handleRenameSession(session); }} className="session-options-item flex min-h-10 w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 transition focus:outline-none">
                               <Pencil aria-hidden="true" className="size-3.5" /> Rename
                             </button>
-                            <button role="menuitem" type="button" onClick={() => { setSessionMenuId(null); void handleDeleteSession(session); }} className="flex min-h-10 w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-red-700 transition hover:bg-red-50 focus:bg-red-50 focus:outline-none">
+                            <button role="menuitem" type="button" onClick={() => { setSessionMenuId(null); void handleDeleteSession(session); }} className="session-options-item flex min-h-10 w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-red-700 transition focus:outline-none">
                               <Trash2 aria-hidden="true" className="size-3.5" /> Delete
                             </button>
                           </div>

@@ -1,5 +1,5 @@
 import { AlertTriangle, Ban, CheckSquare, ChevronDown, MoreHorizontal, RotateCcw, Square } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent, type MouseEvent } from "react";
 import type { PreviewRow } from "../../types/validation.types";
 
 interface RowSelectionTableProps {
@@ -19,11 +19,18 @@ interface RowWarning {
 }
 
 interface DragSelection {
-  originRowNumber: number;
-  startY: number;
+  startClientX: number;
+  startClientY: number;
+  currentClientX: number;
+  currentClientY: number;
+  startContentX: number;
+  startContentY: number;
+  currentContentX: number;
+  currentContentY: number;
   baseSelectedRows: number[];
   mode: "include" | "exclude";
-  moved: boolean;
+  hasMoved: boolean;
+  originRowNumber: number;
 }
 
 const toolbarButtonClass = "inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal text-slate-950 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-50";
@@ -34,6 +41,37 @@ const rowCellClass = "border-b border-slate-100 p-2.5 align-middle text-sm font-
 const summaryTerms = ["grand total", "subtotal", "total"];
 const sectionTerms = ["lot", "section", "category"];
 const footerTerms = ["signature", "prepared by", "approved by", "certified by", "noted by", "checked by"];
+const dragThreshold = 4;
+const autoScrollEdge = 48;
+
+function normalizedSelectionBox(selection: DragSelection) {
+  return {
+    left: Math.min(selection.startContentX, selection.currentContentX),
+    right: Math.max(selection.startContentX, selection.currentContentX),
+    top: Math.min(selection.startContentY, selection.currentContentY),
+    bottom: Math.max(selection.startContentY, selection.currentContentY),
+  };
+}
+
+function boxesIntersect(first: { left: number; right: number; top: number; bottom: number }, second: { left: number; right: number; top: number; bottom: number }) {
+  return first.left <= second.right && first.right >= second.left && first.top <= second.bottom && first.bottom >= second.top;
+}
+
+function clientPointToContent(container: HTMLDivElement, clientX: number, clientY: number) {
+  const bounds = container.getBoundingClientRect();
+  return { x: clientX - bounds.left + container.scrollLeft, y: clientY - bounds.top + container.scrollTop };
+}
+
+function elementContentBox(element: HTMLElement, container: HTMLDivElement) {
+  const elementBounds = element.getBoundingClientRect();
+  const containerBounds = container.getBoundingClientRect();
+  return {
+    left: elementBounds.left - containerBounds.left + container.scrollLeft,
+    right: elementBounds.right - containerBounds.left + container.scrollLeft,
+    top: elementBounds.top - containerBounds.top + container.scrollTop,
+    bottom: elementBounds.bottom - containerBounds.top + container.scrollTop,
+  };
+}
 
 function rowValues(row: PreviewRow) {
   return Object.values(row.cells).map((value) => String(value ?? "").trim());
@@ -151,7 +189,17 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
   const [rangeEnd, setRangeEnd] = useState("");
   const [rangeError, setRangeError] = useState("");
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
-  const dragSelection = useRef<DragSelection | null>(null);
+  const [dragSelection, setDragSelection] = useState<DragSelection | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
+  const dragSelectionRef = useRef<DragSelection | null>(null);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const autoScrollFrameRef = useRef<number | null>(null);
+  const dragWarningSnapshotRef = useRef<RowWarning[]>([]);
+
+  useEffect(() => {
+    dragSelectionRef.current = dragSelection;
+  }, [dragSelection]);
 
   const handleSelectRange = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -189,40 +237,89 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
     setMoreActionsOpen(false);
   };
 
-  useEffect(() => {
-    const findRowNumber = (clientX: number, clientY: number) => {
-      const target = document.elementFromPoint(clientX, clientY);
-      const row = target instanceof Element ? target.closest<HTMLElement>("[data-row-number]") : null;
-      const value = row?.dataset.rowNumber;
-      return value ? Number(value) : null;
+  const rowsInsideSelection = (selection: DragSelection) => {
+    const container = scrollContainerRef.current;
+    if (!container) return [];
+    const box = normalizedSelectionBox(selection);
+    return rows.filter((row) => {
+      if (lockedRows.has(row.row_number)) return false;
+      const element = rowRefs.current.get(row.row_number);
+      return element ? boxesIntersect(elementContentBox(element, container), box) : false;
+    }).map((row) => row.row_number);
+  };
+
+  const applyBoxSelection = (selection: DragSelection) => {
+    if (!selection.hasMoved) return;
+    const nextSelectedRows = new Set(selection.baseSelectedRows);
+    for (const rowNumber of rowsInsideSelection(selection)) {
+      if (selection.mode === "include") nextSelectedRows.add(rowNumber);
+      else nextSelectedRows.delete(rowNumber);
+    }
+    onSelectRows([...nextSelectedRows]);
+  };
+
+  const stopAutoScroll = () => {
+    if (autoScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(autoScrollFrameRef.current);
+      autoScrollFrameRef.current = null;
+    }
+  };
+
+  const startAutoScroll = () => {
+    if (autoScrollFrameRef.current !== null) return;
+    const scrollLoop = () => {
+      const selection = dragSelectionRef.current;
+      const pointer = lastPointerRef.current;
+      const container = scrollContainerRef.current;
+      if (!selection || !selection.hasMoved || !pointer || !container) {
+        autoScrollFrameRef.current = null;
+        return;
+      }
+      const bounds = container.getBoundingClientRect();
+      const deltaY = pointer.y < bounds.top + autoScrollEdge ? -Math.ceil((autoScrollEdge - (pointer.y - bounds.top)) / 4) : pointer.y > bounds.bottom - autoScrollEdge ? Math.ceil((autoScrollEdge - (bounds.bottom - pointer.y)) / 4) : 0;
+      const deltaX = pointer.x < bounds.left + autoScrollEdge ? -Math.ceil((autoScrollEdge - (pointer.x - bounds.left)) / 4) : pointer.x > bounds.right - autoScrollEdge ? Math.ceil((autoScrollEdge - (bounds.right - pointer.x)) / 4) : 0;
+      if (deltaY || deltaX) {
+        container.scrollTop += deltaY;
+        container.scrollLeft += deltaX;
+        const contentPoint = clientPointToContent(container, pointer.x, pointer.y);
+        const nextSelection = { ...selection, currentContentX: contentPoint.x, currentContentY: contentPoint.y };
+        dragSelectionRef.current = nextSelection;
+        setDragSelection(nextSelection);
+        applyBoxSelection(nextSelection);
+        autoScrollFrameRef.current = window.requestAnimationFrame(scrollLoop);
+        return;
+      }
+      autoScrollFrameRef.current = null;
     };
+    autoScrollFrameRef.current = window.requestAnimationFrame(scrollLoop);
+  };
+
+  useEffect(() => {
+    if (!dragSelection) return undefined;
 
     const handleMouseMove = (event: globalThis.MouseEvent) => {
-      const current = dragSelection.current;
-      if (!current) return;
-      if (!current.moved && Math.abs(event.clientY - current.startY) < 4) return;
-      current.moved = true;
-      const rowNumber = findRowNumber(event.clientX, event.clientY);
-      if (rowNumber === null || lockedRows.has(rowNumber)) return;
-      const startIndex = selectableRowNumbers.indexOf(current.originRowNumber);
-      const endIndex = selectableRowNumbers.indexOf(rowNumber);
-      if (startIndex < 0 || endIndex < 0) return;
-      const nextSelectedRows = new Set(current.baseSelectedRows);
-      const lower = Math.min(startIndex, endIndex);
-      const upper = Math.max(startIndex, endIndex);
-      for (let index = lower; index <= upper; index += 1) {
-        const selectedRowNumber = selectableRowNumbers[index];
-        if (selectedRowNumber === undefined) continue;
-        if (current.mode === "include") nextSelectedRows.add(selectedRowNumber);
-        else nextSelectedRows.delete(selectedRowNumber);
+      const current = dragSelectionRef.current;
+      const container = scrollContainerRef.current;
+      if (!current || !container) return;
+      lastPointerRef.current = { x: event.clientX, y: event.clientY };
+      const contentPoint = clientPointToContent(container, event.clientX, event.clientY);
+      const nextSelection = { ...current, currentClientX: event.clientX, currentClientY: event.clientY, currentContentX: contentPoint.x, currentContentY: contentPoint.y, hasMoved: current.hasMoved || Math.hypot(event.clientX - current.startClientX, event.clientY - current.startClientY) > dragThreshold };
+      dragSelectionRef.current = nextSelection;
+      setDragSelection(nextSelection);
+      if (nextSelection.hasMoved) {
+        applyBoxSelection(nextSelection);
+        startAutoScroll();
       }
-      onSelectRows([...nextSelectedRows]);
     };
 
     const handleMouseUp = () => {
-      const current = dragSelection.current;
-      dragSelection.current = null;
-      if (current && !current.moved) onToggleRow(current.originRowNumber);
+      const current = dragSelectionRef.current;
+      if (current && !current.hasMoved) onToggleRow(current.originRowNumber);
+      stopAutoScroll();
+      dragSelectionRef.current = null;
+      lastPointerRef.current = null;
+      dragWarningSnapshotRef.current = [];
+      setDragSelection(null);
     };
 
     window.addEventListener("mousemove", handleMouseMove);
@@ -233,20 +330,33 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
       window.removeEventListener("mouseup", handleMouseUp);
       window.removeEventListener("blur", handleMouseUp);
     };
-  }, [lockedRows, onSelectRows, onToggleRow, selectableRowNumbers]);
+  }, [dragSelection, onToggleRow]);
 
-  const handleRowMouseDown = (event: MouseEvent<HTMLTableRowElement>, rowNumber: number) => {
-    if (event.button !== 0 || lockedRows.has(rowNumber)) return;
+  const handleRowMouseDown = (event: MouseEvent<HTMLTableRowElement>, row: PreviewRow) => {
+    if (event.button !== 0 || lockedRows.has(row.row_number)) return;
     if ((event.target as HTMLElement).closest("button, input, a")) return;
     event.preventDefault();
-    dragSelection.current = {
-      originRowNumber: rowNumber,
-      startY: event.clientY,
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const contentPoint = clientPointToContent(container, event.clientX, event.clientY);
+    const initialSelection = {
+      startClientX: event.clientX, startClientY: event.clientY, currentClientX: event.clientX, currentClientY: event.clientY,
+      startContentX: contentPoint.x, startContentY: contentPoint.y, currentContentX: contentPoint.x, currentContentY: contentPoint.y,
       baseSelectedRows: selectedRows,
-      mode: rows.find((row) => row.row_number === rowNumber)?.selected ? "exclude" : "include",
-      moved: false,
-    };
+      mode: row.selected ? "exclude" : "include", hasMoved: false, originRowNumber: row.row_number,
+    } satisfies DragSelection;
+    dragSelectionRef.current = initialSelection;
+    lastPointerRef.current = { x: event.clientX, y: event.clientY };
+    dragWarningSnapshotRef.current = selectedRowWarnings;
+    setDragSelection(initialSelection);
   };
+
+  const selectionBoxStyle = (() => {
+    if (!dragSelection?.hasMoved) return undefined;
+    const box = normalizedSelectionBox(dragSelection);
+    return { left: box.left, top: box.top, width: Math.max(box.right - box.left, 1), height: Math.max(box.bottom - box.top, 1) } satisfies CSSProperties;
+  })();
+  const displayedRowWarnings = dragSelection ? dragWarningSnapshotRef.current : selectedRowWarnings;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white font-sans text-slate-900 subpixel-antialiased [text-rendering:auto]">
@@ -357,13 +467,13 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
         </div>
       </div>
 
-      {selectedRowWarnings.length ? (
+      {displayedRowWarnings.length ? (
         <div className="border-b border-amber-200 bg-amber-50/90 px-3 py-1.5 text-xs text-amber-900" role="status">
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1 font-semibold">
-              <AlertTriangle className="size-3.5 shrink-0" /> {rowWarningSummary(selectedRowWarnings)}
+              <AlertTriangle className="size-3.5 shrink-0" /> {rowWarningSummary(displayedRowWarnings)}
             </span>
-            {selectedRowWarnings.slice(0, 3).map((warning) => (
+            {displayedRowWarnings.slice(0, 3).map((warning) => (
               <span key={warning.rowNumber} className="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold text-amber-900 ring-1 ring-amber-200">
                 Row {warning.rowNumber}: {warning.reason}
               </span>
@@ -373,8 +483,9 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
         </div>
       ) : null}
 
-      <div className="relative max-h-[520px] overflow-auto rounded-b-2xl bg-white">
-        <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm leading-5">
+      <div ref={scrollContainerRef} className="relative max-h-[520px] overflow-auto rounded-b-2xl bg-white">
+        {selectionBoxStyle ? <div aria-hidden="true" className="pointer-events-none absolute z-20 rounded-2xl border border-emerald-500/70 bg-emerald-400/10 shadow-[0_0_0_1px_rgba(16,185,129,0.18),0_14px_35px_rgba(15,23,42,0.14)] backdrop-blur-[1px]" style={selectionBoxStyle} /> : null}
+        <table className={`w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm leading-5 ${dragSelection ? "select-none" : ""}`}>
           <thead className="sticky top-0 z-10 bg-slate-50 text-sm font-normal text-slate-950">
             <tr>
               <th className="w-12 border-b border-slate-200 p-2.5 text-center font-normal">Use</th>
@@ -392,17 +503,17 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
               return (
                 <tr
                   key={row.row_number}
+                  ref={(element) => {
+                    if (element) rowRefs.current.set(row.row_number, element);
+                    else rowRefs.current.delete(row.row_number);
+                  }}
                   tabIndex={locked ? -1 : 0}
                   role={locked ? undefined : "button"}
                   aria-disabled={locked || undefined}
                   aria-label={isHeaderRow ? `Excel row ${row.row_number} is the header row` : locked ? `Excel row ${row.row_number} is excluded by row setup` : `${row.selected ? "Unselect" : "Select"} Excel row ${row.row_number}`}
                   title={isHeaderRow ? "This row is the header row and is not selectable." : locked ? "This row is excluded by the first data row setting." : needsReview ? "This selected row may not be real data. Review it, or continue if it is correct." : "Click to toggle this row"}
-                  onClick={() => {
-                    // Selection is handled on mouse-up so a click can become a drag.
-                  }}
-                  onMouseDown={(event) => handleRowMouseDown(event, row.row_number)}
+                  onMouseDown={(event) => handleRowMouseDown(event, row)}
                   onKeyDown={(event) => handleRowKeyDown(event, row.row_number)}
-                  data-row-number={row.row_number}
                   className={`group border-t border-slate-100 align-middle select-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${locked ? "cursor-not-allowed" : "cursor-pointer hover:bg-emerald-100/55"} ${needsReview ? "bg-amber-50/70" : isHeaderRow ? "bg-sky-50/80" : row.selected ? "bg-emerald-50/35" : ""} ${locked && !isHeaderRow ? "opacity-90" : ""} ${row.ignored && !row.selected && !locked ? "opacity-90" : ""}`}
                 >
                   <td className="border-b border-slate-100 p-0 align-middle">

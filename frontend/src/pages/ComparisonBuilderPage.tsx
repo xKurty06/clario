@@ -654,7 +654,7 @@ export function ComparisonBuilderPage({ onBackToRowSetup, onRequestPresetSetup, 
     dataSources.length > 0 &&
     enabledRules.length > 0 &&
     warnings.every((warning) => !warning.includes("zero selected rows") && !warning.includes("no fields") && !warning.includes("No enabled") && !warning.includes("incomplete") && !warning.includes("Choose a comparison preset"));
-
+  
   const steps: BuilderStep[] = [
     { id: "sources", label: "Sources", icon: Database, complete: dataSources.length > 0 },
     { id: "rows", label: "Rows", icon: Rows3, complete: dataSources.every((source) => source.selected_row_numbers.length > 0), warning: dataSources.some((source) => !source.selected_row_numbers.length) },
