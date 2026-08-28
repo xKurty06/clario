@@ -437,7 +437,7 @@ export function AppShell() {
           </>
         )}
 
-        <div className={`flex shrink-0 items-center gap-2 ${collapsed ? "p-2" : "p-3"}`}>
+        <div className={`flex shrink-0 items-center gap-2 ${collapsed ? "flex-col p-2" : "p-3"}`}>
           <div title="Files stays local" className={`min-w-0 overflow-hidden border border-emerald-100 bg-emerald-50 text-emerald-800 transition-all duration-300 ${collapsed ? "grid size-10 shrink-0 place-items-center rounded-xl p-0" : "flex min-h-10 flex-1 items-center rounded-xl px-3"}`}>
             {collapsed ? (
               <LockKeyhole aria-hidden="true" className="size-4" />
