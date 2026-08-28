@@ -87,6 +87,7 @@ export function AppShell() {
   const shellStyle = { "--app-sidebar-offset": collapsed ? "72px" : "272px" } as CSSProperties;
 
   const activeSessionName = result?.project_name || projectName || "No active session";
+  const activeSession = result ? sessions.find((session) => session.id === result.id) : undefined;
   const filteredSessions = useMemo(() => {
     const normalized = sessionQuery.trim().toLowerCase();
     if (!normalized) return sessions;
@@ -402,7 +403,7 @@ export function AppShell() {
         ) : (
           <>
             <div className={`shrink-0 ${collapsed ? "px-2 py-3" : "px-3 py-4"}`}>
-              <div className={`flex h-10 items-center ${collapsed ? "justify-center" : "gap-3 px-3"}`}>
+              <div data-session-menu={activeSession?.id} className={`relative flex h-10 items-center ${collapsed ? "justify-center" : "gap-3 px-3"}`}>
                 <button
                   type="button"
                   onClick={closeSession}
@@ -412,7 +413,53 @@ export function AppShell() {
                 >
                   <ArrowLeft className="size-[18px]" />
                 </button>
-                <span className={`min-w-0 overflow-hidden truncate text-sm font-semibold text-slate-600 transition-all duration-300 ${collapsed ? "w-0 opacity-0" : "w-[150px] opacity-100"}`}>{activeSessionName}</span>
+                {activeSession && editingSessionId === activeSession.id ? (
+                  <input
+                    autoFocus
+                    type="text"
+                    value={renameValue}
+                    onChange={(event) => setRenameValue(event.target.value)}
+                    onFocus={(event) => event.currentTarget.select()}
+                    onBlur={() => void confirmRenameSession(activeSession)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        event.currentTarget.blur();
+                      }
+                    }}
+                    maxLength={160}
+                    aria-label={`Rename ${activeSession.project_name}`}
+                    className="session-rename-input min-w-0 flex-1 bg-transparent p-0 text-sm font-semibold text-slate-950 outline-none"
+                  />
+                ) : (
+                  <span className={`min-w-0 overflow-hidden truncate text-sm font-semibold text-slate-600 transition-all duration-300 ${collapsed ? "w-0 opacity-0" : "w-[150px] opacity-100"}`}>{activeSessionName}</span>
+                )}
+                {activeSession ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setSessionMenuId((current) => current === activeSession.id ? null : activeSession.id)}
+                      disabled={mutatingSessionId === activeSession.id}
+                      aria-label={`More options for ${activeSession.project_name}`}
+                      aria-haspopup="menu"
+                      aria-expanded={sessionMenuId === activeSession.id}
+                      className="group ml-auto grid size-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-700 disabled:opacity-60"
+                      title={`More options for ${activeSession.project_name}`}
+                    >
+                      <MoreVertical aria-hidden="true" className="size-4 transition-transform duration-150 group-hover:scale-110" />
+                    </button>
+                    {sessionMenuId === activeSession.id ? (
+                      <div role="menu" className="absolute right-0 top-11 z-40 w-44 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-200/70">
+                        <button role="menuitem" type="button" onClick={() => { setSessionMenuId(null); handleRenameSession(activeSession); }} className="session-options-item flex min-h-10 w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-slate-700 transition focus:outline-none">
+                          <Pencil aria-hidden="true" className="size-3.5" /> Rename
+                        </button>
+                        <button role="menuitem" type="button" onClick={() => { setSessionMenuId(null); void handleDeleteSession(activeSession); }} className="session-options-item flex min-h-10 w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-semibold text-red-700 transition focus:outline-none">
+                          <Trash2 aria-hidden="true" className="size-3.5" /> Delete
+                        </button>
+                      </div>
+                    ) : null}
+                  </>
+                ) : null}
               </div>
             </div>
             <nav aria-label="Workflow navigation" className={`flex-1 overflow-y-auto overflow-x-hidden ${collapsed ? "px-2 py-1" : "px-3 py-1"}`}>
