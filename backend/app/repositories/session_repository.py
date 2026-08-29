@@ -1,10 +1,13 @@
 import json
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from app.config.settings import get_settings
 from app.database.connection import database
+from app.models.comparison_models import PresetType
 from app.models.validation_models import ValidationRequest, ValidationResult
 from app.repositories.report_repository import ReportRepository
 from app.services.file_service import persist_file, restore_persisted_file
@@ -21,6 +24,63 @@ class SessionRepository:
         if not path.is_absolute():
             path = get_settings().data_directory / path
         return path.resolve()
+
+    def create_draft(
+        self,
+        project_name: str,
+        preset: PresetType | str | None = None,
+        file_names: list[str] | None = None,
+        uploaded_file_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        name = (project_name or "New session").strip() or "New session"
+        mode: PresetType = preset if preset in {"reference_vs_copied", "reference_bidder_abstract", "generic_two_file", "custom_comparison_builder"} else "custom_comparison_builder"
+        session_id = uuid4().hex
+        created_at = datetime.now(timezone.utc).isoformat()
+        session_directory = ensure_session_directory(name, session_id)
+        persisted_files = []
+        for file_id in uploaded_file_ids or []:
+            if not file_id:
+                continue
+            persisted_files.append(persist_file(file_id, session_directory / "uploads"))
+
+        persisted_names = [str(item["name"]) for item in persisted_files]
+        final_file_names = file_names or persisted_names
+        if len(persisted_names) > len(final_file_names):
+            final_file_names = persisted_names
+        elif persisted_names and final_file_names != persisted_names:
+            final_file_names = [*persisted_names, *[item for item in final_file_names if item not in persisted_names]]
+
+        request = ValidationRequest(project_name=name, preset=mode, data_sources=[], rules=[])
+        result = ValidationResult(
+            id=session_id,
+            project_name=name,
+            preset=mode,
+            created_at=created_at,
+            file_names=final_file_names,
+            total_selected_rows=0,
+            data_sources=[],
+            extracted_records=[],
+            rule_summaries=[],
+            discrepancies=[],
+            breakdown={},
+        )
+        write_session_files(session_directory, result, request, persisted_files)
+        with database() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO sessions(id,project_name,mode,file_names,discrepancy_count,created_at,result_payload,request_payload,session_path) VALUES(?,?,?,?,?,?,?,?,?)",
+                (
+                    session_id,
+                    name,
+                    mode,
+                    json.dumps(result.file_names),
+                    0,
+                    created_at,
+                    result.model_dump_json(),
+                    request.model_dump_json(),
+                    str(session_directory),
+                ),
+            )
+        return {"id": session_id, "project_name": name, "status": "created"}
 
     def save(self, result: ValidationResult, file_names: list[str], request: ValidationRequest | None = None) -> None:
         with database() as connection:

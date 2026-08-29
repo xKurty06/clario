@@ -109,6 +109,22 @@ function AppShellContent() {
   }, [location.pathname]);
 
   useEffect(() => {
+    const handleSessionsUpdated = () => {
+      loadSessions();
+    };
+    const handleSidebarViewRequest = (event: Event) => {
+      const detail = (event as CustomEvent<{ view?: "sessions" | "workflow" }>).detail;
+      if (detail?.view) setSidebarView(detail.view);
+    };
+    window.addEventListener("sessions:updated", handleSessionsUpdated);
+    window.addEventListener("sidebar:view", handleSidebarViewRequest as EventListener);
+    return () => {
+      window.removeEventListener("sessions:updated", handleSessionsUpdated);
+      window.removeEventListener("sidebar:view", handleSidebarViewRequest as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!sessionMenuId) return;
 
     const closeMenuOnOutsideClick = (event: PointerEvent) => {
@@ -129,25 +145,25 @@ function AppShellContent() {
     };
   }, [sessionMenuId]);
 
-  const startNewValidation = () => {
+  const clearWorkflowState = () => {
     setProjectName("");
     setPreset("");
     setFiles([]);
     setDataSources([]);
     setRules([]);
     setResult(null);
+  };
+
+  const startNewValidation = () => {
+    clearWorkflowState();
     setSidebarView("workflow");
     navigate("/upload");
   };
 
   const closeSession = () => {
-    setProjectName("");
-    setPreset("");
-    setFiles([]);
-    setDataSources([]);
-    setRules([]);
-    setResult(null);
+    clearWorkflowState();
     setSidebarView("sessions");
+    window.dispatchEvent(new CustomEvent("sessions:updated"));
     navigate("/");
   };
 
@@ -435,7 +451,7 @@ function AppShellContent() {
                 ) : (
                   <span className={`min-w-0 overflow-hidden truncate text-sm font-semibold text-slate-600 transition-all duration-300 ${collapsed ? "w-0 opacity-0" : "w-[150px] opacity-100"}`}>{activeSessionName}</span>
                 )}
-                {activeSession ? (
+                {!collapsed && activeSession ? (
                   <>
                     <button
                       type="button"

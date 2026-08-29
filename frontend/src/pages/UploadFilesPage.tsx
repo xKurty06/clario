@@ -6,7 +6,7 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { useWorkflow } from "../features/files/WorkflowContext";
 import { checkBackendHealth } from "../services/apiClient";
 import { uploadFiles } from "../services/fileApi";
-import { listRecentSessions } from "../services/validationApi";
+import { createSessionDraft, listRecentSessions } from "../services/validationApi";
 import type { PresetSelection } from "../types/validation.types";
 import { presetSelectOptions } from "../utils/presetConfig";
 import { isSupportedFileName } from "../utils/validators";
@@ -14,6 +14,12 @@ import { isSupportedFileName } from "../utils/validators";
 const DEFAULT_SESSION_NAME = "New session";
 const requiredBadgeClass = "rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold leading-5 text-amber-700";
 const uploadCardClass = "rounded-2xl border border-slate-200 bg-white p-5 shadow-sm";
+
+function formatFileSize(size: number) {
+  if (!size) return "0 KB";
+  const kilobytes = size / 1024;
+  return kilobytes < 1024 ? `${kilobytes.toFixed(0)} KB` : `${(kilobytes / 1024).toFixed(1)} MB`;
+}
 
 function nextSessionName(existingNames: string[]) {
   const names = new Set(existingNames.map((name) => name.trim()).filter(Boolean));
@@ -50,11 +56,32 @@ export function UploadFilesPage() {
     };
   }, [projectName, setProjectName]);
 
+  const createDraftSession = async (nextSelected: File[], sessionNameOverride?: string, uploadedFiles?: { id: string; name: string }[]) => {
+    const name = (sessionNameOverride ?? projectName ?? "").trim() || DEFAULT_SESSION_NAME;
+    const resolvedPreset = preset || "custom_comparison_builder";
+    if (!nextSelected.length) return;
+
+    const resolvedUploads = uploadedFiles && uploadedFiles.length ? uploadedFiles : nextSelected.map((file) => ({ id: "", name: file.name }));
+    const response = await createSessionDraft({
+      project_name: name,
+      preset: resolvedPreset,
+      file_names: resolvedUploads.map((file) => file.name),
+      uploaded_file_ids: resolvedUploads.filter((file) => file.id).map((file) => file.id),
+    });
+    window.dispatchEvent(new CustomEvent("sessions:updated"));
+    window.dispatchEvent(new CustomEvent("sidebar:view", { detail: { view: "workflow" } }));
+    return response;
+  };
+
   const add = (list: File[]) => {
     const valid = list.filter((file) => isSupportedFileName(file.name));
     setFileError(valid.length !== list.length ? "Only .xlsx, .xls, and .csv files are accepted." : "");
     setFormError("");
-    setSelected((current) => [...current, ...valid].slice(0, 10));
+    setSelected((current) => {
+      const existingKeys = new Set(current.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
+      const merged = [...current, ...valid.filter((file) => !existingKeys.has(`${file.name}:${file.size}:${file.lastModified}`))].slice(0, 10);
+      return merged;
+    });
   };
 
   const submit = async () => {
@@ -89,7 +116,9 @@ export function UploadFilesPage() {
     setBusy(true);
     try {
       await checkBackendHealth();
-      setFiles(await uploadFiles(selected));
+      const uploadedFiles = await uploadFiles(selected);
+      setFiles(uploadedFiles);
+      await createDraftSession(selected, projectName, uploadedFiles);
       setDataSources([]);
       setRules([]);
       setResult(null);
@@ -206,13 +235,28 @@ export function UploadFilesPage() {
               <div key={`${file.name}-${index}`} className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
                 <FileSpreadsheet className="size-5 shrink-0 text-emerald-700" />
                 <span className="min-w-0 flex-1 text-sm font-medium break-anywhere">{file.name}</span>
-                <span className="shrink-0 text-xs text-slate-500">{(file.size / 1024).toFixed(0)} KB</span>
+                <span className="shrink-0 text-xs text-slate-500">{formatFileSize(file.size)}</span>
                 <button title={`Remove ${file.name} from this review`} onClick={() => setSelected((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${file.name}`} className="shrink-0">
                   <X className="size-4" />
                 </button>
               </div>
             ))}
           </div>
+
+          {files.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Uploaded in this session</p>
+              </div>
+              {files.map((file) => (
+                <div key={file.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
+                  <FileSpreadsheet className="size-5 shrink-0 text-emerald-700" />
+                  <span className="min-w-0 flex-1 text-sm font-medium break-anywhere">{file.name}</span>
+                  <span className="shrink-0 text-xs text-slate-500">{formatFileSize(file.size)}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {formError && <p className="mt-3 text-sm text-red-700" role="alert">{formError}</p>}
           <button
@@ -224,7 +268,6 @@ export function UploadFilesPage() {
             {busy ? <LoaderCircle className="size-4 animate-spin" /> : null}
             {busy ? "Inspecting files..." : "Continue to row setup"}
           </button>
-          {files.length > 0 && <p className="mt-3 text-xs text-slate-500">{files.length} previously inspected file(s) in this session.</p>}
         </section>
       </div>
     </div>

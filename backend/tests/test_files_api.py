@@ -1,9 +1,12 @@
 from pathlib import Path
 
 import openpyxl
+from fastapi import UploadFile
 from fastapi.testclient import TestClient
 
+from app.database.migrations import migrate
 from app.main import app
+from app.repositories.session_repository import SessionRepository
 from app.services import file_service, sheet_service
 
 
@@ -123,3 +126,31 @@ def test_get_file_recovers_existing_disk_file_without_metadata(tmp_path: Path, m
     assert name == "abc123.xlsx"
     assert recovered_path == path
     assert size == path.stat().st_size
+
+
+def test_session_draft_persists_all_uploaded_files(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(file_service.get_settings(), "data_directory", tmp_path)
+    file_service._files.clear()
+    migrate()
+
+    first_path = tmp_path / "first.csv"
+    second_path = tmp_path / "second.csv"
+    first_path.write_text("col\n1\n", encoding="utf-8")
+    second_path.write_text("col\n2\n", encoding="utf-8")
+
+    first_upload = UploadFile(filename="first.csv", file=first_path.open("rb"))
+    second_upload = UploadFile(filename="second.csv", file=second_path.open("rb"))
+
+    first_id, first_name, _, _ = __import__("asyncio").run(file_service.save_upload(first_upload))
+    second_id, second_name, _, _ = __import__("asyncio").run(file_service.save_upload(second_upload))
+
+    created = SessionRepository().create_draft(
+        "Multi File Session",
+        "custom_comparison_builder",
+        [first_name, second_name],
+        [first_id, second_id],
+    )
+
+    state = SessionRepository().get_state(created["id"])
+    assert [file["name"] for file in state["files"]] == [first_name, second_name]
+    assert [file["id"] for file in state["files"]] == [first_id, second_id]

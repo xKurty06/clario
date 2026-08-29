@@ -58,6 +58,13 @@ export interface SessionState {
 
 export const listRecentSessions = () => apiRequest<RecentSession[]>("/validation/recent");
 
+export const createSessionDraft = (payload: { project_name: string; preset?: string; file_names?: string[]; uploaded_file_ids?: string[] }) =>
+  apiRequest<{ id: string; project_name: string; status: string }>("/validation/sessions/draft", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
 export const getSessionState = (sessionId: string) => apiRequest<SessionState>(`/validation/sessions/${encodeURIComponent(sessionId)}`);
 
 export const renameSession = (sessionId: string, projectName: string) =>

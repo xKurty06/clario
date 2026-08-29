@@ -27,13 +27,25 @@ export function DashboardPage() {
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState("");
 
-  useEffect(() => {
+  const refreshSessions = () => {
     void Promise.all([listRecentSessions(), listTemplates()])
       .then(([recent, templates]) => {
         setSessions(recent);
         setTemplateCount(templates.length);
       })
       .catch(() => undefined);
+  };
+
+  useEffect(() => {
+    refreshSessions();
+  }, []);
+
+  useEffect(() => {
+    const handleSessionsUpdated = () => {
+      refreshSessions();
+    };
+    window.addEventListener("sessions:updated", handleSessionsUpdated);
+    return () => window.removeEventListener("sessions:updated", handleSessionsUpdated);
   }, []);
 
   const openSession = async (session: RecentSession, destination: "/mapping" | "/results" | "/reports") => {

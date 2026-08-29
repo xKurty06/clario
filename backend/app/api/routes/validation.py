@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from app.models.comparison_models import PresetType
 from app.models.validation_models import ValidationRequest, ValidationResult
 from app.services.validation_service import run_validation
 from app.repositories.session_repository import SessionRepository
@@ -13,6 +14,13 @@ router = APIRouter(prefix="/validation", tags=["validation"])
 
 class SessionRenameRequest(BaseModel):
     project_name: str = Field(min_length=1, max_length=160)
+
+
+class SessionDraftRequest(BaseModel):
+    project_name: str = Field(default="New session", min_length=1, max_length=160)
+    preset: PresetType | None = None
+    file_names: list[str] = Field(default_factory=list)
+    uploaded_file_ids: list[str] = Field(default_factory=list)
 
 
 @router.get("/capabilities")
@@ -39,6 +47,18 @@ async def validate(request: ValidationRequest) -> ValidationResult:
 @router.get("/recent")
 async def recent_sessions() -> list[dict[str, object]]:
     return SessionRepository().list_recent()
+
+
+@router.post("/sessions/draft", status_code=201)
+async def create_session_draft(request: SessionDraftRequest) -> dict[str, str]:
+    project_name = request.project_name.strip()
+    if not project_name:
+        raise HTTPException(status_code=422, detail="Session name cannot be blank.")
+    try:
+        created = SessionRepository().create_draft(project_name, request.preset, request.file_names, request.uploaded_file_ids)
+    except (OSError, ValueError, TypeError) as cause:
+        raise HTTPException(status_code=500, detail="The session draft could not be created.") from cause
+    return {"id": created["id"], "project_name": created["project_name"], "status": created["status"]}
 
 
 @router.get("/sessions/{session_id}")
