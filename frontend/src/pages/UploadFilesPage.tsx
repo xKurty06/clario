@@ -108,11 +108,11 @@ export function UploadFilesPage() {
 
   const submit = async () => {
     const hasExistingSessionFiles = files.length > 0;
-    const hasOpenSession = Boolean(sessionId) && hasExistingSessionFiles;
+    const hasOpenSession = Boolean(sessionId);
     let hasError = false;
     setFormError("");
 
-    if (!selected.length && !hasExistingSessionFiles) {
+    if (!selected.length && !hasExistingSessionFiles && !hasOpenSession) {
       setFileError("Please choose at least one spreadsheet before continuing.");
       hasError = true;
     } else {
@@ -141,10 +141,9 @@ export function UploadFilesPage() {
     try {
       await checkBackendHealth();
 
+      // An existing session is a continuation, even when its saved file list is
+      // temporarily empty. Never create a new draft from an existing session id.
       if (hasOpenSession) {
-        setDataSources([]);
-        setRules([]);
-        setResult(null);
         navigate("/mapping");
         return;
       }
