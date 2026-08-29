@@ -6,7 +6,7 @@ import {
   LockKeyhole,
   Menu,
   MoreVertical,
-  PanelRightOpen,
+  PanelLeftOpen,
   Pencil,
   Plus,
   RefreshCw,
@@ -37,7 +37,7 @@ interface NavigationSection {
 
 const navigation: NavigationSection[] = [
   {
-    label: "Validation workflow",
+    label: "Review workflow",
     items: [
       { to: "/upload", label: "Upload files", icon: Files },
       { to: "/mapping", label: "Row setup", icon: Rows3 },
@@ -74,9 +74,11 @@ function AppShellContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const {
+    sessionId,
     setSessionId,
     projectName,
     setProjectName,
+    preset,
     setPreset,
     setFiles,
     setDataSources,
@@ -87,8 +89,19 @@ function AppShellContent() {
   const { showToast } = useToast();
   const shellStyle = { "--app-sidebar-offset": collapsed ? "72px" : "272px" } as CSSProperties;
 
+  const activeSessionId = result?.id || sessionId;
   const activeSessionName = result?.project_name || projectName || "No active session";
-  const activeSession = result ? sessions.find((session) => session.id === result.id) : undefined;
+  const activeSession =
+    activeSessionId
+      ? sessions.find((session) => session.id === activeSessionId) ?? {
+          id: activeSessionId,
+          project_name: activeSessionName,
+          mode: result?.preset || preset || "custom_comparison_builder",
+          file_names: [],
+          discrepancy_count: result?.discrepancies.length ?? 0,
+          created_at: result?.created_at || new Date().toISOString(),
+        }
+      : undefined;
   const filteredSessions = useMemo(() => {
     const normalized = sessionQuery.trim().toLowerCase();
     if (!normalized) return sessions;
@@ -213,18 +226,18 @@ function AppShellContent() {
     setEditingSessionId(null);
     setMutatingSessionId(session.id);
     setSessions((current) => current.map((item) => item.id === session.id ? { ...item, project_name: projectName } : item));
-    if (result?.id === session.id) {
+    if (activeSessionId === session.id) {
       setProjectName(projectName);
-      setResult({ ...result, project_name: projectName });
+      if (result) setResult({ ...result, project_name: projectName });
     }
     try {
       await renameSession(session.id, projectName);
       showToast("Session renamed.", "success");
     } catch (cause) {
       setSessions((current) => current.map((item) => item.id === session.id ? { ...item, project_name: session.project_name } : item));
-      if (result?.id === session.id) {
+      if (activeSessionId === session.id) {
         setProjectName(session.project_name);
-        setResult({ ...result, project_name: session.project_name });
+        if (result) setResult({ ...result, project_name: session.project_name });
       }
       showToast(cause instanceof Error ? cause.message : "Could not rename this session.", "error");
     } finally {
@@ -244,7 +257,7 @@ function AppShellContent() {
     try {
       await deleteSession(session.id);
       setSessions((current) => current.filter((item) => item.id !== session.id));
-      if (result?.id === session.id) closeSession();
+      if (activeSessionId === session.id) closeSession();
       showToast("Session deleted.", "success");
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : "Could not delete this session.", "error");
@@ -276,7 +289,7 @@ function AppShellContent() {
             >
               <span className="relative grid size-8 place-items-center overflow-hidden rounded-[10px] bg-white transition-transform duration-200 group-hover:scale-105 group-active:scale-95">
                 {renderLogo("size-7 object-contain transition-all duration-200 group-hover:-translate-x-2 group-hover:opacity-0 group-focus-visible:-translate-x-2 group-focus-visible:opacity-0")}
-                <PanelRightOpen aria-hidden="true" className="absolute size-[17px] translate-x-2 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100" />
+                <PanelLeftOpen aria-hidden="true" className="absolute size-[17px] translate-x-2 opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100" />
               </span>
             </button>
           ) : (
@@ -307,11 +320,11 @@ function AppShellContent() {
               type="button"
               onClick={startNewValidation}
               className={`flex h-10 items-center rounded-xl bg-emerald-700 text-sm font-semibold text-white transition hover:bg-emerald-800 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 ${collapsed ? "mx-auto w-10 justify-center" : "w-full gap-3 px-3"}`}
-              title="Start a new validation session"
-              aria-label="Start a new validation session"
+              title="Start validation"
+              aria-label="Start validation"
             >
               <Plus className="size-[18px] shrink-0" />
-              <span className={`min-w-0 overflow-hidden truncate transition-all duration-300 ${collapsed ? "w-0 opacity-0" : "w-[150px] opacity-100"}`}>New validation</span>
+              <span className={`min-w-0 overflow-hidden truncate transition-all duration-300 ${collapsed ? "w-0 opacity-0" : "w-[150px] opacity-100"}`}>Start validation</span>
             </button>
 
             {!collapsed ? (
@@ -357,7 +370,7 @@ function AppShellContent() {
                 {loadingSessions ? <p className="mt-3 px-3 text-xs text-slate-500">Loading sessions...</p> : null}
                 <div className="mt-2 space-y-1.5">
                   {filteredSessions.map((session) => {
-                    const active = result?.id === session.id;
+                    const active = activeSessionId === session.id;
                     return (
                       <div data-session-menu={session.id} className={`relative flex items-stretch rounded-2xl transition ${active ? "bg-emerald-50 text-emerald-800" : "text-slate-700 hover:bg-slate-100 hover:text-slate-950"}`}>
                         <div className="min-w-0 flex-1">
@@ -423,7 +436,7 @@ function AppShellContent() {
                     );
                   })}
                   {!loadingSessions && !filteredSessions.length ? (
-                    <p className="px-3 py-4 text-xs leading-5 text-slate-500">No sessions found. Start a new validation to create one.</p>
+                    <p className="px-3 py-4 text-xs leading-5 text-slate-500">No sessions found. Start validation to create one.</p>
                   ) : null}
                 </div>
               </>
@@ -523,6 +536,7 @@ function AppShellContent() {
         )}
 
         <div className={`flex shrink-0 items-center gap-2 ${collapsed ? "flex-col p-2" : "p-3"}`}>
+          <ThemeSwitcher collapsed={collapsed} />
           <div title="Your data stays local" className={`min-w-0 overflow-hidden border border-emerald-100 bg-emerald-50 text-emerald-800 transition-all duration-300 ${collapsed ? "grid size-10 shrink-0 place-items-center rounded-xl p-0" : "flex min-h-10 flex-1 items-center rounded-xl px-3"}`}>
             {collapsed ? (
               <LockKeyhole aria-hidden="true" className="size-4" />
@@ -533,7 +547,6 @@ function AppShellContent() {
               </div>
             )}
           </div>
-          <ThemeSwitcher collapsed={collapsed} />
         </div>
       </aside>
 
