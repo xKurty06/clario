@@ -65,6 +65,13 @@ export const createSessionDraft = (payload: { project_name: string; preset?: str
     body: JSON.stringify(payload),
   });
 
+export const addSessionFile = (sessionId: string, fileId: string) =>
+  apiRequest<{ id: string; name: string; path: string; size: number }>(`/validation/sessions/${encodeURIComponent(sessionId)}/files`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ file_id: fileId }),
+  });
+
 export const getSessionState = (sessionId: string) => apiRequest<SessionState>(`/validation/sessions/${encodeURIComponent(sessionId)}`);
 
 export const deleteSessionFile = (sessionId: string, fileId: string) =>
