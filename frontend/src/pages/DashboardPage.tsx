@@ -123,29 +123,13 @@ export function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                      <button
-                        type="button"
-                        onClick={() => openSession(session, "/results")}
-                        disabled={loading || session.can_reopen === false}
-                        className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {loading ? <LoaderCircle className="size-4 animate-spin" /> : null}
-                        Open result
+                      <button type="button" onClick={() => openSession(session, "/results")} disabled={loading || session.can_reopen === false} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+                        {loading ? <LoaderCircle className="size-4 animate-spin" /> : null} Open result
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => openSession(session, session.can_continue_setup ? "/mapping" : "/results")}
-                        disabled={loading || session.can_reopen === false}
-                        className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
+                      <button type="button" onClick={() => openSession(session, session.can_continue_setup ? "/mapping" : "/results")} disabled={loading || session.can_reopen === false} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
                         Continue setup
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => openSession(session, "/reports")}
-                        disabled={loading || session.can_reopen === false}
-                        className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
+                      <button type="button" onClick={() => openSession(session, "/reports")} disabled={loading || session.can_reopen === false} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-emerald-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
                         <FileDown className="size-4" /> Report
                       </button>
                     </div>
@@ -162,7 +146,7 @@ export function DashboardPage() {
               <li className="flex gap-3" key={step}><span className="grid size-6 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">{index + 1}</span><span className="pt-0.5 text-slate-700">{step}</span></li>
             ))}
           </ol>
-          <Link className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800" to="/upload">Open file setup <ArrowRight aria-hidden="true" className="size-4" /></Link>
+          <Link className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800" to="/upload">Validation <ArrowRight aria-hidden="true" className="size-4" /></Link>
         </aside>
       </div>
     </div>
