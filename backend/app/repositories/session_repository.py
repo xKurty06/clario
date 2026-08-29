@@ -192,8 +192,6 @@ class SessionRepository:
                     try:
                         shutil.rmtree(session_path)
                     except (PermissionError, OSError):
-                        # Windows can keep files locked while a spreadsheet or another app still has them open.
-                        # Treat the folder cleanup as best-effort so the saved session record can still be removed.
                         pass
 
             connection.execute("DELETE FROM reports WHERE session_id = ?", (session_id,))
@@ -203,7 +201,7 @@ class SessionRepository:
     def remove_file(self, session_id: str, file_id: str) -> bool:
         with database() as connection:
             row = connection.execute(
-                "SELECT result_payload, request_payload, session_path FROM sessions WHERE id = ? LIMIT 1",
+                "SELECT result_payload, request_payload, file_names, session_path FROM sessions WHERE id = ? LIMIT 1",
                 (session_id,),
             ).fetchone()
             if row is None:
@@ -211,60 +209,79 @@ class SessionRepository:
 
             result_payload = json.loads(row["result_payload"]) if row["result_payload"] else None
             request_payload = json.loads(row["request_payload"]) if row["request_payload"] else None
-            if result_payload is not None:
-                file_names = list(result_payload.get("file_names") or [])
-                result_payload["file_names"] = [name for name in file_names if name != next((item["name"] for item in (result_payload.get("files") or []) if item.get("id") == file_id), None)]
-                if "file_names" in result_payload and not result_payload["file_names"]:
-                    result_payload["file_names"] = []
-                if result_payload.get("data_sources"):
-                    result_payload["data_sources"] = [source for source in result_payload["data_sources"] if source.get("file_id") != file_id]
-
-            if request_payload is not None and isinstance(request_payload, dict):
-                if isinstance(request_payload.get("data_sources"), list):
-                    request_payload["data_sources"] = [source for source in request_payload["data_sources"] if source.get("file_id") != file_id]
-                if isinstance(request_payload.get("rules"), list):
-                    request_payload["rules"] = [rule for rule in request_payload["rules"] if not (
-                        (rule.get("left_data_source_id") and rule["left_data_source_id"] in [source.get("id") for source in request_payload["data_sources"] if source.get("file_id") == file_id])
-                        or (rule.get("right_data_source_id") and rule["right_data_source_id"] in [source.get("id") for source in request_payload["data_sources"] if source.get("file_id") == file_id])
-                    )]
-
             session_path = self._session_directory_path(row["session_path"])
-            files_changed = False
-            if session_path and session_path.exists() and session_path.is_dir():
-                uploads_dir = session_path / "uploads"
-                for candidate in list(uploads_dir.glob(f"{file_id}.*")):
-                    if candidate.exists() and candidate.is_file():
-                        candidate.unlink(missing_ok=True)
-                        files_changed = True
+            metadata: dict[str, Any] | None = None
+            persisted_files: list[dict[str, Any]] = []
 
+            if session_path and session_path.exists() and session_path.is_dir():
                 metadata_path = session_path / "session.json"
                 if metadata_path.exists():
-                    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-                    files = metadata.get("files") or []
-                    metadata["files"] = [item for item in files if str(item.get("id")) != str(file_id)]
-                    metadata["file_names"] = [name for name in metadata.get("file_names") or [] if name != next((item.get("name") for item in files if str(item.get("id")) == str(file_id)), None)]
+                    try:
+                        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError):
+                        metadata = None
+                if metadata and isinstance(metadata.get("files"), list):
+                    persisted_files = [item for item in metadata["files"] if isinstance(item, dict)]
+
+            removed_file = next((item for item in persisted_files if str(item.get("id")) == str(file_id)), None)
+            removed_name = str(removed_file.get("name")) if removed_file and removed_file.get("name") else None
+
+            if removed_file:
+                persisted_files = [item for item in persisted_files if str(item.get("id")) != str(file_id)]
+                persisted_path = removed_file.get("path")
+                if persisted_path:
+                    path = Path(str(persisted_path))
+                    if path.exists() and path.is_file():
+                        path.unlink()
+
+            if metadata is not None:
+                metadata["files"] = persisted_files
+                metadata["file_names"] = [str(item.get("name")) for item in persisted_files if item.get("name")]
+                metadata_path = session_path / "session.json" if session_path else None
+                if metadata_path:
                     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
-                    files_changed = True
 
-            if files_changed and row["session_path"]:
-                session_dir = self._session_directory_path(row["session_path"])
-                if session_dir:
-                    result_path = session_dir / "result.json"
-                    setup_path = session_dir / "setup.json"
-                    if result_path.exists() and result_payload is not None:
-                        result_path.write_text(json.dumps(result_payload, indent=2), encoding="utf-8")
-                    if setup_path.exists() and request_payload is not None:
-                        setup_path.write_text(json.dumps(request_payload, indent=2), encoding="utf-8")
+            if result_payload is not None:
+                result_payload["file_names"] = [
+                    name for name in list(result_payload.get("file_names") or [])
+                    if not removed_name or name != removed_name
+                ]
+                result_payload["data_sources"] = [
+                    source for source in list(result_payload.get("data_sources") or [])
+                    if source.get("file_id") != file_id
+                ]
 
+            removed_source_ids: set[str] = set()
+            if request_payload is not None and isinstance(request_payload, dict):
+                sources = list(request_payload.get("data_sources") or [])
+                removed_source_ids = {str(source.get("id")) for source in sources if source.get("file_id") == file_id}
+                request_payload["data_sources"] = [source for source in sources if source.get("file_id") != file_id]
+                if isinstance(request_payload.get("rules"), list) and removed_source_ids:
+                    request_payload["rules"] = [
+                        rule for rule in request_payload["rules"]
+                        if str(rule.get("left_data_source_id")) not in removed_source_ids
+                        and str(rule.get("right_data_source_id")) not in removed_source_ids
+                    ]
+
+            if session_path and session_path.exists() and session_path.is_dir():
+                result_path = session_path / "result.json"
+                setup_path = session_path / "setup.json"
+                if result_path.exists() and result_payload is not None:
+                    result_path.write_text(json.dumps(result_payload, indent=2), encoding="utf-8")
+                if setup_path.exists() and request_payload is not None:
+                    setup_path.write_text(json.dumps(request_payload, indent=2), encoding="utf-8")
+
+            remaining_names = list(result_payload.get("file_names") or []) if result_payload is not None else []
             connection.execute(
-                "UPDATE sessions SET result_payload = ?, request_payload = ? WHERE id = ?",
+                "UPDATE sessions SET file_names = ?, result_payload = ?, request_payload = ? WHERE id = ?",
                 (
+                    json.dumps(remaining_names),
                     json.dumps(result_payload) if result_payload is not None else None,
                     json.dumps(request_payload) if request_payload is not None else None,
                     session_id,
                 ),
             )
-            return True
+            return removed_file is not None or removed_name is not None
 
     def get_session_directory(self, session_id: str) -> Path | None:
         with database() as connection:
