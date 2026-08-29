@@ -247,3 +247,89 @@ test("session resume continues from restored files without reselecting them", as
   await expect(page).toHaveURL(/\/mapping/);
   await expect(page.getByRole("heading", { name: "Confirm row setup" })).toBeVisible();
 });
+
+test("session draft keeps previously uploaded files when adding a new local file", async ({ page }) => {
+  const newUploadedFile: UploadedFile = {
+    id: "file-new",
+    name: "new-worksheet.csv",
+    extension: ".csv",
+    size: 70,
+    sheets: [
+      {
+        name: "Sheet1",
+        row_count: 3,
+        column_count: 2,
+        detected_header_row: 1,
+        headers: ["Item Description", "Quantity"],
+        sample_rows: [
+          { "Item Description": "Item Description", Quantity: "Quantity" },
+          { "Item Description": "Bond Paper", Quantity: "10" },
+        ],
+      },
+    ],
+  };
+
+  let draftedPayload: { file_names?: string[]; uploaded_file_ids?: string[] } | undefined;
+
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/recent$/, async (route) => {
+    await route.fulfill({ status: 200, json: [] });
+  });
+
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/sessions\/draft$/, async (route) => {
+    draftedPayload = route.request().postDataJSON() as { file_names?: string[]; uploaded_file_ids?: string[] };
+    await route.fulfill({
+      status: 201,
+      json: { id: "session-draft-merge", project_name: "Saved draft", status: "created" },
+    });
+  });
+
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/files\/upload$/, async (route) => {
+    await route.fulfill({ status: 200, json: [newUploadedFile] });
+  });
+
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/sessions\/session-restore$/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      json: {
+        result: {
+          id: "session-restore",
+          project_name: "Saved draft",
+          preset: "generic_two_file",
+          created_at: "2026-01-01T00:00:00Z",
+          file_names: uploadedFiles.map((file) => file.name),
+          total_selected_rows: 0,
+          data_sources: [],
+          extracted_records: [],
+          rule_summaries: [],
+          discrepancies: [],
+          breakdown: { high: 0, medium: 0, low: 0 },
+        },
+        request: {
+          project_name: "Saved draft",
+          preset: "generic_two_file",
+          data_sources: [],
+          rules: [],
+        },
+        files: uploadedFiles,
+      },
+    });
+  });
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Continue setup" }).first().click();
+  await expect(page).toHaveURL(/\/mapping/);
+
+  await page.goto("/upload");
+  await expect(page.getByText(uploadedFiles[0].name)).toBeVisible();
+  await expect(page.getByText(uploadedFiles[1].name)).toBeVisible();
+  await page.locator('input[type="file"]').setInputFiles([
+    { name: newUploadedFile.name, mimeType: "text/csv", buffer: Buffer.from("Item Description,Quantity\nBond Paper,10\n") },
+  ]);
+
+  await expect(page.getByText(newUploadedFile.name)).toBeVisible();
+  await page.getByRole("button", { name: "Continue to row setup" }).click();
+
+  await expect(page).toHaveURL(/\/mapping/);
+  expect(draftedPayload?.file_names).toEqual([uploadedFiles[0].name, uploadedFiles[1].name, newUploadedFile.name]);
+  expect(draftedPayload?.uploaded_file_ids).toEqual([uploadedFiles[0].id, uploadedFiles[1].id, newUploadedFile.id]);
+});

@@ -360,6 +360,26 @@ html[data-theme="dark"] :is(main, [role="dialog"]) :where(
   background-color: var(--color-brand-soft) !important;
 }
 
+html[data-theme="dark"] :is(main, [role="dialog"]) .help-tip-trigger {
+  color: var(--color-text-muted) !important;
+}
+
+html[data-theme="dark"] :is(main, [role="dialog"]) .help-tip-trigger:hover {
+  color: var(--color-brand-text) !important;
+  background-color: rgba(52, 211, 153, 0.12) !important;
+}
+
+html[data-theme="dark"] [role="tooltip"] {
+  background-color: rgba(15, 23, 42, 0.98) !important;
+  color: var(--color-text) !important;
+  border: 1px solid var(--color-border) !important;
+}
+
+html[data-theme="dark"] [role="tooltip"] > span {
+  border-top-color: rgba(15, 23, 42, 0.98) !important;
+  border-bottom-color: rgba(15, 23, 42, 0.98) !important;
+}
+
 html[data-theme="dark"] :is(main, [role="dialog"]) :where(.hover\:bg-emerald-50\/30:hover) {
   background-color: rgba(52, 211, 153, 0.12) !important;
 }

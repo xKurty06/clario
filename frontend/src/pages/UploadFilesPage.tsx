@@ -29,6 +29,19 @@ function nextSessionName(existingNames: string[]) {
   return `${DEFAULT_SESSION_NAME} (${index})`;
 }
 
+function mergeUploadedFiles(existingFiles: { id: string; name: string }[], newFiles: { id: string; name: string }[]) {
+  const merged = [...existingFiles];
+  const seen = new Set(merged.map((file) => `${file.id || ""}:${file.name}`));
+  for (const file of newFiles) {
+    const key = `${file.id || ""}:${file.name}`;
+    if (!seen.has(key)) {
+      merged.push(file);
+      seen.add(key);
+    }
+  }
+  return merged;
+}
+
 export function UploadFilesPage() {
   const navigate = useNavigate();
   const input = useRef<HTMLInputElement>(null);
@@ -150,7 +163,8 @@ export function UploadFilesPage() {
 
       let nextFiles = files;
       if (selected.length) {
-        nextFiles = await uploadFiles(selected);
+        const uploadedSelection = await uploadFiles(selected);
+        nextFiles = mergeUploadedFiles(files, uploadedSelection);
         setFiles(nextFiles);
       }
 

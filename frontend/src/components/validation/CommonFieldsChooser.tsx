@@ -116,7 +116,7 @@ export function CommonFieldsChooser() {
                   return (
                     <label
                       key={choice.key}
-                      className={`flex gap-3 rounded-2xl border p-4 text-sm transition ${checked ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}
+                      className={`flex cursor-pointer gap-3 rounded-2xl border p-4 text-sm transition ${checked ? "border-emerald-200 bg-emerald-50 hover:border-blue-300 hover:bg-blue-50" : "border-slate-200 bg-white hover:bg-slate-50"}`}
                       title={`Add ${field.field_name}`}
                     >
                       <input
