@@ -1,14 +1,12 @@
 import { FileSpreadsheet, FileUp, LoaderCircle, LockKeyhole, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FieldLabel, HelpTip, SelectField } from "../components/forms";
+import { HelpTip } from "../components/forms";
 import { PageHeader } from "../components/layout/PageHeader";
 import { useWorkflow } from "../features/files/WorkflowContext";
 import { checkBackendHealth } from "../services/apiClient";
 import { uploadFiles } from "../services/fileApi";
-import { createSessionDraft, deleteSessionFile, listRecentSessions } from "../services/validationApi";
-import type { PresetSelection } from "../types/validation.types";
-import { presetSelectOptions } from "../utils/presetConfig";
+import { addSessionFile, createSessionDraft, deleteSessionFile, listRecentSessions } from "../services/validationApi";
 import { isSupportedFileName } from "../utils/validators";
 
 const DEFAULT_SESSION_NAME = "New session";
@@ -45,13 +43,12 @@ function mergeUploadedFiles(existingFiles: { id: string; name: string }[], newFi
 export function UploadFilesPage() {
   const navigate = useNavigate();
   const input = useRef<HTMLInputElement>(null);
-  const { sessionId, setSessionId, projectName, setProjectName, preset, setPreset, files, setFiles, dataSources, setDataSources, removeSourcePreview, rules, setRules, setResult } = useWorkflow();
+  const { sessionId, setSessionId, projectName, setProjectName, files, setFiles, dataSources, setDataSources, removeSourcePreview, rules, setRules, setResult } = useWorkflow();
   const [selected, setSelected] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
   const [fileError, setFileError] = useState("");
   const [sessionNameError, setSessionNameError] = useState("");
-  const [presetError, setPresetError] = useState("");
   const [dragActive, setDragActive] = useState(false);
 
   useEffect(() => {
@@ -69,18 +66,12 @@ export function UploadFilesPage() {
     };
   }, [projectName, setProjectName]);
 
-  const createDraftSession = async (nextSelected: File[], sessionNameOverride?: string, uploadedFiles?: { id: string; name: string }[]) => {
-    const name = (sessionNameOverride ?? projectName ?? "").trim() || DEFAULT_SESSION_NAME;
-    const resolvedPreset = preset || "custom_comparison_builder";
-    const resolvedUploads = uploadedFiles && uploadedFiles.length ? uploadedFiles : nextSelected.map((file) => ({ id: "", name: file.name }));
-
-    if (!resolvedUploads.length) return;
-
+  const createDraftSession = async (sessionName: string, uploadedFiles: { id: string; name: string }[]) => {
+    if (!uploadedFiles.length) return;
     const response = await createSessionDraft({
-      project_name: name,
-      preset: resolvedPreset,
-      file_names: resolvedUploads.map((file) => file.name),
-      uploaded_file_ids: resolvedUploads.filter((file) => file.id).map((file) => file.id),
+      project_name: sessionName,
+      file_names: uploadedFiles.map((file) => file.name),
+      uploaded_file_ids: uploadedFiles.map((file) => file.id),
     });
     window.dispatchEvent(new CustomEvent("sessions:updated"));
     window.dispatchEvent(new CustomEvent("sidebar:view", { detail: { view: "workflow" } }));
@@ -93,27 +84,23 @@ export function UploadFilesPage() {
     setFormError("");
     setSelected((current) => {
       const existingKeys = new Set(current.map((file) => `${file.name}:${file.size}:${file.lastModified}`));
-      const merged = [...current, ...valid.filter((file) => !existingKeys.has(`${file.name}:${file.size}:${file.lastModified}`))].slice(0, 10);
-      return merged;
+      return [...current, ...valid.filter((file) => !existingKeys.has(`${file.name}:${file.size}:${file.lastModified}`))].slice(0, 10);
     });
   };
 
   const removeUploadedFile = async (fileId: string) => {
     const nextFiles = files.filter((file) => file.id !== fileId);
     setFiles(nextFiles);
-
     const affectedSourceIds = dataSources.filter((source) => source.file_id === fileId).map((source) => source.id);
     if (affectedSourceIds.length) {
       setDataSources(dataSources.filter((source) => source.file_id !== fileId));
       affectedSourceIds.forEach((id) => removeSourcePreview(id));
       setRules(rules.filter((rule) => !(rule.left_data_source_id && affectedSourceIds.includes(rule.left_data_source_id)) && !(rule.right_data_source_id && affectedSourceIds.includes(rule.right_data_source_id))));
     }
-
     if (!sessionId) return;
-
     try {
       await deleteSessionFile(sessionId, fileId);
-      setSessionId(sessionId);
+      window.dispatchEvent(new CustomEvent("sessions:updated"));
     } catch (cause) {
       setFormError(cause instanceof Error ? cause.message : "Could not remove this file from the saved session.");
     }
@@ -122,56 +109,41 @@ export function UploadFilesPage() {
   const submit = async () => {
     const hasExistingSessionFiles = files.length > 0;
     const hasOpenSession = Boolean(sessionId);
-    let hasError = false;
     setFormError("");
-
+    setFileError("");
     if (!selected.length && !hasExistingSessionFiles && !hasOpenSession) {
       setFileError("Please choose at least one spreadsheet before continuing.");
-      hasError = true;
-    } else {
-      setFileError("");
-    }
-
-    if (!projectName.trim()) {
-      setSessionNameError("Please enter a session name before continuing.");
-      hasError = true;
-    } else {
-      setSessionNameError("");
-    }
-
-    if (!preset) {
-      setPresetError("Please choose a comparison preset before continuing.");
-      hasError = true;
-    } else {
-      setPresetError("");
-    }
-
-    if (hasError) {
       return;
     }
+    if (!projectName.trim()) {
+      setSessionNameError("Please enter a session name before continuing.");
+      return;
+    }
+    setSessionNameError("");
 
     setBusy(true);
     try {
       await checkBackendHealth();
-
-      // An existing session is a continuation, even when its saved file list is
-      // temporarily empty. Never create a new draft from an existing session id.
-      if (hasOpenSession) {
-        navigate("/mapping");
-        return;
-      }
-
-      let nextFiles = files;
       if (selected.length) {
         const uploadedSelection = await uploadFiles(selected);
-        nextFiles = mergeUploadedFiles(files, uploadedSelection);
+        const nextFiles = mergeUploadedFiles(files, uploadedSelection);
         setFiles(nextFiles);
+
+        if (hasOpenSession) {
+          await Promise.all(uploadedSelection.map((file) => addSessionFile(sessionId as string, file.id)));
+          window.dispatchEvent(new CustomEvent("sessions:updated"));
+        } else {
+          const created = await createDraftSession(projectName.trim(), uploadedSelection);
+          if (created) setSessionId(created.id);
+        }
+        setSelected([]);
       }
 
-      await createDraftSession(selected, projectName, nextFiles);
-      setDataSources([]);
-      setRules([]);
-      setResult(null);
+      if (!hasOpenSession && !sessionId) {
+        setDataSources([]);
+        setRules([]);
+        setResult(null);
+      }
       navigate("/mapping");
     } catch (cause) {
       setFormError(cause instanceof Error ? cause.message : "Upload failed.");
@@ -183,13 +155,13 @@ export function UploadFilesPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Step 1 of 4"
+        eyebrow="Validation"
         title="Choose comparison files"
-        description="Select a comparison preset and local spreadsheets. Files are processed on this device and originals remain unchanged."
+        description="Select the local spreadsheets you want to inspect. Clario keeps the files in the active validation session and leaves the originals unchanged."
       />
       <div className="mt-6 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm leading-6 text-emerald-900 shadow-sm">
         <p className="font-semibold">Before you continue</p>
-        <p className="mt-1">Choose the preset that best matches your comparison. You can still review rows, map fields, and edit rules before validation runs.</p>
+        <p className="mt-1">Choose your files first. You can review rows, map fields, and configure validation rules before running the comparison.</p>
       </div>
       <div className="grid items-start gap-8 pt-8 xl:grid-cols-[320px_minmax(0,1fr)]">
         <section className={`${uploadCardClass} self-start space-y-5`}>
@@ -197,7 +169,7 @@ export function UploadFilesPage() {
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-1">
                 <label htmlFor="session-name" className="text-sm font-semibold text-slate-900">Session name</label>
-                <HelpTip text="Give this review a clear name. The same name is used in the validation result and PDF report." />
+                <HelpTip text="Give this validation session a clear name. It is also used for saved reports." />
               </div>
               <span className={requiredBadgeClass}>Required</span>
             </div>
@@ -213,29 +185,6 @@ export function UploadFilesPage() {
             />
             {sessionNameError && <p className="mt-2 text-xs font-medium text-red-700" role="alert">{sessionNameError}</p>}
           </div>
-          <div>
-            <div className="flex items-center justify-between gap-3">
-              <FieldLabel
-                className="text-sm text-slate-900"
-                help="The preset only creates a starting structure. You can still customize sources, rows, fields, and rules later."
-              >
-                Comparison preset
-              </FieldLabel>
-              <span className={requiredBadgeClass}>Required</span>
-            </div>
-            <SelectField
-              className="mt-2"
-              ariaLabel="Comparison preset"
-              value={preset}
-              onChange={(value) => {
-                setPreset(value as PresetSelection);
-                if (value) setPresetError("");
-              }}
-              options={presetSelectOptions}
-            />
-            {presetError && <p className="mt-2 text-xs font-medium text-red-700" role="alert">{presetError}</p>}
-            <p className="mt-2 text-xs leading-5 text-slate-500">The preset only creates a starting structure. You can still customize sources, rows, fields, and rules later.</p>
-          </div>
           <div className="flex items-start gap-2 rounded-xl bg-emerald-50 p-3 text-xs leading-5 text-emerald-800">
             <LockKeyhole className="mt-0.5 size-4 shrink-0" />
             <span>No cloud upload, account, or internet connection is used.</span>
@@ -245,30 +194,16 @@ export function UploadFilesPage() {
         <section className={`${uploadCardClass} min-w-0 self-start`}>
           <div className="mb-2 flex items-center gap-1 text-sm font-semibold text-slate-700">
             Files to compare
-            <HelpTip text="Choose the Excel or CSV files you want to inspect. The app reads a temporary local copy and does not modify the originals." />
+            <HelpTip text="Choose the Excel or CSV files you want to inspect. New files added to an existing session are saved immediately." />
           </div>
           <button
             title="Choose local Excel or CSV files"
             type="button"
             onClick={() => input.current?.click()}
-            onDragEnter={(event) => {
-              event.preventDefault();
-              setDragActive(true);
-            }}
-            onDragOver={(event) => {
-              event.preventDefault();
-              event.dataTransfer.dropEffect = "copy";
-              setDragActive(true);
-            }}
-            onDragLeave={(event) => {
-              event.preventDefault();
-              if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragActive(false);
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              setDragActive(false);
-              add([...event.dataTransfer.files]);
-            }}
+            onDragEnter={(event) => { event.preventDefault(); setDragActive(true); }}
+            onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; setDragActive(true); }}
+            onDragLeave={(event) => { event.preventDefault(); if (!event.currentTarget.contains(event.relatedTarget as Node)) setDragActive(false); }}
+            onDrop={(event) => { event.preventDefault(); setDragActive(false); add([...event.dataTransfer.files]); }}
             className={`grid min-h-52 w-full place-items-center rounded-2xl border border-dashed p-8 text-center transition active:scale-[0.99] ${dragActive ? "border-emerald-600 bg-emerald-50 ring-4 ring-emerald-100" : "border-slate-300 bg-white hover:border-emerald-500 hover:bg-emerald-50/30"}`}
           >
             <span>
@@ -286,40 +221,29 @@ export function UploadFilesPage() {
                 <FileSpreadsheet className="size-5 shrink-0 text-emerald-700" />
                 <span className="min-w-0 flex-1 text-sm font-medium break-anywhere">{file.name}</span>
                 <span className="shrink-0 text-xs text-slate-500">{formatFileSize(file.size)}</span>
-                <button title={`Remove ${file.name} from this review`} onClick={() => setSelected((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${file.name}`} className="shrink-0">
-                  <X className="size-4" />
-                </button>
+                <button title={`Remove ${file.name} from this review`} onClick={() => setSelected((current) => current.filter((_, itemIndex) => itemIndex !== index))} aria-label={`Remove ${file.name}`} className="shrink-0"><X className="size-4" /></button>
               </div>
             ))}
           </div>
 
           {files.length > 0 && (
             <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Uploaded in this session</p>
-              </div>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Uploaded in this session</p>
               {files.map((file) => (
                 <div key={file.id} className="flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">
                   <FileSpreadsheet className="size-5 shrink-0 text-emerald-700" />
                   <span className="min-w-0 flex-1 text-sm font-medium break-anywhere">{file.name}</span>
                   <span className="shrink-0 text-xs text-slate-500">{formatFileSize(file.size)}</span>
-                  <button title={`Remove ${file.name} from this session`} onClick={() => removeUploadedFile(file.id)} aria-label={`Remove ${file.name}`} className="shrink-0">
-                    <X className="size-4" />
-                  </button>
+                  <button title={`Remove ${file.name} from this session`} onClick={() => removeUploadedFile(file.id)} aria-label={`Remove ${file.name}`} className="shrink-0"><X className="size-4" /></button>
                 </div>
               ))}
             </div>
           )}
 
           {formError && <p className="mt-3 text-sm text-red-700" role="alert">{formError}</p>}
-          <button
-            title="Read the selected files and continue to row setup"
-            disabled={busy}
-            onClick={submit}
-            className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-          >
+          <button title="Read the selected files and continue to validation" disabled={busy} onClick={submit} className="mt-5 inline-flex cursor-pointer items-center gap-2 rounded-xl bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
             {busy ? <LoaderCircle className="size-4 animate-spin" /> : null}
-            {busy ? "Inspecting files..." : "Continue to row setup"}
+            {busy ? "Inspecting files..." : "Continue to validation"}
           </button>
         </section>
       </div>
