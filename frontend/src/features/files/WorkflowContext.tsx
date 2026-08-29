@@ -82,7 +82,9 @@ const Context = createContext<WorkflowState | null>(null);
 export function WorkflowProvider({ children }: PropsWithChildren) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
-  const [preset, setPreset] = useState<PresetSelection>("");
+  // Presets are intentionally not exposed in the current workflow. Keep the
+  // legacy state at the neutral custom value for backward-compatible payloads.
+  const [preset, setPreset] = useState<PresetSelection>("custom_comparison_builder");
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [dataSources, setDataSourcesState] = useState<ComparisonDataSource[]>([]);
   const [sourcePreviews, setSourcePreviews] = useState<Record<string, DataSourcePreview>>({});
@@ -90,15 +92,11 @@ export function WorkflowProvider({ children }: PropsWithChildren) {
   const [result, setResultState] = useState<ValidationResult | null>(() => readStoredResult());
 
   const setDataSources = useCallback((value: ComparisonDataSource[]) => {
-    setDataSourcesState((current) =>
-      value.map((source) => normalizeRowSetupConfirmation(source, current.find((item) => item.id === source.id))),
-    );
+    setDataSourcesState((current) => value.map((source) => normalizeRowSetupConfirmation(source, current.find((item) => item.id === source.id))));
   }, []);
 
   const updateDataSource = useCallback((id: string, value: ComparisonDataSource) => {
-    setDataSourcesState((current) =>
-      current.map((item) => (item.id === id ? normalizeRowSetupConfirmation(value, item) : item)),
-    );
+    setDataSourcesState((current) => current.map((item) => (item.id === id ? normalizeRowSetupConfirmation(value, item) : item)));
   }, []);
 
   const removeDataSource = useCallback((id: string) => {
@@ -126,12 +124,11 @@ export function WorkflowProvider({ children }: PropsWithChildren) {
       removeDataSource,
       sourcePreviews,
       setSourcePreview: (id: string, value: DataSourcePreview) => setSourcePreviews((current) => ({ ...current, [id]: value })),
-      removeSourcePreview: (id: string) =>
-        setSourcePreviews((current) => {
-          const next = { ...current };
-          delete next[id];
-          return next;
-        }),
+      removeSourcePreview: (id: string) => setSourcePreviews((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      }),
       rules,
       setRules,
       updateRule: (id: string, value: ComparisonRule) => setRules((current) => current.map((item) => (item.id === id ? value : item))),
@@ -147,8 +144,6 @@ export function WorkflowProvider({ children }: PropsWithChildren) {
 
 export function useWorkflow() {
   const value = useContext(Context);
-  if (!value) {
-    throw new Error("WorkflowProvider is missing");
-  }
+  if (!value) throw new Error("WorkflowProvider is missing");
   return value;
 }
