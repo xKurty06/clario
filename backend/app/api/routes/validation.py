@@ -23,6 +23,10 @@ class SessionDraftRequest(BaseModel):
     uploaded_file_ids: list[str] = Field(default_factory=list)
 
 
+class SessionFileRequest(BaseModel):
+    file_id: str = Field(min_length=1, max_length=80)
+
+
 @router.get("/capabilities")
 async def validation_capabilities() -> dict[str, str]:
     return {"status": "ready", "matching": "strict", "workflow": "comparison_builder"}
@@ -59,6 +63,17 @@ async def create_session_draft(request: SessionDraftRequest) -> dict[str, str]:
     except (OSError, ValueError, TypeError) as cause:
         raise HTTPException(status_code=500, detail="The session draft could not be created.") from cause
     return {"id": created["id"], "project_name": created["project_name"], "status": created["status"]}
+
+
+@router.post("/sessions/{session_id}/files", status_code=201)
+async def add_session_file(session_id: str, request: SessionFileRequest) -> dict[str, object]:
+    try:
+        persisted = SessionRepository().add_file(session_id, request.file_id)
+    except (OSError, ValueError, TypeError) as cause:
+        raise HTTPException(status_code=500, detail="The uploaded file could not be saved to this session.") from cause
+    if persisted is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    return persisted
 
 
 @router.get("/sessions/{session_id}")
