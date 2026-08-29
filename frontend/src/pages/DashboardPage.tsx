@@ -41,14 +41,16 @@ export function DashboardPage() {
     setSessionError("");
     try {
       const state = await getSessionState(session.id);
+      const hasRunResult = (state.result.rule_summaries?.length ?? 0) > 0 || (state.result.extracted_records?.length ?? 0) > 0;
       setSessionId(session.id);
-      setResult(state.result);
+      setResult(hasRunResult ? state.result : null);
       setFiles(state.files ?? []);
-      setProjectName(state.result.project_name);
-      setPreset(state.result.preset);
+      setProjectName(state.request?.project_name || state.result.project_name);
+      setPreset(state.request?.preset || state.result.preset);
       setDataSources(state.request?.data_sources ?? state.result.data_sources);
       setRules(state.request?.rules ?? []);
-      navigate(destination);
+      window.dispatchEvent(new CustomEvent("sidebar:view", { detail: { view: "workflow" } }));
+      navigate(hasRunResult ? destination : "/mapping");
     } catch (cause) {
       setSessionError(cause instanceof Error ? cause.message : "Could not reopen this session.");
     } finally {

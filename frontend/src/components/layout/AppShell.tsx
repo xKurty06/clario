@@ -10,6 +10,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Rows3,
   Search,
   Settings2,
   SlidersHorizontal,
@@ -39,7 +40,8 @@ const navigation: NavigationSection[] = [
     label: "Validation workflow",
     items: [
       { to: "/upload", label: "Upload files", icon: Files },
-      { to: "/mapping", label: "Comparison builder", icon: SlidersHorizontal },
+      { to: "/mapping", label: "Row setup", icon: Rows3 },
+      { to: "/builder", label: "Comparison builder", icon: SlidersHorizontal },
       { to: "/results", label: "Validation results", icon: FileSearch },
       { to: "/reports", label: "Export report", icon: FileOutput },
     ],

@@ -13,11 +13,11 @@ const savedSession = {
 test("continuing a saved session keeps its id and does not create a duplicate", async ({ page }) => {
   let draftCalls = 0;
 
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/recent$/, async (route) => {
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/validation\/recent$/, async (route) => {
     await route.fulfill({ status: 200, json: [savedSession] });
   });
 
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/sessions\/session-restore$/, async (route) => {
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/validation\/sessions\/session-restore$/, async (route) => {
     await route.fulfill({
       status: 200,
       json: {
@@ -40,7 +40,7 @@ test("continuing a saved session keeps its id and does not create a duplicate", 
     });
   });
 
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/sessions\/draft$/, async (route) => {
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/validation\/sessions\/draft$/, async (route) => {
     draftCalls += 1;
     await route.fulfill({ status: 500, json: { detail: "Duplicate session creation detected." } });
   });

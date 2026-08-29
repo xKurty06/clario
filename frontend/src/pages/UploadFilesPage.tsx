@@ -7,6 +7,7 @@ import { useWorkflow } from "../features/files/WorkflowContext";
 import { checkBackendHealth } from "../services/apiClient";
 import { uploadFiles } from "../services/fileApi";
 import { addSessionFile, createSessionDraft, deleteSessionFile, listRecentSessions } from "../services/validationApi";
+import type { UploadedFile } from "../types/file.types";
 import { isSupportedFileName } from "../utils/validators";
 
 const DEFAULT_SESSION_NAME = "New session";
@@ -27,14 +28,13 @@ function nextSessionName(existingNames: string[]) {
   return `${DEFAULT_SESSION_NAME} (${index})`;
 }
 
-function mergeUploadedFiles(existingFiles: { id: string; name: string }[], newFiles: { id: string; name: string }[]) {
+function mergeUploadedFiles(existingFiles: UploadedFile[], newFiles: UploadedFile[]) {
   const merged = [...existingFiles];
-  const seen = new Set(merged.map((file) => `${file.id || ""}:${file.name}`));
+  const seen = new Set(merged.map((file) => file.id).filter(Boolean));
   for (const file of newFiles) {
-    const key = `${file.id || ""}:${file.name}`;
-    if (!seen.has(key)) {
+    if (file.id && !seen.has(file.id)) {
       merged.push(file);
-      seen.add(key);
+      seen.add(file.id);
     }
   }
   return merged;
@@ -126,14 +126,18 @@ export function UploadFilesPage() {
       await checkBackendHealth();
       if (selected.length) {
         const uploadedSelection = await uploadFiles(selected);
+        const existingFileIds = new Set(files.map((file) => file.id));
+        const newUploadedFiles = uploadedSelection.filter((file) => file.id && !existingFileIds.has(file.id));
         const nextFiles = mergeUploadedFiles(files, uploadedSelection);
         setFiles(nextFiles);
 
         if (hasOpenSession) {
-          await Promise.all(uploadedSelection.map((file) => addSessionFile(sessionId as string, file.id)));
-          window.dispatchEvent(new CustomEvent("sessions:updated"));
+          if (newUploadedFiles.length) {
+            await Promise.all(newUploadedFiles.map((file) => addSessionFile(sessionId as string, file.id)));
+            window.dispatchEvent(new CustomEvent("sessions:updated"));
+          }
         } else {
-          const created = await createDraftSession(projectName.trim(), uploadedSelection);
+          const created = await createDraftSession(projectName.trim(), nextFiles);
           if (created) setSessionId(created.id);
         }
         setSelected([]);

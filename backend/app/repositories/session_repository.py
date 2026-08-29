@@ -17,6 +17,30 @@ from app.services.sheet_service import inspect_sheets
 
 class SessionRepository:
     @staticmethod
+    def _unique_file_ids(file_ids: list[str] | None) -> list[str]:
+        seen: set[str] = set()
+        unique_ids: list[str] = []
+        for file_id in file_ids or []:
+            normalized = str(file_id).strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            unique_ids.append(normalized)
+        return unique_ids
+
+    @staticmethod
+    def _unique_file_metadata(files: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        seen: set[str] = set()
+        unique_files: list[dict[str, Any]] = []
+        for item in files:
+            file_id = str(item.get("id") or "").strip()
+            if not file_id or file_id in seen:
+                continue
+            seen.add(file_id)
+            unique_files.append(item)
+        return unique_files
+
+    @staticmethod
     def _session_directory_path(raw_path: str | None) -> Path | None:
         if raw_path in (None, ""):
             return None
@@ -44,9 +68,7 @@ class SessionRepository:
         created_at = datetime.now(timezone.utc).isoformat()
         session_directory = ensure_session_directory(name, session_id)
         persisted_files = []
-        for file_id in uploaded_file_ids or []:
-            if not file_id:
-                continue
+        for file_id in self._unique_file_ids(uploaded_file_ids):
             persisted_files.append(persist_file(file_id, session_directory / "uploads"))
 
         persisted_names = [str(item["name"]) for item in persisted_files]
@@ -114,7 +136,7 @@ class SessionRepository:
                 except (OSError, json.JSONDecodeError):
                     metadata = {}
 
-            persisted_files = [item for item in metadata.get("files", []) if isinstance(item, dict)]
+            persisted_files = self._unique_file_metadata([item for item in metadata.get("files", []) if isinstance(item, dict)])
             persisted_files = [item for item in persisted_files if str(item.get("id")) != file_id]
             persisted_files.append(persisted)
             file_names = [str(item.get("name")) for item in persisted_files if item.get("name")]
@@ -292,7 +314,7 @@ class SessionRepository:
                     except (OSError, json.JSONDecodeError):
                         metadata = None
                 if metadata and isinstance(metadata.get("files"), list):
-                    persisted_files = [item for item in metadata["files"] if isinstance(item, dict)]
+                    persisted_files = self._unique_file_metadata([item for item in metadata["files"] if isinstance(item, dict)])
 
             removed_file = next((item for item in persisted_files if str(item.get("id")) == str(file_id)), None)
             removed_name = str(removed_file.get("name")) if removed_file and removed_file.get("name") else None
@@ -374,7 +396,7 @@ class SessionRepository:
         if result is None:
             return None
         files = []
-        for item in read_session_files(directory) if directory else []:
+        for item in self._unique_file_metadata(read_session_files(directory)) if directory else []:
             try:
                 file_id = str(item["id"])
                 name = str(item["name"])

@@ -628,7 +628,7 @@ export function ComparisonBuilderPage({ onBackToRowSetup, onRequestPresetSetup, 
 
   useEffect(() => {
     if (!files.length || dataSources.length) return;
-    setDataSources(scaffoldSources(files));
+    setDataSources((current) => (current.length ? current : scaffoldSources(files)));
   }, [files, dataSources.length, setDataSources]);
 
   const fieldsBySource = useMemo(() => Object.fromEntries(dataSources.map((source) => [source.id, source.fields])), [dataSources]);

@@ -91,6 +91,35 @@ class SessionRegressionTests(unittest.TestCase):
         self.assertEqual(state.status_code, 200)
         self.assertEqual([item["id"] for item in state.json()["files"]], [new_file_id])
 
+    def test_reopened_session_add_file_is_idempotent_by_file_id(self) -> None:
+        session_id, session_directory, original_file_id = self._create_saved_session()
+        new_upload = self.client.post(
+            "/api/v1/files/upload",
+            files=[("files", ("new-file.csv", io.BytesIO(b"Item,Quantity\nPen,5\n"), "text/csv"))],
+        )
+        self.assertEqual(new_upload.status_code, 200)
+        new_file_id = new_upload.json()[0]["id"]
+
+        first_add = self.client.post(
+            f"/api/v1/validation/sessions/{session_id}/files",
+            json={"file_id": new_file_id},
+        )
+        second_add = self.client.post(
+            f"/api/v1/validation/sessions/{session_id}/files",
+            json={"file_id": new_file_id},
+        )
+
+        self.assertEqual(first_add.status_code, 201)
+        self.assertEqual(second_add.status_code, 201)
+        metadata = json.loads((session_directory / "session.json").read_text(encoding="utf-8"))
+        self.assertEqual([item["id"] for item in metadata["files"]], [original_file_id, new_file_id])
+        self.assertEqual(metadata["file_names"], ["saved.csv", "new-file.csv"])
+        self.assertEqual(len(list((session_directory / "uploads").glob(f"{new_file_id}.*"))), 1)
+
+        state = self.client.get(f"/api/v1/validation/sessions/{session_id}")
+        self.assertEqual(state.status_code, 200)
+        self.assertEqual([item["id"] for item in state.json()["files"]], [original_file_id, new_file_id])
+
     def test_saved_session_lookup_preserves_existing_session_id(self) -> None:
         session_id, _, _ = self._create_saved_session()
 

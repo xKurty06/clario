@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type PropsWithChildren, type SetStateAction } from "react";
 import type { UploadedFile } from "../../types/file.types";
 import type {
   ComparisonDataSource,
@@ -53,6 +53,19 @@ function normalizeRowSetupConfirmation(next: ComparisonDataSource, previous?: Co
   };
 }
 
+function uniqueFilesById(files: UploadedFile[]) {
+  const seen = new Set<string>();
+  return files.filter((file) => {
+    if (!file.id || seen.has(file.id)) return false;
+    seen.add(file.id);
+    return true;
+  });
+}
+
+function applyStateAction<T>(action: SetStateAction<T>, current: T) {
+  return typeof action === "function" ? (action as (value: T) => T)(current) : action;
+}
+
 interface WorkflowState {
   sessionId: string | null;
   setSessionId: (value: string | null) => void;
@@ -61,9 +74,9 @@ interface WorkflowState {
   preset: PresetSelection;
   setPreset: (value: PresetSelection) => void;
   files: UploadedFile[];
-  setFiles: (value: UploadedFile[]) => void;
+  setFiles: (value: SetStateAction<UploadedFile[]>) => void;
   dataSources: ComparisonDataSource[];
-  setDataSources: (value: ComparisonDataSource[]) => void;
+  setDataSources: (value: SetStateAction<ComparisonDataSource[]>) => void;
   updateDataSource: (id: string, value: ComparisonDataSource) => void;
   removeDataSource: (id: string) => void;
   sourcePreviews: Record<string, DataSourcePreview>;
@@ -85,14 +98,18 @@ export function WorkflowProvider({ children }: PropsWithChildren) {
   // Presets are intentionally not exposed in the current workflow. Keep the
   // legacy state at the neutral custom value for backward-compatible payloads.
   const [preset, setPreset] = useState<PresetSelection>("custom_comparison_builder");
-  const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [files, setFilesState] = useState<UploadedFile[]>([]);
   const [dataSources, setDataSourcesState] = useState<ComparisonDataSource[]>([]);
   const [sourcePreviews, setSourcePreviews] = useState<Record<string, DataSourcePreview>>({});
   const [rules, setRules] = useState<ComparisonRule[]>([]);
   const [result, setResultState] = useState<ValidationResult | null>(() => readStoredResult());
 
-  const setDataSources = useCallback((value: ComparisonDataSource[]) => {
-    setDataSourcesState((current) => value.map((source) => normalizeRowSetupConfirmation(source, current.find((item) => item.id === source.id))));
+  const setFiles = useCallback((value: SetStateAction<UploadedFile[]>) => {
+    setFilesState((current) => uniqueFilesById(applyStateAction(value, current)));
+  }, []);
+
+  const setDataSources = useCallback((value: SetStateAction<ComparisonDataSource[]>) => {
+    setDataSourcesState((current) => applyStateAction(value, current).map((source) => normalizeRowSetupConfirmation(source, current.find((item) => item.id === source.id))));
   }, []);
 
   const updateDataSource = useCallback((id: string, value: ComparisonDataSource) => {

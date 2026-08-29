@@ -94,7 +94,7 @@ export function ReportExportPage() {
           </div>
 
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link to="/mapping" className={primaryActionClass}>
+            <Link to="/builder" className={primaryActionClass}>
               <ListChecks className="size-4" /> Go to Review & Run
             </Link>
             <Link to="/results" className={secondaryActionClass}>

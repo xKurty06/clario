@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { ComparisonBuilderPage } from "./ComparisonBuilderPage";
 import { useWorkflow } from "../features/files/WorkflowContext";
 import type { ComparisonDataSource } from "../types/validation.types";
@@ -26,17 +27,24 @@ function sourceForFile(file: { id: string; name: string; sheets: Array<{ name: s
   };
 }
 
-export function SessionComparisonBuilderPage() {
-  const { files, dataSources, setDataSources, removeSourcePreview } = useWorkflow();
+export function useEnsureFileSources() {
+  const { files, setDataSources } = useWorkflow();
 
   useEffect(() => {
     if (!files.length) return;
-    const knownFileIds = new Set(dataSources.map((source) => source.file_id));
-    const additions = files.filter((file) => !knownFileIds.has(file.id)).map((file, index) => sourceForFile(file, dataSources.length + index));
-    if (!additions.length) return;
-    setDataSources([...dataSources, ...additions]);
-    additions.forEach((source) => removeSourcePreview(source.id));
-  }, [files, dataSources, setDataSources, removeSourcePreview]);
+    setDataSources((current) => {
+      const knownFileIds = new Set(current.map((source) => source.file_id));
+      const additions = files
+        .filter((file) => file.id && !knownFileIds.has(file.id))
+        .map((file, index) => sourceForFile(file, current.length + index));
+      return additions.length ? [...current, ...additions] : current;
+    });
+  }, [files, setDataSources]);
+}
 
-  return <ComparisonBuilderPage />;
+export function SessionComparisonBuilderPage() {
+  const navigate = useNavigate();
+  useEnsureFileSources();
+
+  return <ComparisonBuilderPage onBackToRowSetup={() => navigate("/mapping")} />;
 }

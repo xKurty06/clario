@@ -105,24 +105,31 @@ function validationResult(): ValidationResult {
 }
 
 async function mockBackend(page: Page) {
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/health$/, async (route) => {
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/health$/, async (route) => {
     await route.fulfill({ status: 200, json: { status: "ok" } });
   });
 
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/recent$/, async (route) => {
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/validation\/recent$/, async (route) => {
     await route.fulfill({ status: 200, json: [] });
   });
 
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/files\/upload$/, async (route) => {
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/files\/upload$/, async (route) => {
     await route.fulfill({ status: 200, json: uploadedFiles });
   });
 
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/files\/data-source-preview$/, async (route) => {
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/validation\/sessions\/draft$/, async (route) => {
+    await route.fulfill({
+      status: 201,
+      json: { id: "session-regression", project_name: "Regression session", status: "created" },
+    });
+  });
+
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/files\/data-source-preview$/, async (route) => {
     const payload = route.request().postDataJSON() as { data_source: ComparisonDataSource };
     await route.fulfill({ status: 200, json: previewForSource(payload.data_source) });
   });
 
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/run$/, async (route) => {
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/validation\/run$/, async (route) => {
     await route.fulfill({ status: 200, json: validationResult() });
   });
 }
@@ -133,8 +140,6 @@ test("main comparison workflow stays usable", async ({ page }) => {
   await page.goto("/upload");
   await expect(page.getByRole("heading", { name: "Choose comparison files" })).toBeVisible();
 
-  await page.getByLabel("Comparison preset").click();
-  await page.getByRole("option", { name: "Generic Two-File Comparison" }).click();
   await page.getByLabel("Session name").fill("Regression session");
   await page.locator('input[type="file"]').setInputFiles([
     {
@@ -151,14 +156,14 @@ test("main comparison workflow stays usable", async ({ page }) => {
 
   await expect(page.getByText(uploadedFiles[0].name)).toBeVisible();
   await expect(page.getByText(uploadedFiles[1].name)).toBeVisible();
-  await page.getByRole("button", { name: "Continue to row setup" }).click();
+  await page.getByRole("button", { name: "Continue to validation" }).click();
 
   await expect(page.getByRole("heading", { name: "Confirm row setup" })).toBeVisible();
-  await expect(page.getByText("Setup confidence").first()).toBeVisible();
+  await expect(page.getByText("High confidence").first()).toBeVisible();
   await expect(page.getByText("Selected data").first()).toBeVisible();
   await page.getByRole("button", { name: "Confirm all previewed" }).first().click();
-  await expect(page.getByRole("button", { name: "Continue to comparison builder" })).toBeEnabled();
-  await page.getByRole("button", { name: "Continue to comparison builder" }).click();
+  await expect(page.getByRole("button", { name: "Continue to comparison builder" }).first()).toBeEnabled();
+  await page.getByRole("button", { name: "Continue to comparison builder" }).first().click();
 
   await expect(page.getByRole("heading", { name: "Comparison builder" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Go to step 1: Sources" })).toBeVisible();
@@ -188,11 +193,11 @@ test("main comparison workflow stays usable", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "Review rule-based discrepancies" })).toBeVisible();
   await expect(page.getByText("0 discrepancy(s) across 4 selected rows")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Export report" })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: "Export report" })).toBeVisible();
 });
 
 test("session resume continues from restored files without reselecting them", async ({ page }) => {
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/recent$/, async (route) => {
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/validation\/recent$/, async (route) => {
     await route.fulfill({
       status: 200,
       json: [{
@@ -207,7 +212,7 @@ test("session resume continues from restored files without reselecting them", as
     });
   });
 
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/sessions\/session-restore$/, async (route) => {
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/validation\/sessions\/session-restore$/, async (route) => {
     await route.fulfill({
       status: 200,
       json: {
@@ -240,10 +245,12 @@ test("session resume continues from restored files without reselecting them", as
   await page.getByRole("button", { name: "Continue setup" }).first().click();
   await expect(page).toHaveURL(/\/mapping/);
 
-  await page.goto("/upload");
-  await expect(page.getByText(uploadedFiles[0].name)).toBeVisible();
-  await expect(page.getByText(uploadedFiles[1].name)).toBeVisible();
-  await page.getByRole("button", { name: "Continue to row setup" }).click();
+  await page.getByRole("link", { name: "Upload files" }).click();
+  await expect(page).toHaveURL(/\/upload/);
+  await expect(page.getByRole("heading", { name: "Choose comparison files" })).toBeVisible();
+  await expect(page.getByText(uploadedFiles[0].name).first()).toBeVisible();
+  await expect(page.getByText(uploadedFiles[1].name).first()).toBeVisible();
+  await page.getByRole("button", { name: "Continue to validation" }).click();
   await expect(page).toHaveURL(/\/mapping/);
   await expect(page.getByRole("heading", { name: "Confirm row setup" })).toBeVisible();
 });
@@ -269,25 +276,42 @@ test("session draft keeps previously uploaded files when adding a new local file
     ],
   };
 
-  let draftedPayload: { file_names?: string[]; uploaded_file_ids?: string[] } | undefined;
+  const requests: string[] = [];
 
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/recent$/, async (route) => {
-    await route.fulfill({ status: 200, json: [] });
-  });
-
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/sessions\/draft$/, async (route) => {
-    draftedPayload = route.request().postDataJSON() as { file_names?: string[]; uploaded_file_ids?: string[] };
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/validation\/recent$/, async (route) => {
     await route.fulfill({
-      status: 201,
-      json: { id: "session-draft-merge", project_name: "Saved draft", status: "created" },
+      status: 200,
+      json: [{
+        id: "session-restore",
+        project_name: "Saved draft",
+        mode: "generic_two_file",
+        file_names: uploadedFiles.map((file) => file.name),
+        discrepancy_count: 0,
+        created_at: "2026-01-01T00:00:00Z",
+        can_continue_setup: true,
+      }],
     });
   });
 
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/files\/upload$/, async (route) => {
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/validation\/sessions\/draft$/, async (route) => {
+    requests.push("draft");
+    await route.fulfill({ status: 500, json: { detail: "Unexpected draft creation." } });
+  });
+
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/files\/upload$/, async (route) => {
+    requests.push("upload");
     await route.fulfill({ status: 200, json: [newUploadedFile] });
   });
 
-  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/sessions\/session-restore$/, async (route) => {
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/validation\/sessions\/session-restore\/files$/, async (route) => {
+    requests.push(`persist:${route.request().postDataJSON().file_id}`);
+    await route.fulfill({
+      status: 201,
+      json: { id: newUploadedFile.id, name: newUploadedFile.name, path: `/sessions/Saved draft/uploads/${newUploadedFile.id}.csv`, size: newUploadedFile.size },
+    });
+  });
+
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):876[56]\/api\/v1\/validation\/sessions\/session-restore$/, async (route) => {
     await route.fulfill({
       status: 200,
       json: {
@@ -319,17 +343,18 @@ test("session draft keeps previously uploaded files when adding a new local file
   await page.getByRole("button", { name: "Continue setup" }).first().click();
   await expect(page).toHaveURL(/\/mapping/);
 
-  await page.goto("/upload");
-  await expect(page.getByText(uploadedFiles[0].name)).toBeVisible();
-  await expect(page.getByText(uploadedFiles[1].name)).toBeVisible();
+  await page.getByRole("link", { name: "Upload files" }).click();
+  await expect(page).toHaveURL(/\/upload/);
+  await expect(page.getByRole("heading", { name: "Choose comparison files" })).toBeVisible();
+  await expect(page.getByText(uploadedFiles[0].name).first()).toBeVisible();
+  await expect(page.getByText(uploadedFiles[1].name).first()).toBeVisible();
   await page.locator('input[type="file"]').setInputFiles([
     { name: newUploadedFile.name, mimeType: "text/csv", buffer: Buffer.from("Item Description,Quantity\nBond Paper,10\n") },
   ]);
 
   await expect(page.getByText(newUploadedFile.name)).toBeVisible();
-  await page.getByRole("button", { name: "Continue to row setup" }).click();
+  await page.getByRole("button", { name: "Continue to validation" }).click();
 
   await expect(page).toHaveURL(/\/mapping/);
-  expect(draftedPayload?.file_names).toEqual([uploadedFiles[0].name, uploadedFiles[1].name, newUploadedFile.name]);
-  expect(draftedPayload?.uploaded_file_ids).toEqual([uploadedFiles[0].id, uploadedFiles[1].id, newUploadedFile.id]);
+  expect(requests).toEqual(["upload", `persist:${newUploadedFile.id}`]);
 });

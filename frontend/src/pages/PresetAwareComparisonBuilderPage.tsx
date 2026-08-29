@@ -31,16 +31,18 @@ function sourceForFile(file: { id: string; name: string; sheets: Array<{ name: s
  * Preset-specific behavior has been removed from the active workflow.
  */
 export function PresetAwareComparisonBuilderPage() {
-  const { files, dataSources, setDataSources } = useWorkflow();
+  const { files, setDataSources } = useWorkflow();
 
   useEffect(() => {
     if (!files.length) return;
-    const knownFileIds = new Set(dataSources.map((source) => source.file_id));
-    const additions = files
-      .filter((file) => !knownFileIds.has(file.id))
-      .map((file, index) => sourceForFile(file, dataSources.length + index));
-    if (additions.length) setDataSources([...dataSources, ...additions]);
-  }, [files, dataSources, setDataSources]);
+    setDataSources((current) => {
+      const knownFileIds = new Set(current.map((source) => source.file_id));
+      const additions = files
+        .filter((file) => file.id && !knownFileIds.has(file.id))
+        .map((file, index) => sourceForFile(file, current.length + index));
+      return additions.length ? [...current, ...additions] : current;
+    });
+  }, [files, setDataSources]);
 
   return <ComparisonBuilderPage />;
 }
