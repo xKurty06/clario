@@ -1,8 +1,23 @@
-import { Copy, LayoutTemplate, LoaderCircle, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { LayoutTemplate } from "lucide-react";
 import { EmptyState } from "../components/common/EmptyState";
 import { PageHeader } from "../components/layout/PageHeader";
-import { deleteTemplate, duplicateTemplate, listTemplates } from "../services/templateApi";
-import type { MappingTemplate } from "../types/template.types";
-export function TemplateManagerPage(){const [items,setItems]=useState<MappingTemplate[]>([]);const [busy,setBusy]=useState(true);const [error,setError]=useState("");const load=()=>listTemplates().then(setItems).catch(e=>setError(e instanceof Error?e.message:"Could not load templates")).finally(()=>setBusy(false));useEffect(()=>{void load()},[]);
-  return <div><PageHeader eyebrow="Library" title="Manage reusable templates" description="Saved mappings are stored locally in SQLite. Duplicate templates before adapting them to a similar workbook."/><div className="pt-8">{busy&&<p className="flex gap-2 text-sm"><LoaderCircle className="size-4 animate-spin"/>Loading templates…</p>}{error&&<p className="text-sm text-red-700">{error}</p>}{!busy&&!items.length&&<EmptyState icon={LayoutTemplate} title="No saved templates" description="Save a confirmed mapping from the mapping page."/>}<div className="divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">{items.map(t=><div key={t.id} className="flex items-center gap-4 p-4"><LayoutTemplate className="size-5 text-emerald-700"/><div className="flex-1"><p className="font-semibold">{t.name}</p><p className="mt-1 text-xs text-slate-500">{t.file_role} · {t.included_sheets.join(", ")||"default sheet"}</p></div><button aria-label={`Duplicate ${t.name}`} onClick={async()=>{await duplicateTemplate(t.id!);load()}} className="rounded-lg p-2 hover:bg-slate-100"><Copy className="size-4"/></button><button aria-label={`Delete ${t.name}`} onClick={async()=>{await deleteTemplate(t.id!);load()}} className="rounded-lg p-2 text-red-700 hover:bg-red-50"><Trash2 className="size-4"/></button></div>)}</div></div></div>}
+
+/** Reserved for a future release. Templates are not part of the current workflow. */
+export function TemplateManagerPage() {
+  return (
+    <div>
+      <PageHeader
+        eyebrow="Future"
+        title="Templates"
+        description="Reusable validation templates are reserved for a future version of Clario."
+      />
+      <div className="pt-8">
+        <EmptyState
+          icon={LayoutTemplate}
+          title="Not available in this release"
+          description="The current workflow is intentionally configured directly from uploaded files, fields, and rules."
+        />
+      </div>
+    </div>
+  );
+}
