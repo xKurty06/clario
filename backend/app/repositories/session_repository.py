@@ -88,7 +88,78 @@ class SessionRepository:
             )
         return {"id": session_id, "project_name": name, "status": "created"}
 
-    def save(self, result: ValidationResult, file_names: list[str], request: ValidationRequest | None = None) -> None:
+    def add_file(self, session_id: str, file_id: str) -> dict[str, Any] | None:
+        """Persist a newly uploaded working file into an already-open session."""
+        with database() as connection:
+            row = connection.execute(
+                "SELECT result_payload, request_payload, file_names, session_path FROM sessions WHERE id = ? LIMIT 1",
+                (session_id,),
+            ).fetchone()
+            if row is None:
+                return None
+
+            session_path = self._session_directory_path(row["session_path"])
+            if session_path is None:
+                project_name = "Saved session"
+                result_payload = json.loads(row["result_payload"]) if row["result_payload"] else {}
+                project_name = str(result_payload.get("project_name") or project_name)
+                session_path = ensure_session_directory(project_name, session_id)
+
+            persisted = persist_file(file_id, session_path / "uploads")
+            metadata_path = session_path / "session.json"
+            metadata: dict[str, Any] = {}
+            if metadata_path.exists():
+                try:
+                    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    metadata = {}
+
+            persisted_files = [item for item in metadata.get("files", []) if isinstance(item, dict)]
+            persisted_files = [item for item in persisted_files if str(item.get("id")) != file_id]
+            persisted_files.append(persisted)
+            file_names = [str(item.get("name")) for item in persisted_files if item.get("name")]
+
+            metadata["id"] = session_id
+            metadata["project_name"] = metadata.get("project_name") or "Saved session"
+            metadata["file_names"] = file_names
+            metadata["files"] = persisted_files
+            metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+
+            result_payload = json.loads(row["result_payload"]) if row["result_payload"] else None
+            if result_payload is not None:
+                result_payload["file_names"] = file_names
+                result_payload["data_sources"] = [
+                    source for source in result_payload.get("data_sources", [])
+                    if source.get("file_id") in {str(item.get("id")) for item in persisted_files}
+                ]
+                (session_path / "result.json").write_text(json.dumps(result_payload, indent=2), encoding="utf-8")
+
+            request_payload = json.loads(row["request_payload"]) if row["request_payload"] else None
+            if request_payload is not None:
+                request_payload["data_sources"] = [
+                    source for source in request_payload.get("data_sources", [])
+                    if source.get("file_id") in {str(item.get("id")) for item in persisted_files}
+                ]
+                (session_path / "setup.json").write_text(json.dumps(request_payload, indent=2), encoding="utf-8")
+
+            connection.execute(
+                "UPDATE sessions SET file_names = ?, result_payload = ?, request_payload = ?, session_path = ? WHERE id = ?",
+                (
+                    json.dumps(file_names),
+                    json.dumps(result_payload) if result_payload is not None else row["result_payload"],
+                    json.dumps(request_payload) if request_payload is not None else row["request_payload"],
+                    str(session_path),
+                    session_id,
+                ),
+            )
+            return persisted
+
+    def save(
+        self,
+        result: ValidationResult,
+        file_names: list[str],
+        request: ValidationRequest | None = None,
+    ) -> None:
         with database() as connection:
             existing = connection.execute("SELECT session_path FROM sessions WHERE id = ? LIMIT 1", (result.id,)).fetchone()
             existing_path = str(existing["session_path"]) if existing and existing["session_path"] else None
@@ -242,14 +313,8 @@ class SessionRepository:
                     metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
             if result_payload is not None:
-                result_payload["file_names"] = [
-                    name for name in list(result_payload.get("file_names") or [])
-                    if not removed_name or name != removed_name
-                ]
-                result_payload["data_sources"] = [
-                    source for source in list(result_payload.get("data_sources") or [])
-                    if source.get("file_id") != file_id
-                ]
+                result_payload["file_names"] = [name for name in list(result_payload.get("file_names") or []) if not removed_name or name != removed_name]
+                result_payload["data_sources"] = [source for source in list(result_payload.get("data_sources") or []) if source.get("file_id") != file_id]
 
             removed_source_ids: set[str] = set()
             if request_payload is not None and isinstance(request_payload, dict):
@@ -257,11 +322,7 @@ class SessionRepository:
                 removed_source_ids = {str(source.get("id")) for source in sources if source.get("file_id") == file_id}
                 request_payload["data_sources"] = [source for source in sources if source.get("file_id") != file_id]
                 if isinstance(request_payload.get("rules"), list) and removed_source_ids:
-                    request_payload["rules"] = [
-                        rule for rule in request_payload["rules"]
-                        if str(rule.get("left_data_source_id")) not in removed_source_ids
-                        and str(rule.get("right_data_source_id")) not in removed_source_ids
-                    ]
+                    request_payload["rules"] = [rule for rule in request_payload["rules"] if str(rule.get("left_data_source_id")) not in removed_source_ids and str(rule.get("right_data_source_id")) not in removed_source_ids]
 
             if session_path and session_path.exists() and session_path.is_dir():
                 result_path = session_path / "result.json"
