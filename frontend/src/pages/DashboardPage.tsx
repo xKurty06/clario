@@ -62,9 +62,11 @@ export function DashboardPage() {
         title="Review procurement files with a traceable workflow"
         description="Set up mappings, confirm extracted rows, and review every discrepancy before creating a report. Validation will remain rule-based and local."
         action={
-          <Link className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700" to="/upload">
-            <Plus aria-hidden="true" className="size-4" /> New validation
-          </Link>
+          <div>
+            <Link className="inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-800 active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700" to="/upload">
+              <Plus aria-hidden="true" className="size-4" /> New validation
+            </Link>
+          </div>
         }
       />
       <section className="grid grid-cols-3 divide-x divide-slate-200 border-b border-slate-200 py-7" aria-label="Workspace summary">

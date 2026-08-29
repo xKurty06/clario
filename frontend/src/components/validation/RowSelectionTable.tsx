@@ -248,8 +248,24 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
     }).map((row) => row.row_number);
   };
 
+  const rowAtPoint = (selection: DragSelection) => {
+    const container = scrollContainerRef.current;
+    if (!container) return null;
+    return rows.find((row) => {
+      if (lockedRows.has(row.row_number)) return false;
+      const element = rowRefs.current.get(row.row_number);
+      if (!element) return false;
+      const box = elementContentBox(element, container);
+      return selection.currentContentX >= box.left && selection.currentContentX <= box.right && selection.currentContentY >= box.top && selection.currentContentY <= box.bottom;
+    })?.row_number ?? null;
+  };
+
   const applyBoxSelection = (selection: DragSelection) => {
     if (!selection.hasMoved) return;
+    if (rowAtPoint(selection) === selection.originRowNumber) {
+      onSelectRows(selection.baseSelectedRows);
+      return;
+    }
     const nextSelectedRows = new Set(selection.baseSelectedRows);
     for (const rowNumber of rowsInsideSelection(selection)) {
       if (selection.mode === "include") nextSelectedRows.add(rowNumber);
@@ -514,7 +530,7 @@ export function RowSelectionTable({ headers, rows, lockedRowNumbers = [], header
                   title={isHeaderRow ? "This row is the header row and is not selectable." : locked ? "This row is excluded by the first data row setting." : needsReview ? "This selected row may not be real data. Review it, or continue if it is correct." : "Click to toggle this row"}
                   onMouseDown={(event) => handleRowMouseDown(event, row)}
                   onKeyDown={(event) => handleRowKeyDown(event, row.row_number)}
-                  className={`group border-t border-slate-100 align-middle select-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${locked ? "cursor-not-allowed" : "cursor-pointer hover:bg-emerald-100/55"} ${needsReview ? "bg-amber-50/70" : isHeaderRow ? "bg-sky-50/80" : row.selected ? "bg-emerald-50/35" : ""} ${locked && !isHeaderRow ? "opacity-90" : ""} ${row.ignored && !row.selected && !locked ? "opacity-90" : ""}`}
+                  className={`group border-t border-slate-100 align-middle select-none transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-emerald-600 ${locked ? "cursor-not-allowed" : "cursor-pointer hover:bg-slate-100"} ${needsReview ? "bg-amber-50/70" : isHeaderRow ? "bg-sky-50/80" : row.selected ? "bg-emerald-50/35" : ""} ${locked && !isHeaderRow ? "opacity-90" : ""} ${row.ignored && !row.selected && !locked ? "opacity-90" : ""}`}
                 >
                   <td className="border-b border-slate-100 p-0 align-middle">
                     <div className="flex min-h-11 items-center justify-center px-2.5 py-2">

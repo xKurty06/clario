@@ -35,6 +35,7 @@ function ToastItem({ notification, onRemove }: { notification: ToastNotification
   const Icon = style.icon;
 
   const dismiss = () => {
+    if (exiting) return;
     setExiting(true);
     window.setTimeout(onRemove, 220);
   };
@@ -55,7 +56,7 @@ function ToastItem({ notification, onRemove }: { notification: ToastNotification
       <button
         type="button"
         onClick={dismiss}
-        className="-mr-1 grid size-5 shrink-0 place-items-center rounded text-current/60 transition hover:bg-slate-100 hover:text-current focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-current"
+        className="-mr-1 grid size-5 shrink-0 place-items-center rounded text-current/60 transition hover:bg-slate-100 hover:text-current focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-current"
         aria-label="Dismiss notification"
         title="Dismiss notification"
       >
@@ -67,11 +68,30 @@ function ToastItem({ notification, onRemove }: { notification: ToastNotification
 }
 
 function ToastViewport({ notifications, onRemove }: { notifications: ToastNotification[]; onRemove: (id: number) => void }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const content = contentRef.current;
+    if (!viewport || !content) return;
+
+    const updateOverflow = () => setIsOverflowing(content.scrollHeight > viewport.clientHeight + 1);
+    updateOverflow();
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(viewport);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [notifications.length]);
+
   return (
-    <div className="fixed bottom-5 right-5 z-50 flex max-h-[33vh] w-[min(22rem,calc(100vw-2rem))] flex-col justify-end gap-2 overflow-hidden" aria-label="Notifications">
-      {notifications.map((notification) => (
-        <ToastItem key={notification.id} notification={notification} onRemove={() => onRemove(notification.id)} />
-      ))}
+    <div ref={viewportRef} className={`toast-viewport fixed bottom-5 right-5 z-50 flex max-h-[33vh] w-[min(22rem,calc(100vw-2rem))] flex-col justify-end gap-2 overflow-hidden ${isOverflowing ? "toast-viewport--overflowing" : ""}`} aria-label="Notifications">
+      <div ref={contentRef} className="flex flex-col gap-2">
+        {notifications.map((notification) => (
+          <ToastItem key={notification.id} notification={notification} onRemove={() => onRemove(notification.id)} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -82,7 +102,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const showToast = (message: string, tone: ToastTone) => {
     const id = nextId.current++;
-    setNotifications((current) => [...current, { id, message, tone, duration: 4000 }]);
+    setNotifications((current) => [{ id, message, tone, duration: 4000 }, ...current]);
   };
 
   const removeToast = (id: number) => setNotifications((current) => current.filter((notification) => notification.id !== id));
