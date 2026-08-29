@@ -54,6 +54,8 @@ function normalizeRowSetupConfirmation(next: ComparisonDataSource, previous?: Co
 }
 
 interface WorkflowState {
+  sessionId: string | null;
+  setSessionId: (value: string | null) => void;
   projectName: string;
   setProjectName: (value: string) => void;
   preset: PresetSelection;
@@ -78,6 +80,7 @@ interface WorkflowState {
 const Context = createContext<WorkflowState | null>(null);
 
 export function WorkflowProvider({ children }: PropsWithChildren) {
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [projectName, setProjectName] = useState("");
   const [preset, setPreset] = useState<PresetSelection>("");
   const [files, setFiles] = useState<UploadedFile[]>([]);
@@ -109,6 +112,8 @@ export function WorkflowProvider({ children }: PropsWithChildren) {
 
   const value = useMemo(
     () => ({
+      sessionId,
+      setSessionId,
       projectName,
       setProjectName,
       preset,
@@ -134,7 +139,7 @@ export function WorkflowProvider({ children }: PropsWithChildren) {
       result,
       setResult,
     }),
-    [projectName, preset, files, dataSources, setDataSources, updateDataSource, removeDataSource, sourcePreviews, rules, result, setResult],
+    [sessionId, projectName, preset, files, dataSources, setDataSources, updateDataSource, removeDataSource, sourcePreviews, rules, result, setResult],
   );
 
   return <Context.Provider value={value}>{children}</Context.Provider>;

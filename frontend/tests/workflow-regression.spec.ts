@@ -190,3 +190,60 @@ test("main comparison workflow stays usable", async ({ page }) => {
   await expect(page.getByText("0 discrepancy(s) across 4 selected rows")).toBeVisible();
   await expect(page.getByRole("link", { name: "Export report" })).toBeVisible();
 });
+
+test("session resume continues from restored files without reselecting them", async ({ page }) => {
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/recent$/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      json: [{
+        id: "session-restore",
+        project_name: "Saved draft",
+        mode: "generic_two_file",
+        file_names: uploadedFiles.map((file) => file.name),
+        discrepancy_count: 0,
+        created_at: "2026-01-01T00:00:00Z",
+        can_continue_setup: true,
+      }],
+    });
+  });
+
+  await page.route(/http:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1\/validation\/sessions\/session-restore$/, async (route) => {
+    await route.fulfill({
+      status: 200,
+      json: {
+        result: {
+          id: "session-restore",
+          project_name: "Saved draft",
+          preset: "generic_two_file",
+          created_at: "2026-01-01T00:00:00Z",
+          file_names: uploadedFiles.map((file) => file.name),
+          total_selected_rows: 0,
+          data_sources: [],
+          extracted_records: [],
+          rule_summaries: [],
+          discrepancies: [],
+          breakdown: { high: 0, medium: 0, low: 0 },
+        },
+        request: {
+          project_name: "Saved draft",
+          preset: "generic_two_file",
+          data_sources: [],
+          rules: [],
+        },
+        files: uploadedFiles,
+      },
+    });
+  });
+
+  await page.goto("/");
+  await expect(page.getByRole("button", { name: "Continue setup" }).first()).toBeVisible();
+  await page.getByRole("button", { name: "Continue setup" }).first().click();
+  await expect(page).toHaveURL(/\/mapping/);
+
+  await page.goto("/upload");
+  await expect(page.getByText(uploadedFiles[0].name)).toBeVisible();
+  await expect(page.getByText(uploadedFiles[1].name)).toBeVisible();
+  await page.getByRole("button", { name: "Continue to row setup" }).click();
+  await expect(page).toHaveURL(/\/mapping/);
+  await expect(page.getByRole("heading", { name: "Confirm row setup" })).toBeVisible();
+});

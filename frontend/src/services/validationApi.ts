@@ -67,6 +67,9 @@ export const createSessionDraft = (payload: { project_name: string; preset?: str
 
 export const getSessionState = (sessionId: string) => apiRequest<SessionState>(`/validation/sessions/${encodeURIComponent(sessionId)}`);
 
+export const deleteSessionFile = (sessionId: string, fileId: string) =>
+  apiRequest<void>(`/validation/sessions/${encodeURIComponent(sessionId)}/files/${encodeURIComponent(fileId)}`, { method: "DELETE" });
+
 export const renameSession = (sessionId: string, projectName: string) =>
   apiRequest<{ status: string; project_name: string }>(`/validation/sessions/${encodeURIComponent(sessionId)}`, {
     method: "PUT",

@@ -154,3 +154,27 @@ def test_session_draft_persists_all_uploaded_files(tmp_path: Path, monkeypatch) 
     state = SessionRepository().get_state(created["id"])
     assert [file["name"] for file in state["files"]] == [first_name, second_name]
     assert [file["id"] for file in state["files"]] == [first_id, second_id]
+
+
+def test_session_remove_file_deletes_persisted_upload_and_metadata(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(file_service.get_settings(), "data_directory", tmp_path)
+    file_service._files.clear()
+    migrate()
+
+    workbook_path = tmp_path / "remove-me.csv"
+    workbook_path.write_text("col\n1\n", encoding="utf-8")
+    upload = UploadFile(filename="remove-me.csv", file=workbook_path.open("rb"))
+    file_id, file_name, _, _ = __import__("asyncio").run(file_service.save_upload(upload))
+
+    created = SessionRepository().create_draft("Remove File Session", "custom_comparison_builder", [file_name], [file_id])
+    session_path = SessionRepository().get_session_directory(created["id"])
+    assert session_path is not None
+    uploaded_copy = next((session_path / "uploads").glob(f"{file_id}.*"))
+    assert uploaded_copy.exists()
+
+    removed = SessionRepository().remove_file(created["id"], file_id)
+
+    assert removed is True
+    assert not any((session_path / "uploads").glob(f"{file_id}.*"))
+    state = SessionRepository().get_state(created["id"])
+    assert [file["name"] for file in state["files"]] == []

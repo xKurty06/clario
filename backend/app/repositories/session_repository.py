@@ -200,6 +200,72 @@ class SessionRepository:
             cursor = connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
             return cursor.rowcount > 0
 
+    def remove_file(self, session_id: str, file_id: str) -> bool:
+        with database() as connection:
+            row = connection.execute(
+                "SELECT result_payload, request_payload, session_path FROM sessions WHERE id = ? LIMIT 1",
+                (session_id,),
+            ).fetchone()
+            if row is None:
+                return False
+
+            result_payload = json.loads(row["result_payload"]) if row["result_payload"] else None
+            request_payload = json.loads(row["request_payload"]) if row["request_payload"] else None
+            if result_payload is not None:
+                file_names = list(result_payload.get("file_names") or [])
+                result_payload["file_names"] = [name for name in file_names if name != next((item["name"] for item in (result_payload.get("files") or []) if item.get("id") == file_id), None)]
+                if "file_names" in result_payload and not result_payload["file_names"]:
+                    result_payload["file_names"] = []
+                if result_payload.get("data_sources"):
+                    result_payload["data_sources"] = [source for source in result_payload["data_sources"] if source.get("file_id") != file_id]
+
+            if request_payload is not None and isinstance(request_payload, dict):
+                if isinstance(request_payload.get("data_sources"), list):
+                    request_payload["data_sources"] = [source for source in request_payload["data_sources"] if source.get("file_id") != file_id]
+                if isinstance(request_payload.get("rules"), list):
+                    request_payload["rules"] = [rule for rule in request_payload["rules"] if not (
+                        (rule.get("left_data_source_id") and rule["left_data_source_id"] in [source.get("id") for source in request_payload["data_sources"] if source.get("file_id") == file_id])
+                        or (rule.get("right_data_source_id") and rule["right_data_source_id"] in [source.get("id") for source in request_payload["data_sources"] if source.get("file_id") == file_id])
+                    )]
+
+            session_path = self._session_directory_path(row["session_path"])
+            files_changed = False
+            if session_path and session_path.exists() and session_path.is_dir():
+                uploads_dir = session_path / "uploads"
+                for candidate in list(uploads_dir.glob(f"{file_id}.*")):
+                    if candidate.exists() and candidate.is_file():
+                        candidate.unlink(missing_ok=True)
+                        files_changed = True
+
+                metadata_path = session_path / "session.json"
+                if metadata_path.exists():
+                    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+                    files = metadata.get("files") or []
+                    metadata["files"] = [item for item in files if str(item.get("id")) != str(file_id)]
+                    metadata["file_names"] = [name for name in metadata.get("file_names") or [] if name != next((item.get("name") for item in files if str(item.get("id")) == str(file_id)), None)]
+                    metadata_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
+                    files_changed = True
+
+            if files_changed and row["session_path"]:
+                session_dir = self._session_directory_path(row["session_path"])
+                if session_dir:
+                    result_path = session_dir / "result.json"
+                    setup_path = session_dir / "setup.json"
+                    if result_path.exists() and result_payload is not None:
+                        result_path.write_text(json.dumps(result_payload, indent=2), encoding="utf-8")
+                    if setup_path.exists() and request_payload is not None:
+                        setup_path.write_text(json.dumps(request_payload, indent=2), encoding="utf-8")
+
+            connection.execute(
+                "UPDATE sessions SET result_payload = ?, request_payload = ? WHERE id = ?",
+                (
+                    json.dumps(result_payload) if result_payload is not None else None,
+                    json.dumps(request_payload) if request_payload is not None else None,
+                    session_id,
+                ),
+            )
+            return True
+
     def get_session_directory(self, session_id: str) -> Path | None:
         with database() as connection:
             row = connection.execute("SELECT session_path FROM sessions WHERE id = ? LIMIT 1", (session_id,)).fetchone()

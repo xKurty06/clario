@@ -6,7 +6,7 @@ import { PageHeader } from "../components/layout/PageHeader";
 import { useWorkflow } from "../features/files/WorkflowContext";
 import { checkBackendHealth } from "../services/apiClient";
 import { uploadFiles } from "../services/fileApi";
-import { createSessionDraft, listRecentSessions } from "../services/validationApi";
+import { createSessionDraft, deleteSessionFile, listRecentSessions } from "../services/validationApi";
 import type { PresetSelection } from "../types/validation.types";
 import { presetSelectOptions } from "../utils/presetConfig";
 import { isSupportedFileName } from "../utils/validators";
@@ -32,7 +32,7 @@ function nextSessionName(existingNames: string[]) {
 export function UploadFilesPage() {
   const navigate = useNavigate();
   const input = useRef<HTMLInputElement>(null);
-  const { projectName, setProjectName, preset, setPreset, files, setFiles, dataSources, setDataSources, removeSourcePreview, rules, setRules, setResult } = useWorkflow();
+  const { sessionId, setSessionId, projectName, setProjectName, preset, setPreset, files, setFiles, dataSources, setDataSources, removeSourcePreview, rules, setRules, setResult } = useWorkflow();
   const [selected, setSelected] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
@@ -59,9 +59,10 @@ export function UploadFilesPage() {
   const createDraftSession = async (nextSelected: File[], sessionNameOverride?: string, uploadedFiles?: { id: string; name: string }[]) => {
     const name = (sessionNameOverride ?? projectName ?? "").trim() || DEFAULT_SESSION_NAME;
     const resolvedPreset = preset || "custom_comparison_builder";
-    if (!nextSelected.length) return;
-
     const resolvedUploads = uploadedFiles && uploadedFiles.length ? uploadedFiles : nextSelected.map((file) => ({ id: "", name: file.name }));
+
+    if (!resolvedUploads.length) return;
+
     const response = await createSessionDraft({
       project_name: name,
       preset: resolvedPreset,
@@ -84,20 +85,34 @@ export function UploadFilesPage() {
     });
   };
 
-  const removeUploadedFile = (fileId: string) => {
-    setFiles(files.filter((file) => file.id !== fileId));
+  const removeUploadedFile = async (fileId: string) => {
+    const nextFiles = files.filter((file) => file.id !== fileId);
+    setFiles(nextFiles);
+
     const affectedSourceIds = dataSources.filter((source) => source.file_id === fileId).map((source) => source.id);
-    if (!affectedSourceIds.length) return;
-    setDataSources(dataSources.filter((source) => source.file_id !== fileId));
-    affectedSourceIds.forEach((id) => removeSourcePreview(id));
-    setRules(rules.filter((rule) => !(rule.left_data_source_id && affectedSourceIds.includes(rule.left_data_source_id)) && !(rule.right_data_source_id && affectedSourceIds.includes(rule.right_data_source_id))));
+    if (affectedSourceIds.length) {
+      setDataSources(dataSources.filter((source) => source.file_id !== fileId));
+      affectedSourceIds.forEach((id) => removeSourcePreview(id));
+      setRules(rules.filter((rule) => !(rule.left_data_source_id && affectedSourceIds.includes(rule.left_data_source_id)) && !(rule.right_data_source_id && affectedSourceIds.includes(rule.right_data_source_id))));
+    }
+
+    if (!sessionId) return;
+
+    try {
+      await deleteSessionFile(sessionId, fileId);
+      setSessionId(sessionId);
+    } catch (cause) {
+      setFormError(cause instanceof Error ? cause.message : "Could not remove this file from the saved session.");
+    }
   };
 
   const submit = async () => {
+    const hasExistingSessionFiles = files.length > 0;
+    const hasOpenSession = Boolean(sessionId) && hasExistingSessionFiles;
     let hasError = false;
     setFormError("");
 
-    if (!selected.length) {
+    if (!selected.length && !hasExistingSessionFiles) {
       setFileError("Please choose at least one spreadsheet before continuing.");
       hasError = true;
     } else {
@@ -125,9 +140,22 @@ export function UploadFilesPage() {
     setBusy(true);
     try {
       await checkBackendHealth();
-      const uploadedFiles = await uploadFiles(selected);
-      setFiles(uploadedFiles);
-      await createDraftSession(selected, projectName, uploadedFiles);
+
+      if (hasOpenSession) {
+        setDataSources([]);
+        setRules([]);
+        setResult(null);
+        navigate("/mapping");
+        return;
+      }
+
+      let nextFiles = files;
+      if (selected.length) {
+        nextFiles = await uploadFiles(selected);
+        setFiles(nextFiles);
+      }
+
+      await createDraftSession(selected, projectName, nextFiles);
       setDataSources([]);
       setRules([]);
       setResult(null);

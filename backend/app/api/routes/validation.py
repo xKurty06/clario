@@ -91,3 +91,13 @@ async def delete_session(session_id: str) -> None:
         raise HTTPException(status_code=500, detail="The session could not be deleted.") from cause
     if not deleted:
         raise HTTPException(status_code=404, detail="Session not found.")
+
+
+@router.delete("/sessions/{session_id}/files/{file_id}", status_code=204)
+async def remove_session_file(session_id: str, file_id: str) -> None:
+    try:
+        removed = SessionRepository().remove_file(session_id, file_id)
+    except (OSError, ValueError) as cause:
+        raise HTTPException(status_code=500, detail="The file could not be removed from the saved session.") from cause
+    if not removed:
+        raise HTTPException(status_code=404, detail="Session or file not found.")

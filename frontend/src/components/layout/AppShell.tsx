@@ -72,6 +72,7 @@ function AppShellContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const {
+    setSessionId,
     projectName,
     setProjectName,
     setPreset,
@@ -146,6 +147,7 @@ function AppShellContent() {
   }, [sessionMenuId]);
 
   const clearWorkflowState = () => {
+    setSessionId(null);
     setProjectName("");
     setPreset("");
     setFiles([]);
@@ -174,6 +176,7 @@ function AppShellContent() {
       const state = await getSessionState(session.id);
       const hasRunResult = (state.result.rule_summaries?.length ?? 0) > 0 || (state.result.extracted_records?.length ?? 0) > 0;
 
+      setSessionId(session.id);
       setProjectName(state.request?.project_name || state.result.project_name);
       setPreset(state.request?.preset || state.result.preset);
       setFiles(state.files ?? []);

@@ -21,7 +21,7 @@ function formatSessionDate(value: string) {
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const { setProjectName, setPreset, setFiles, setDataSources, setRules, setResult } = useWorkflow();
+  const { setSessionId, setProjectName, setPreset, setFiles, setDataSources, setRules, setResult } = useWorkflow();
   const [sessions, setSessions] = useState<RecentSession[]>([]);
   const [templateCount, setTemplateCount] = useState(0);
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
@@ -53,6 +53,7 @@ export function DashboardPage() {
     setSessionError("");
     try {
       const state = await getSessionState(session.id);
+      setSessionId(session.id);
       setResult(state.result);
       setFiles(state.files ?? []);
       setProjectName(state.result.project_name);
