@@ -13,6 +13,15 @@ from app.services.sheet_service import inspect_sheets
 
 
 class SessionRepository:
+    @staticmethod
+    def _session_directory_path(raw_path: str | None) -> Path | None:
+        if raw_path in (None, ""):
+            return None
+        path = Path(str(raw_path))
+        if not path.is_absolute():
+            path = get_settings().data_directory / path
+        return path.resolve()
+
     def save(self, result: ValidationResult, file_names: list[str], request: ValidationRequest | None = None) -> None:
         with database() as connection:
             existing = connection.execute("SELECT session_path FROM sessions WHERE id = ? LIMIT 1", (result.id,)).fetchone()
@@ -87,7 +96,7 @@ class SessionRepository:
                 ),
             )
 
-            session_path = Path(str(row["session_path"])) if row["session_path"] else None
+            session_path = self._session_directory_path(row["session_path"])
             if session_path and session_path.exists() and session_path.is_dir():
                 metadata_path = session_path / "session.json"
                 result_path = session_path / "result.json"
@@ -108,14 +117,18 @@ class SessionRepository:
             if row is None:
                 return False
 
-            session_path = Path(str(row["session_path"])) if row["session_path"] else None
+            session_path = self._session_directory_path(row["session_path"])
             if session_path:
                 sessions_root = get_settings().sessions_directory.resolve()
-                resolved_path = session_path.resolve()
-                if resolved_path != sessions_root and sessions_root not in resolved_path.parents:
+                if session_path != sessions_root and sessions_root not in session_path.parents:
                     raise ValueError("The saved session path is outside the sessions directory.")
-                if resolved_path.exists():
-                    shutil.rmtree(resolved_path)
+                if session_path.exists():
+                    try:
+                        shutil.rmtree(session_path)
+                    except (PermissionError, OSError):
+                        # Windows can keep files locked while a spreadsheet or another app still has them open.
+                        # Treat the folder cleanup as best-effort so the saved session record can still be removed.
+                        pass
 
             connection.execute("DELETE FROM reports WHERE session_id = ?", (session_id,))
             cursor = connection.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
@@ -126,8 +139,8 @@ class SessionRepository:
             row = connection.execute("SELECT session_path FROM sessions WHERE id = ? LIMIT 1", (session_id,)).fetchone()
         if row is None or not row["session_path"]:
             return None
-        directory = Path(str(row["session_path"]))
-        return directory if directory.exists() and directory.is_dir() else None
+        directory = self._session_directory_path(row["session_path"])
+        return directory if directory and directory.exists() and directory.is_dir() else None
 
     def get_state(self, session_id: str) -> dict[str, Any] | None:
         with database() as connection:
@@ -139,7 +152,7 @@ class SessionRepository:
         if row is None:
             return None
 
-        directory = Path(str(row["session_path"])) if row["session_path"] else None
+        directory = self._session_directory_path(row["session_path"])
         result = ValidationResult.model_validate_json(row["result_payload"]) if row["result_payload"] else None
         request = ValidationRequest.model_validate_json(row["request_payload"]) if row["request_payload"] else None
 

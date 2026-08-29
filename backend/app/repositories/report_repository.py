@@ -3,10 +3,24 @@ from pathlib import Path
 import re
 from uuid import uuid4
 
+from app.config.settings import get_settings
 from app.database.connection import database
 
 
 class ReportRepository:
+    @staticmethod
+    def _session_directory_path(raw_path: str | None) -> Path | None:
+        if raw_path in (None, ""):
+            return None
+        path = Path(str(raw_path))
+        if not path.is_absolute():
+            path = get_settings().data_directory / path
+        resolved = path.resolve()
+        sessions_root = get_settings().sessions_directory.resolve()
+        if resolved != sessions_root and sessions_root not in resolved.parents:
+            return resolved
+        return resolved
+
     @staticmethod
     def is_report_file(path: Path, session_id: str) -> bool:
         return re.fullmatch(rf"report-\d+-{re.escape(session_id[:8])}\.pdf", path.name, re.IGNORECASE) is not None
@@ -40,7 +54,10 @@ class ReportRepository:
         if session is None or not session["session_path"]:
             return []
 
-        reports_directory = Path(str(session["session_path"])) / "reports"
+        session_path = self._session_directory_path(session["session_path"])
+        if session_path is None:
+            return []
+        reports_directory = session_path / "reports"
         if not reports_directory.is_dir():
             return []
 
@@ -73,7 +90,10 @@ class ReportRepository:
             ).fetchone()
         if session is None or not session["session_path"]:
             return None
-        reports_directory = (Path(str(session["session_path"])) / "reports").resolve()
+        session_path = self._session_directory_path(session["session_path"])
+        if session_path is None:
+            return None
+        reports_directory = (session_path / "reports").resolve()
         report_path = Path(requested)
         if report_path.parent != reports_directory or not self.is_report_file(report_path, session_id):
             return None
