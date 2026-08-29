@@ -2,7 +2,7 @@ import json
 import shutil
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 from app.config.settings import get_settings
@@ -33,7 +33,13 @@ class SessionRepository:
         uploaded_file_ids: list[str] | None = None,
     ) -> dict[str, Any]:
         name = (project_name or "New session").strip() or "New session"
-        mode: PresetType = preset if preset in {"reference_vs_copied", "reference_bidder_abstract", "generic_two_file", "custom_comparison_builder"} else "custom_comparison_builder"
+        valid_presets = {
+            "reference_vs_copied",
+            "reference_bidder_abstract",
+            "generic_two_file",
+            "custom_comparison_builder",
+        }
+        mode = cast(PresetType, preset if isinstance(preset, str) and preset in valid_presets else "custom_comparison_builder")
         session_id = uuid4().hex
         created_at = datetime.now(timezone.utc).isoformat()
         session_directory = ensure_session_directory(name, session_id)

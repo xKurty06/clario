@@ -172,14 +172,21 @@ function AppShellContent() {
     setOpeningSessionId(session.id);
     try {
       const state = await getSessionState(session.id);
+      const hasRunResult = (state.result.rule_summaries?.length ?? 0) > 0 || (state.result.extracted_records?.length ?? 0) > 0;
+
       setProjectName(state.request?.project_name || state.result.project_name);
       setPreset(state.request?.preset || state.result.preset);
       setFiles(state.files ?? []);
       setDataSources(state.request?.data_sources || state.result.data_sources);
       setRules(state.request?.rules || []);
-      setResult(state.result);
+      // A session drafted from Upload files (but never actually run through validation)
+      // only has an empty placeholder result. Treating that as a real `result` would make
+      // the app think this session is "complete" everywhere it checks `result` - including
+      // the dashboard redirect - and would strand the user on an empty Results page instead
+      // of taking them back to where their files and setup actually are.
+      setResult(hasRunResult ? state.result : null);
       setSidebarView("workflow");
-      navigate("/results");
+      navigate(hasRunResult ? "/results" : "/mapping");
     } catch (cause) {
       showToast(cause instanceof Error ? cause.message : "Could not open this session.", "error");
     } finally {
