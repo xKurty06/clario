@@ -32,7 +32,7 @@ function nextSessionName(existingNames: string[]) {
 export function UploadFilesPage() {
   const navigate = useNavigate();
   const input = useRef<HTMLInputElement>(null);
-  const { projectName, setProjectName, preset, setPreset, files, setFiles, setDataSources, setRules, setResult } = useWorkflow();
+  const { projectName, setProjectName, preset, setPreset, files, setFiles, dataSources, setDataSources, removeSourcePreview, rules, setRules, setResult } = useWorkflow();
   const [selected, setSelected] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState("");
@@ -82,6 +82,15 @@ export function UploadFilesPage() {
       const merged = [...current, ...valid.filter((file) => !existingKeys.has(`${file.name}:${file.size}:${file.lastModified}`))].slice(0, 10);
       return merged;
     });
+  };
+
+  const removeUploadedFile = (fileId: string) => {
+    setFiles(files.filter((file) => file.id !== fileId));
+    const affectedSourceIds = dataSources.filter((source) => source.file_id === fileId).map((source) => source.id);
+    if (!affectedSourceIds.length) return;
+    setDataSources(dataSources.filter((source) => source.file_id !== fileId));
+    affectedSourceIds.forEach((id) => removeSourcePreview(id));
+    setRules(rules.filter((rule) => !(rule.left_data_source_id && affectedSourceIds.includes(rule.left_data_source_id)) && !(rule.right_data_source_id && affectedSourceIds.includes(rule.right_data_source_id))));
   };
 
   const submit = async () => {
@@ -253,6 +262,9 @@ export function UploadFilesPage() {
                   <FileSpreadsheet className="size-5 shrink-0 text-emerald-700" />
                   <span className="min-w-0 flex-1 text-sm font-medium break-anywhere">{file.name}</span>
                   <span className="shrink-0 text-xs text-slate-500">{formatFileSize(file.size)}</span>
+                  <button title={`Remove ${file.name} from this session`} onClick={() => removeUploadedFile(file.id)} aria-label={`Remove ${file.name}`} className="shrink-0">
+                    <X className="size-4" />
+                  </button>
                 </div>
               ))}
             </div>
