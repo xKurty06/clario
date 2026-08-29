@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import files, reports, templates, validation
+from app.api.routes import files, reports, validation
 from app.config.constants import API_PREFIX, APP_DISPLAY_NAME, APP_VERSION
 from app.config.settings import get_settings
 from app.core.exceptions import AppError
@@ -53,6 +53,5 @@ async def health() -> dict[str, str]:
 
 
 app.include_router(files.router, prefix=API_PREFIX)
-app.include_router(templates.router, prefix=API_PREFIX)
 app.include_router(validation.router, prefix=API_PREFIX)
 app.include_router(reports.router, prefix=API_PREFIX)
