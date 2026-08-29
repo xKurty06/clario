@@ -17,6 +17,7 @@ def register_file(file_id: str, path: Path) -> None:
 def make_preview_workbook(path: Path) -> None:
     book = openpyxl.Workbook()
     sheet = book.active
+    assert sheet is not None
     sheet.title = "Items"
     sheet.append(["Item Number", "Description", "Quantity"])
     sheet.append(["1", "Bond Paper", 2])
@@ -78,6 +79,7 @@ def test_inspect_sheets_returns_fast_basic_metadata(tmp_path: Path) -> None:
     path = tmp_path / "multi-sheet.xlsx"
     book = openpyxl.Workbook()
     first = book.active
+    assert first is not None
     first.title = "Cover"
     first.append(["Document title"])
     first.append(["Item No", "Description", "Qty"])
@@ -152,6 +154,7 @@ def test_session_draft_persists_all_uploaded_files(tmp_path: Path, monkeypatch) 
     )
 
     state = SessionRepository().get_state(created["id"])
+    assert state is not None
     assert [file["name"] for file in state["files"]] == [first_name, second_name]
     assert [file["id"] for file in state["files"]] == [first_id, second_id]
 
@@ -177,4 +180,5 @@ def test_session_remove_file_deletes_persisted_upload_and_metadata(tmp_path: Pat
     assert removed is True
     assert not any((session_path / "uploads").glob(f"{file_id}.*"))
     state = SessionRepository().get_state(created["id"])
+    assert state is not None
     assert [file["name"] for file in state["files"]] == []
