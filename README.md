@@ -170,6 +170,7 @@ A native desktop experience powered by Electron.
 ## Application Overview
 
 <img src="./frontend/public/assets/screenshots/dashboard.png" width="900">
+<img src="./frontend/public/assets/screenshots/row-setup.png" width="900">
 
 ## Comparison Builder
 
@@ -177,7 +178,7 @@ A native desktop experience powered by Electron.
 
 ## Validation Results
 
-<img src="./frontend/public/assets/screenshots/results.png" width="900">
+<img src="./frontend/public/assets/screenshots/validation-results.png" width="900">
 
 ---
 
